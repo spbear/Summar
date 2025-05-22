@@ -1,0 +1,35 @@
+{
+	"name": "summar-ai-powered-summarizer",
+	"version": "1.0.0",
+	"description": "Summarizes the content of web pages and PDFs using the OpenAI API.",
+	"main": "main.js",
+	"type": "module",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && cp src/manifest.json dist/manifest.json && cp src/styles.css dist/styles.css && cp src/models.json dist/models.json && cp src/prompts.json dist/prompts.json && zip -j dist/summar.zip dist/manifest.json dist/styles.css dist/main.js dist/models.json dist/prompts.json",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/markdown-it": "^14.1.2",
+		"@types/semver": "^7.5.8",
+		"@typescript-eslint/eslint-plugin": "5.29.0",
+		"@typescript-eslint/parser": "5.29.0",
+		"builtin-modules": "3.3.0",
+		"esbuild": "^0.25.2",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "4.7.4"
+	},
+	"dependencies": {
+		"@capacitor/device": "^7.0.0",
+		"@types/node": "^22.12.0",
+		"jszip": "^3.10.1",
+		"markdown-it": "^14.1.0",
+		"node": "^23.11.0",
+		"node-fetch": "^3.3.2",
+		"semver": "^7.6.3"
+	}
+}

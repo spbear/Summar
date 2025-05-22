@@ -1,0 +1,234 @@
+.settings-tabs {
+    display: flex;
+    margin-bottom: 1rem;
+    gap: 10px;
+    overflow-x: auto;  /* 스크롤 가능하도록 설정 */
+    white-space: nowrap;  /* 줄 바꿈 방지 */
+    padding-bottom: 5px; /* 스크롤바와의 여백 */
+    scrollbar-width: thin; /* 파이어폭스용 */
+    scroll-behavior: smooth; /* 부드러운 스크롤 */
+
+    padding-top: 5px; /* 🔥 상단 여백 추가하여 버튼이 잘리지 않도록 설정 */
+}
+
+.settings-tabs::-webkit-scrollbar {
+    height: 6px; /* 스크롤바 높이 */
+}
+
+.settings-tabs::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+}
+
+.settings-tab-button {
+    padding: 8px 16px;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background-color: var(--background-primary);
+    flex-shrink: 0; /* 크기 축소 방지 */
+
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.settings-tab-button.active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+
+    border-radius: 5px;
+    transform: scale(1.05); /* 크기 살짝 확대 */
+    opacity: 1 !important; /* 🔥 안드로이드에서 흐려지는 문제 해결 */
+}
+
+
+/* 🔥 초기 활성화된 탭 버튼과 이후 선택된 탭 버튼을 완전히 동일하게 처리 */
+.settings-tab-button:focus,
+.settings-tab-button:focus-visible,
+.settings-tab-button.active:focus,
+.settings-tab-button.active:focus-visible,
+.clickable-icon.active:focus {
+    background-color: var(--interactive-accent) !important;
+    color: var(--text-on-accent) !important;
+    opacity: 1 !important;
+}
+
+.settings-tab-content {
+    display: none;
+}
+
+.settings-tab-content:not(.hidden) {
+    display: block;
+}
+
+.setting-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.setting-container input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.setting-container label {
+    margin-right: 10px;
+}
+
+.setting-container input[type="text"] {
+    flex: 1;
+}
+
+.setting-item {
+    border-top: none !important; /* Setting 내부에서 자동 추가되는 선 제거 */
+    margin: 2px !important; 
+    padding: 0px !important;
+    margin-bottom: 10px !important; /* Custom commands 등에서 아이템 간격 확보 */
+  }
+  
+/* 기본 버튼 스타일 */
+.clickable-icon {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+/* 활성화된 버튼 스타일 */
+.clickable-icon.active {
+    background-color: var(--interactive-accent); /* Obsidian의 주요 색상 */
+    /* color: white; */
+    border-radius: 5px;
+    /* box-shadow: 0 0 5px rgba(0, 0, 0, 0.2); */
+    transform: scale(1.1);
+
+    color: var(--text-on-accent);
+}
+
+/* 아이콘 강조 효과 */
+.clickable-icon.active svg {
+
+    stroke: white;
+}
+
+/* 활성화된 버튼 호버 효과 */
+.settings-tab-button.active:hover,
+.clickable-icon.active:hover {
+    background-color: var(--interactive-accent-hover);
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.lucide-icon-button {
+    border: 1px solid var(--color-border);
+    background: var(--background-primary);
+    cursor: pointer;
+    padding: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+/* 마우스 오버 효과 */
+.lucide-icon-button:hover {
+    background: var(--interactive-hover);
+}
+
+/* 클릭 시 효과 */
+.lucide-icon-button:active {
+    transform: scale(0.95);
+}
+
+.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+/* 🔹 SummarView의 inputField, fetchButton, pdfButton, recordButton, resultContainer 스타일 개선 */
+.summarview-input,
+.summarview-button,
+.summarview-result {
+    border: 1px solid var(--color-border); /* Obsidian 기본 테두리 색상 */
+    background: var(--background-primary);
+    color: var(--text-normal);
+    border-radius: 6px; /* 둥근 모서리 적용 */
+    padding: 8px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+/* 🔹 다크 테마에서 자연스러운 테두리 색상 적용 */
+.theme-dark .summarview-input,
+.theme-dark .summarview-button,
+.theme-dark .summarview-result {
+    border-color: var(--color-border-muted); /* 기존보다 부드러운 테두리 색상 */
+}
+
+/* 🔹 버튼 hover 효과 */
+.summarview-button:hover {
+    background: var(--interactive-hover);
+    border-color: var(--interactive-accent);
+}
+
+/* 🔹 비활성화된 요소 스타일 */
+.summarview-button:disabled,
+.summarview-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.summarview-button {
+    position: relative;
+}
+
+.summarview-button:hover::after {
+    content: none;
+}
+
+/* Obsidian 네이티브 툴팁 스타일 적용 */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]:hover::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    margin-bottom: 4px;
+    box-shadow: var(--shadow-tooltip);
+}
+
+/* 버튼 구분선 스타일 */
+.button-separator {
+    color: var(--text-muted);
+    margin: 0 5px;
+    user-select: none;
+}
+
+/* Custom Command 옵션 토글 행 스타일 */
+.custom-command-options-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 24px;
+  margin-top: 2px;
+  margin-bottom: 10px;
+}
+.custom-command-options-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.95em;
+  cursor: pointer;
+}
