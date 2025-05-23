@@ -1,4 +1,4 @@
-name: Deploy to timestamped release and update latest
+name: Deploy release based on manifest.json version
 
 on:
   push:
@@ -8,10 +8,10 @@ on:
       - 'src/manifest.json'
 
 permissions:
-  contents: write 
+  contents: write
 
 jobs:
-  build-and-deploy:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,29 +26,29 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build project
+      - name: Build project (KST timestamps)
         run: npm run build
         env:
           TZ: Asia/Seoul
 
-      - name: Set timestamp tag
-        id: time
+      - name: Extract version from manifest.json
+        id: version
         run: |
-          export TZ=Asia/Seoul
-          echo "tag=Release-$(date +'%y%m%d-%H%M')" >> $GITHUB_OUTPUT
+          VERSION=$(jq -r .version src/manifest.json)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Create timestamp tag (for release)
+      - name: Create version tag (vX.Y.Z)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ steps.time.outputs.tag }}
-          git push origin ${{ steps.time.outputs.tag }}
+          git tag ${{ steps.version.outputs.version }}
+          git push origin ${{ steps.version.outputs.version }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.time.outputs.tag }}
-          name: ${{ steps.time.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
           files: |
             dist/summar.zip
             dist/manifest.json
