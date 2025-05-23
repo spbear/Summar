@@ -42,12 +42,12 @@ export class CalendarHandler {
             if (Platform.isMacOS && Platform.isDesktopApp) {
                 // 초기 실행
                 await this.updateScheduledMeetings();
-                if (this.plugin.settings.autoRecording) {
+                if (this.plugin.settings.autoLaunchZoomOnSchedule) {
                     this.plugin.reservedStatus.setStatusbarIcon("calendar-clock", "red");
                 } else {
                     this.plugin.reservedStatus.setStatusbarIcon("calendar-x", "var(--text-muted)");
                 }
-                // this.plugin.reservedStatus.update(this.plugin.settings.autoRecording ? "⏰" : "", this.plugin.settings.autoRecording ? "green" : "black");
+                // this.plugin.reservedStatus.update(this.plugin.settings.autoLaunchZoomOnSchedule ? "⏰" : "", this.plugin.settings.autoLaunchZoomOnSchedule ? "green" : "black");
 
                 // 10분마다 업데이트 실행
                 this.intervalId = setInterval(() => {
@@ -167,14 +167,14 @@ export class CalendarHandler {
                 const now = new Date();
                 const delayMs = event.start.getTime() - now.getTime();
 
-                if (this.plugin.settings.autoRecording &&
+                if (this.plugin.settings.autoLaunchZoomOnSchedule &&
                     delayMs > 0 && delayMs < MAX_DELAY &&
                     !this.timers.has(event.start.getTime()) &&
                     event.zoom_link && event.zoom_link.length > 0) {
                     const timer = setTimeout(async () => {
-                        if (this.plugin.recordingManager.getRecorderState() !== "recording") {
-                            await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
-                        }
+                        // if (this.plugin.recordingManager.getRecorderState() !== "recording") {
+                        //     await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
+                        // }
                         this.launchZoomMeeting(event.zoom_link as string);
                         clearTimeout(timer);
                     }, delayMs);
@@ -240,17 +240,17 @@ export class CalendarHandler {
         `;
             eventEl.innerHTML = strInnerHTML;
 
-            const zoomLinkEl = eventEl.querySelector(".event-zoom-link");
-            zoomLinkEl?.addEventListener("click", async (e) => {
+            // const zoomLinkEl = eventEl.querySelector(".event-zoom-link");
+            // zoomLinkEl?.addEventListener("click", async (e) => {
 
-                if (this.plugin.recordingManager.getRecorderState() !== "recording") {
-                    new ConfirmModal(this.plugin.app, async (shouldRecord: boolean) => {
-                        if (shouldRecord) {
-                            await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
-                        }
-                        }).open();
-                }
-            });
+            //     if (this.plugin.recordingManager.getRecorderState() !== "recording") {
+            //         new ConfirmModal(this.plugin.app, async (shouldRecord: boolean) => {
+            //             if (shouldRecord) {
+            //                 await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
+            //             }
+            //             }).open();
+            //     }
+            // });
 
 
             // ✅ Obsidian 내에서 새 탭으로 노트 열기
@@ -282,35 +282,35 @@ export class CalendarHandler {
     }
 }
 
-class ConfirmModal extends Modal {
-    onSubmit: (result: boolean) => void;
+// class ConfirmModal extends Modal {
+//     onSubmit: (result: boolean) => void;
 
-    constructor(app: App, onSubmit: (result: boolean) => void) {
-        super(app);
-        this.onSubmit = onSubmit;
-    }
+//     constructor(app: App, onSubmit: (result: boolean) => void) {
+//         super(app);
+//         this.onSubmit = onSubmit;
+//     }
 
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.createEl("h3", { text: "Would you like to start recording?" });
+//     onOpen() {
+//         const { contentEl } = this;
+//         contentEl.createEl("h3", { text: "Would you like to start recording?" });
 
-        const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
+//         const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
 
-        const yesButton = buttonContainer.createEl("button", { text: "Yes" });
-        yesButton.addEventListener("click", () => {
-            this.close();
-            this.onSubmit(true);
-        });
+//         const yesButton = buttonContainer.createEl("button", { text: "Yes" });
+//         yesButton.addEventListener("click", () => {
+//             this.close();
+//             this.onSubmit(true);
+//         });
 
-        const noButton = buttonContainer.createEl("button", { text: "No" });
-        noButton.addEventListener("click", () => {
-            this.close();
-            this.onSubmit(false);
-        });
-    }
+//         const noButton = buttonContainer.createEl("button", { text: "No" });
+//         noButton.addEventListener("click", () => {
+//             this.close();
+//             this.onSubmit(false);
+//         });
+//     }
 
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
-    }
-}
+//     onClose() {
+//         const { contentEl } = this;
+//         contentEl.empty();
+//     }
+// }

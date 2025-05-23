@@ -54,3 +54,7 @@ Copy the build output to your Obsidian plugins directory and enable Summar in Ob
 - **2025-02-01**: Added custom command to run OpenAI API with selected text
 - **2025-02-16**: Calendar schedule fetch and auto recording
 - **2025-04-17**: Added feature to upload notes to Confluence
+- **2025-05-08**: Integrate Gemini API for transcription feature
+- **2025-05-16**: Implement summary refinement feature
+- **2025-05-20**: Added a feature that automatically starts recording when Zoom is launched
+- **2025-05-21**: Add options to append custom command results to note and copy to clipboard 

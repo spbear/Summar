@@ -41,7 +41,7 @@ export interface PluginSettings {
   calendar_polling_interval: number;
   calendar_zoom_only: boolean;
   
-  autoRecording: boolean;
+  autoLaunchZoomOnSchedule: boolean;
   autoRecordOnZoomMeeting: boolean;
 
   openaiApiEndpoint: string; // OpenAI API 엔드포인트 URL (기본값: https://api.openai.com)

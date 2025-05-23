@@ -111,52 +111,7 @@ requestCalendarAccess { granted in
 // 비동기 실행을 위해 약간의 대기 필요
 RunLoop.main.run()
 `;
-/*
-export const DEFAULT_SETTINGS: PluginSettings = {
-  openaiApiKey: "",
-  googleApiKey: "",
-  confluenceApiToken: "",
 
-  confluenceParentPageUrl: "",
-  confluenceParentPageSpaceKey: "",
-  confluenceParentPageId: "",
-
-  useConfluenceAPI: true,
-  confluenceDomain: "https://wiki.workers-hub.com",
-  systemPrompt: ``,
-  webPrompt: ``,
-  pdfPrompt: ``,
-
-//////
-webModel: 'o1-mini',
-// pdfModel: 'gpt-4o',
-transcriptSTT: "whisper-1",
-transcribingPrompt: "",
-transcriptModel: 'gpt-4.1',
-// customModel: 'o3-mini',
-/////
-
-  selectedDeviceId: "",
-  recordingDir: "",
-  recordingUnit: 15,
-  recordingLanguage: "ko-KR",
-  recordingPrompt: ``,
-  recordingResultNewNote: true,
-  refineSummary: true,
-  refiningPrompt: ``,
-  //////
-  testUrl: "",        // initial URL of the page to summarize
-  debugLevel: 0,  // debug level
-
-  cmd_max: 10,
-  cmd_count: 0,
-  calendar_count: 0,
-  calendar_fetchdays: 1,
-  calendar_polling_interval: 600000,
-  calendar_zoom_only: false,
-  autoRecording: false
-};
-*/
 
 export class SummarViewContainer {
    plugin: SummarPlugin;

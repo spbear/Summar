@@ -206,7 +206,7 @@ export class SummarSettingsTab extends PluginSettingTab {
 
           case 'schedule-tab':
             if (Platform.isMacOS && Platform.isDesktopApp) {
-              await this.buildScheduleSettings(tabContent);
+              await this.buildCalendarSettings(tabContent);
             }
             break;
         }
@@ -1098,8 +1098,8 @@ async activateTab(tabId: string): Promise<void> {
       );
   }
 
-  async buildScheduleSettings(containerEl: HTMLElement): Promise<void> {
-    containerEl.createEl("h2", { text: "Auto recording" });
+  async buildCalendarSettings(containerEl: HTMLElement): Promise<void> {
+    containerEl.createEl("h2", { text: "Calendar integration" });
 
     new Setting(containerEl)
       .setName("Enter the macOS calendar to search for Zoom meetings")
@@ -1131,11 +1131,11 @@ async activateTab(tabId: string): Promise<void> {
         }));
 
     new Setting(containerEl)
-      .setName("Automatically records events that include Zoom meetings.")
-      .setDesc("If the toggle switch is turned on, recording will automatically start at the scheduled time of events that include Zoom meetings.")
+      .setName("Automatically launches Zoom meetings for calendar events.")
+      .setDesc("If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoRecording).onChange(async (value) => {
-          this.plugin.settings.autoRecording = value;
+        toggle.setValue(this.plugin.settings.autoLaunchZoomOnSchedule).onChange(async (value) => {
+          this.plugin.settings.autoLaunchZoomOnSchedule = value;
           await this.plugin.calendarHandler.displayEvents(value);
           // this.plugin.reservedStatus.update(value ? "⏰" : "", value ? "green" : "black");
           if (value) {
@@ -1146,7 +1146,7 @@ async activateTab(tabId: string): Promise<void> {
         }));
 
     // const eventContainer = containerEl.createDiv();
-    await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoRecording, containerEl.createDiv());
+    await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, containerEl.createDiv());
   }
 
 }

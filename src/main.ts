@@ -56,7 +56,7 @@ export default class SummarPlugin extends Plugin {
     calendar_fetchdays: 1,
     calendar_polling_interval: 600000,
     calendar_zoom_only: false,
-    autoRecording: false,
+    autoLaunchZoomOnSchedule: false,
     autoRecordOnZoomMeeting: false
   };
 
