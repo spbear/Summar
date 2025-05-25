@@ -15,7 +15,7 @@ export class PluginUpdater {
     this.plugin = plugin;
   }
 
-  async updatePlugin(): Promise<void> {
+  async updatePlugin(forceUpdate: boolean = false): Promise<void> {
     try {
       // 최신 플러그인 다운로드 및 설치
       const zipName = normalizePath(this.plugin.PLUGIN_DIR + "/" + this.plugin.PLUGIN_ID + ".zip");
@@ -25,9 +25,11 @@ export class PluginUpdater {
       await this.plugin.app.vault.adapter.remove(zipName);
 
       SummarDebug.log(1, 'Summar update complete! Please reload Obsidian to apply changes.');
-      const fragment = document.createDocumentFragment();
+      if (forceUpdate) {
+          window.location.reload(); // Obsidian 재로드
+      } else {
+        const fragment = document.createDocumentFragment();
 
-      {
         // 설명 메시지 추가
         const message1 = document.createElement("span");
         message1.textContent = "Summar update completed! Please click ";
