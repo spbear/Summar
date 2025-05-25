@@ -274,7 +274,7 @@ async activateTab(tabId: string): Promise<void> {
           button.setButtonText('Updating...');
           try {
             const pluginUpdater = new PluginUpdater(this.plugin);
-            await pluginUpdater.updatePlugin();
+            await pluginUpdater.updatePlugin(true);
           } catch (error) {
             SummarDebug.error(1, 'Error during plugin update:', error);
             button.setButtonText('Force update and restart');
