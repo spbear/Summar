@@ -251,56 +251,67 @@ async activateTab(tabId: string): Promise<void> {
   async buildCommonSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "Common Settings" });
 
+    // Current version과 Available version을 Setting UI로 분리
+    const currentVersion = this.plugin.manifest.version;
+    let remoteVersion: string | null = null;
+    let forceUpdateButton: ButtonComponent | undefined; // undefined 허용
 
-    // Current version: #.#.# - Click here to force an update, and click here to reload Obsidian.
-    // 설명 메시지 추가
-    const message1 = document.createElement("span");
-    message1.textContent = "Current version: " + this.plugin.manifest.version + " - Click ";
-    containerEl.appendChild(message1);
+    // Setting 생성
+    const versionSetting = new Setting(containerEl)
+      .setName(`Currently installed Summar version: ${currentVersion}`)
+      .setDesc('Available version: checking...')
+      .addButton((button) => {
+        forceUpdateButton = button;
+        button.setButtonText('Force update and restart');
+        button.setDisabled(true);
+        button.buttonEl.style.marginLeft = '12px';
+        button.buttonEl.style.minWidth = '170px';
+        button.buttonEl.style.fontWeight = 'bold';
+        button.buttonEl.setAttribute('data-tooltip', 'This will update to the latest version and restart Obsidian.');
+        button.onClick(async () => {
+          if (!remoteVersion || remoteVersion === currentVersion) return;
+          button.setDisabled(true);
+          button.setButtonText('Updating...');
+          try {
+            const pluginUpdater = new PluginUpdater(this.plugin);
+            await pluginUpdater.updatePlugin();
+          } catch (error) {
+            SummarDebug.error(1, 'Error during plugin update:', error);
+            button.setButtonText('Force update and restart');
+            button.setDisabled(false);
+          }
+        });
+      });
 
-    const forceUpdate = document.createElement("a");
-    forceUpdate.textContent = "here";
-    forceUpdate.href = "#";
-    forceUpdate.style.cursor = "pointer";
-    forceUpdate.style.color = "var(--text-accent)"; // 링크 색상 설정 (옵션)
-    // 클릭 이벤트 핸들러
-    forceUpdate.addEventListener("click", (event) => {
-      event.preventDefault(); // 기본 동작 방지
-      setTimeout(async () => {
-        try {
-          SummarDebug.log(1, "Checking for plugin updates...");
-          const pluginUpdater = new PluginUpdater(this.plugin);
-          await pluginUpdater.updatePlugin();
-        } catch (error) {
-          SummarDebug.error(1, "Error during plugin update:", error);
+    // 비동기로 최신 버전 정보 가져와서 UI 업데이트
+    (async () => {
+      try {
+        const pluginUpdater = new PluginUpdater(this.plugin);
+        // @ts-ignore
+        remoteVersion = await pluginUpdater.getRemoteVersion(pluginUpdater.REMOTE_MANIFEST_URL);
+        if (remoteVersion) {
+          versionSetting.setDesc(`Available version: ${remoteVersion}`);
+          if (forceUpdateButton) {
+            if (remoteVersion !== currentVersion) {
+              // 업데이트 필요: 버튼 활성화 및 하이라이트
+              forceUpdateButton.setDisabled(false);
+              forceUpdateButton.setCta(); // Obsidian 스타일 강조
+            } else {
+              // 최신: 버튼 비활성화
+              forceUpdateButton.setDisabled(true);
+              forceUpdateButton.buttonEl.classList.remove('mod-cta');
+            }
+          }
+        } else {
+          versionSetting.setDesc('Available version: unknown');
         }
-      }, 100); // 0.1s    
-    });
-    // Fragment에 링크 추가
-    containerEl.appendChild(forceUpdate);
+      } catch (e) {
+        versionSetting.setDesc('Available version: error');
+      }
+    })();
 
-    const message2 = document.createElement("span");
-    message2.textContent = " to force an update, and click ";
-    containerEl.appendChild(message2);
-
-    // 링크 생성 및 스타일링
-    const forceReload = document.createElement("a");
-    forceReload.textContent = "here";
-    forceReload.href = "#";
-    forceReload.style.cursor = "pointer";
-    forceReload.style.color = "var(--text-accent)"; // 링크 색상 설정 (옵션)
-
-    // 클릭 이벤트 핸들러
-    forceReload.addEventListener("click", (event) => {
-      event.preventDefault(); // 기본 동작 방지
-      window.location.reload(); // Obsidian 재로드
-    });
-    // Fragment에 링크 추가
-    containerEl.appendChild(forceReload);
-
-    const message3 = document.createElement("span");
-    message3.textContent = " to reload Obsidian.";
-    containerEl.appendChild(message3);
+    // 기존 안내 메시지 및 force update/reload UI 제거
+    // (message1, forceUpdate, message2, forceReload, message3 삭제)
 
     containerEl.createEl("p"); 
 
