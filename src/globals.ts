@@ -217,7 +217,7 @@ export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam 
   
   if (typeof request === 'string') {
     // request가 문자열이면 객체로 변환
-    requestParam = { url: request, headers: {}, method: "GET", body: "", throw: true }; 
+    requestParam = { url: request, headers: {}, method: "GET", throw: true }; 
   } else {
     // request가 객체이면 그대로 사용
     requestParam = request;
