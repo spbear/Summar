@@ -1,6 +1,6 @@
 import { PluginSettingTab, Setting, Platform, ButtonComponent } from "obsidian";
 
-import { SummarDebug, getDeviceId, sanitizeLabel } from "./globals";
+import { SummarDebug, SummarRequestUrl, getDeviceId, sanitizeLabel } from "./globals";
 import { PluginUpdater } from "./pluginupdater";
 import SummarPlugin from "./main";
 import { ConfluenceAPI } from "./confluenceapi";
@@ -296,6 +296,12 @@ async activateTab(tabId: string): Promise<void> {
               // 업데이트 필요: 버튼 활성화 및 하이라이트
               forceUpdateButton.setDisabled(false);
               forceUpdateButton.setCta(); // Obsidian 스타일 강조
+              
+              const response = await SummarRequestUrl(this.plugin,"https://api.github.com/repos/mcgabby/summar/releases/latest");
+              const body = response.json.body;
+              if (body && body.length > 0) {  
+                forceUpdateButton.setTooltip(body);
+              }
             } else {
               // 최신: 버튼 비활성화
               forceUpdateButton.setDisabled(true);
