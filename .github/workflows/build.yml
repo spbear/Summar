@@ -37,6 +37,14 @@ jobs:
           VERSION=$(jq -r .version src/manifest.json)
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Get latest commit message
+        id: commit
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create version tag (vX.Y.Z)
         run: |
           git config user.name "github-actions[bot]"
@@ -49,6 +57,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
+          body: ${{ steps.commit.outputs.message }}
           files: |
             dist/summar.zip
             dist/manifest.json
