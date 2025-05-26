@@ -101,7 +101,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				if (this.plugin.settings.refineSummary)
 				{
 					this.timer.stop();
-					this.refine(transcripted, summary, newFilePath);
+					await this.refine(transcripted, summary, newFilePath);
 				}
 			} else {
 				this.updateResultText("No valid response from OpenAI API.");
