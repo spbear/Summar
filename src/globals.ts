@@ -431,3 +431,93 @@ export async function showSettingsTab(plugin: SummarPlugin, tabname: string) {
   // 설정창이 완전히 열릴 때까지 감시 시작
   requestAnimationFrame(waitForSummarTab);
 }
+
+export class SummarTooltip {
+  private plugin: SummarPlugin;  
+  private tooltipEl: HTMLElement | null = null;
+  private showTimeout: number | null = null;
+
+  constructor(plugin: SummarPlugin) {
+    this.plugin = plugin;
+    this.plugin.register(() => this.cleanup());
+  }
+
+  attach(el: HTMLElement, content: string, delay = 300) {
+    el.addEventListener('mouseenter', () => {
+      this.showTimeout = window.setTimeout(() => {
+        this.showTooltip(el, content);
+      }, delay);
+    });
+
+    el.addEventListener('mouseleave', () => {
+      this.hideTooltip();
+    });
+
+    el.addEventListener('blur', () => {
+      this.hideTooltip();
+    });
+
+    el.addEventListener('focus', () => {
+      this.showTooltip(el, content);
+    });
+  }
+
+  private showTooltip(anchor: HTMLElement, content: string) {
+    if (this.tooltipEl) return;
+
+    const tooltip = createDiv('custom-tooltip');
+    tooltip.setText(content);
+
+    document.body.appendChild(tooltip);
+    this.tooltipEl = tooltip;
+  
+    requestAnimationFrame(() => {
+      const styles = getComputedStyle(document.body);
+  
+      let bgColor = styles.getPropertyValue('--tooltip-bg').trim();
+      let textColor = styles.getPropertyValue('--tooltip-text').trim();
+
+      if (bgColor === '' || bgColor === 'transparent' || /rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\)/.test(bgColor)) {
+        bgColor = '#2e2e2e'; // 어두운 회색 계열 기본값
+      }
+
+      tooltip.setCssStyles({
+        position: 'fixed',
+        backgroundColor: bgColor,
+        color: textColor || '#ffffff',
+        padding: '6px 12px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        maxWidth: '300px',
+        textAlign: 'left',
+        whiteSpace: 'pre-wrap',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+        zIndex: '9999',
+        pointerEvents: 'none'
+      });
+
+      const rect = anchor.getBoundingClientRect();
+      const tipRect = tooltip.getBoundingClientRect();
+
+      tooltip.setCssStyles({
+        top: `${rect.bottom + 5}px`,
+        left: `${Math.max(5, rect.left + rect.width / 2 - tipRect.width / 2)}px`
+      });
+    });
+  }
+
+  private hideTooltip() {
+    if (this.showTimeout) {
+      clearTimeout(this.showTimeout);
+      this.showTimeout = null;
+    }
+    if (this.tooltipEl) {
+      this.tooltipEl.remove();
+      this.tooltipEl = null;
+    }
+  }
+
+  private cleanup() {
+    this.hideTooltip();
+  }
+}
