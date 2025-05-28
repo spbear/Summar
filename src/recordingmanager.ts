@@ -1,7 +1,7 @@
 import { normalizePath, Platform, Notice } from "obsidian";
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarDebug, SummarViewContainer, fetchOpenai, getDeviceId, getDeviceIdFromLabel } from "./globals";
+import { SummarDebug, SummarViewContainer, fetchOpenai, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath } from "./globals";
 import { NativeAudioRecorder } from "./audiorecorder";
 import { RecordingTimer } from "./recordingtimer";
 import { SummarTimer } from "./summartimer";
@@ -78,12 +78,15 @@ export class AudioRecordingManager extends SummarViewContainer {
 			if (aiData.choices && aiData.choices.length > 0) {
 				summary = aiData.choices[0].message.content || "No summary generated.";
 
-				let summaryNote = "";
-				if (newFilePath.includes(".md")) {
-					summaryNote = newFilePath.replace(".md", " summary.md");
+				let summaryCandidate = "";
+				if (newFilePath.toLowerCase().includes(" transcript.md")) {
+					summaryCandidate = newFilePath.replace(" transcript.md", " summary");
 				} else {
-					summaryNote = newFilePath + " summary.md";
-				}					
+					summaryCandidate = newFilePath + " summary";
+				}
+
+				const summaryNote = getAvailableFilePath(summaryCandidate, ".md", this.plugin);
+
 				this.updateResultText(summary);
 				this.enableNewNote(true, summaryNote);
 				
@@ -101,7 +104,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				if (this.plugin.settings.refineSummary)
 				{
 					this.timer.stop();
-					await this.refine(transcripted, summary, newFilePath);
+					await this.refine(transcripted, summary, summaryNote);
 				}
 			} else {
 				this.updateResultText("No valid response from OpenAI API.");
@@ -164,12 +167,17 @@ export class AudioRecordingManager extends SummarViewContainer {
 			if (aiData.choices && aiData.choices.length > 0) {
 				refined = aiData.choices[0].message.content || "Request failed.";
 
-				let refinementNote = "";
-				if (newFilePath.includes(".md")) {
-					refinementNote = newFilePath.replace(".md", " refinement.md");
+				let refinementCandidate = "";
+				if (newFilePath.toLowerCase().includes(" summary")) {
+					refinementCandidate = newFilePath.replace(" summary", " refinement");
 				} else {
-					refinementNote = newFilePath + " refinement.md";
-				}					
+					refinementCandidate = newFilePath + " refinement";
+				}
+				if (refinementCandidate.toLowerCase().endsWith(".md")) {
+					refinementCandidate = refinementCandidate.slice(0, -3); // Remove ".md" extension
+				}
+				const refinementNote = getAvailableFilePath(refinementCandidate, ".md", this.plugin);
+
 				this.updateResultText(refined);
 				this.enableNewNote(true, refinementNote);
 

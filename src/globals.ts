@@ -361,6 +361,19 @@ export async function getDeviceIdFromLabel(savedLabel: string): Promise<string |
       return null;
   }
 }
+
+
+// Function to find the next available filename with postfix
+export function getAvailableFilePath(basePath: string, suffix: string, plugin: SummarPlugin): string  {
+  let index = 1;
+  let currentPath = `${basePath}${suffix}`;
+  while (plugin.app.vault.getAbstractFileByPath(currentPath)) {
+    currentPath = `${basePath} (${index})${suffix}`;
+    index++;
+  }
+  return currentPath;
+}
+
 export async function showSettingsTab(plugin: SummarPlugin, tabname: string) {
   // 설정 창 열기
   (plugin.app as any).commands.executeCommandById("app:open-settings");
