@@ -1,6 +1,6 @@
 import { TFile, TFolder, normalizePath, requestUrl, RequestUrlParam } from "obsidian";
 import SummarPlugin from "./main";
-import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab } from "./globals";
+import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath } from "./globals";
 import { SummarTimer } from "./summartimer";
 
 export class AudioHandler extends SummarViewContainer {
@@ -179,26 +179,15 @@ export class AudioHandler extends SummarViewContainer {
 
 		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
 
-		// Function to find the next available filename with postfix
-		const getAvailableFilePath = (basePath: string): string => {
-			let index = 1;
-			let currentPath = `${basePath}.md`;
-			while (this.plugin.app.vault.getAbstractFileByPath(currentPath)) {
-				currentPath = `${basePath} (${index}).md`;
-				index++;
-			}
-			return currentPath;
-		};
-		// Check if the file already exists
-		const existingFile = this.plugin.app.vault.getAbstractFileByPath(`${baseFilePath}.md`);
-		let newFilePath = ""
+		const existingFile = this.plugin.app.vault.getAbstractFileByPath(`${baseFilePath} transcript.md`);
+		let newFilePath = "";
 		if (existingFile && existingFile instanceof TFile) {
 			// If the file exists, find a new unique filename
-			newFilePath = getAvailableFilePath(baseFilePath);
+			newFilePath = getAvailableFilePath(baseFilePath, " transcript.md", this.plugin);
 			SummarDebug.log(1, `File already exists. Created new file: ${newFilePath}`);
 		} else {
 			// If the file does not exist, create it
-			newFilePath = `${baseFilePath}.md`;
+			newFilePath = `${baseFilePath} transcript.md`;
 			SummarDebug.log(1, `File created: ${newFilePath}`);
 		}
 		await this.plugin.app.vault.create(newFilePath, `${audioList}\n${transcriptedText}`);

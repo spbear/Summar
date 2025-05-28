@@ -200,7 +200,10 @@ export default class SummarPlugin extends Plugin {
         // Add menu item for files
         if (file instanceof TFile) {
           // Add menu item for audio and webm files
-          if (file instanceof TFile && this.audioHandler.isAudioOrWebmFile(file)) {
+
+          const parentFolderPath = normalizePath(file.path.substring(0, file.path.lastIndexOf("/")));
+          const parentFolder = this.app.vault.getAbstractFileByPath(parentFolderPath);          
+          if (this.audioHandler.isAudioOrWebmFile(file)) {
             menu.addItem((item) => {
               item
                 .setTitle("Summarize meeting from audio file")
@@ -212,9 +215,29 @@ export default class SummarPlugin extends Plugin {
                     SummarDebug.log(1, `File selected: ${file.path}`);
                     if (files && files.length > 0) {
                       this.activateView();
-                      const { transcriptedText, newFilePath } = await this.audioHandler.sendAudioData(files);
+                      const { transcriptedText, newFilePath } = await this.audioHandler.sendAudioData(files, (parentFolder instanceof TFolder ? parentFolder.path : "") as string  );
                       SummarDebug.log(3, `transcripted text: ${transcriptedText}`);
                       const summarized = await this.recordingManager.summarize(transcriptedText, newFilePath);
+                    }
+                  } catch (error) {
+                    SummarDebug.error(1, "Error handling file:", error);
+                  }
+                });
+            });
+          } else if (file.name.toLowerCase().includes(" transcript.md")) {
+            menu.addItem((item) => {
+              item
+                .setTitle("Summarize meeting from transcript file")
+                .setIcon("file")
+                .onClick(async () => {
+                  try {
+                    // this.handleFileAction(file);
+                    const files = await this.convertTFileToFileArray([file]);
+                    SummarDebug.log(1, `File selected: ${file.path}`);
+                    if (files && files.length > 0) {
+                      this.activateView();
+                      const transcriptedText = await this.app.vault.read(file);
+                      const summarized = await this.recordingManager.summarize(transcriptedText, file.path );
                     }
                   } catch (error) {
                     SummarDebug.error(1, "Error handling file:", error);
