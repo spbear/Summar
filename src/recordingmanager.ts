@@ -7,6 +7,7 @@ import { RecordingTimer } from "./recordingtimer";
 import { SummarTimer } from "./summartimer";
 import { JsonBuilder } from "./jsonbuilder";
 import { exec } from "child_process";
+import fixWebmDuration from "webm-duration-fix/lib/index.js";
 
 export class AudioRecordingManager extends SummarViewContainer {
 	private timer: SummarTimer;
@@ -343,6 +344,17 @@ export class AudioRecordingManager extends SummarViewContainer {
 	}
 
 	private async saveFile(blob: Blob, fileName: string): Promise<void> {
+		// webm 파일이면 duration 메타데이터를 삽입
+		if (fileName.toLowerCase().endsWith('.webm')) {
+			try {
+				const fixedBlob = await fixWebmDuration(blob);
+				blob = fixedBlob;
+				SummarDebug.log(1, `webm-duration-fix applied to: ${fileName}`);
+			} catch (e) {
+				SummarDebug.error(1, `webm-duration-fix failed for: ${fileName}`, e);
+			}
+		}
+
 		return new Promise((resolve, reject) => {
 			try {			
 				SummarDebug.log(1, `saveFile(filenName): ${fileName}`);

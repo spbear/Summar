@@ -30,6 +30,7 @@
 		"markdown-it": "^14.1.0",
 		"node": "^23.11.0",
 		"node-fetch": "^3.3.2",
-		"semver": "^7.6.3"
+		"semver": "^7.6.3",
+		"webm-duration-fix": "^1.0.4"
 	}
 }

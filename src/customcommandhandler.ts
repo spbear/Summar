@@ -94,6 +94,15 @@ export class CustomCommandHandler extends SummarViewContainer {
 							insertLine = Math.max(from.line, to.line) + 1;
 							insertCh = 0;
 						}
+						// 커서가 문서의 마지막 줄 끝에 있으면 먼저 줄 추가 후 다음 줄에 결과 삽입
+						const cursor = editor.getCursor();
+						const lastLine = editor.lastLine();
+						const lastLineLen = editor.getLine(lastLine).length;
+						if (cursor.line === lastLine && cursor.ch === lastLineLen) {
+							editor.replaceRange("\n", { line: lastLine, ch: lastLineLen });
+							insertLine = lastLine + 1;
+							insertCh = 0;
+						}
 						// 결과 삽입
 						editor.replaceRange(responseText + "\n", { line: insertLine, ch: insertCh });
 						// selection 해제 및 커서 이동 (결과의 첫 위치)
