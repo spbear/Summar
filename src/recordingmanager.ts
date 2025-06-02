@@ -46,17 +46,17 @@ export class AudioRecordingManager extends SummarViewContainer {
 		// SummarDebug.log(2, "Fetched page content:", page_content);
 		SummarDebug.log(1, `newFilePath: ${newFilePath}`);
 
-		const recordingPrompt = this.plugin.settings.recordingPrompt;
+		const transcriptSummaryPrompt = this.plugin.settings.transcriptSummaryPrompt;
 		const openaiApiKey = this.plugin.settings.openaiApiKey;
 
 		let summary = "";
 
 		try {
 			const body_content = JSON.stringify({
-				model: this.plugin.settings.transcriptModel,
+				model: this.plugin.settings.transcriptSummaryModel,
 				messages: [
 					// { role: "system", content: systemPrompt },
-					{ role: "user", content: `${recordingPrompt}\n\n${transcripted}` },
+					{ role: "user", content: `${transcriptSummaryPrompt}\n\n${transcripted}` },
 				],
 				// max_tokens: 16384,
 			});
@@ -93,7 +93,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				
 				SummarDebug.log(1,`newFilePath = ${newFilePath}`);
 
-				if (this.plugin.settings.recordingResultNewNote) {
+				if (this.plugin.settings.saveTranscriptAndRefineToNewNote) {
 					await this.plugin.app.vault.create(summaryNote, summary);
 					await this.plugin.app.workspace.openLinkText(
 						normalizePath(summaryNote),
@@ -131,15 +131,15 @@ export class AudioRecordingManager extends SummarViewContainer {
 		this.updateResultText("Improving the summary…");
 		this.enableNewNote(false);
 
-		const refiningPrompt = this.plugin.settings.refiningPrompt;
+		const refineSummaryPrompt = this.plugin.settings.refineSummaryPrompt;
 		const openaiApiKey = this.plugin.settings.openaiApiKey;
 
 		try {
 			const jsonBuilder = new JsonBuilder();
-			jsonBuilder.addData("model", this.plugin.settings.transcriptModel);
+			jsonBuilder.addData("model", this.plugin.settings.transcriptSummaryModel);
 			jsonBuilder.addToArray("messages", {
 				role: "user",
-				content: refiningPrompt,
+				content: refineSummaryPrompt,
 			});
 			jsonBuilder.addToArray("messages", {
 				role: "user",
@@ -182,7 +182,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				this.updateResultText(refined);
 				this.enableNewNote(true, refinementNote);
 
-				if (this.plugin.settings.recordingResultNewNote) {
+				if (this.plugin.settings.saveTranscriptAndRefineToNewNote) {
 					await this.plugin.app.vault.create(refinementNote, refined);
 					await this.plugin.app.workspace.openLinkText(
 						normalizePath(refinementNote),
