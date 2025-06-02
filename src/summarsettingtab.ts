@@ -568,8 +568,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultButton && !setDefaultButton.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          promptTextAreaEl.value = this.plugin.defaultPrompts.webPrompt;
-          this.plugin.settings.webPrompt = this.plugin.defaultPrompts.webPrompt;
+          this.plugin.settings.webPrompt = promptTextAreaEl.value = this.plugin.defaultPrompts.webPrompt;
           setDefaultButton.setDisabled(true);
           if (revertButton) {
             if (promptTextAreaEl.value !== initialPrompt) {
@@ -589,8 +588,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialPrompt !== null) {
-          promptTextAreaEl.value = initialPrompt;
-          // this.plugin.settings.webPrompt = initialPrompt;
+          this.plugin.settings.webPrompt = promptTextAreaEl.value = initialPrompt;
           if (revertButton) revertButton.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultButton) {
@@ -692,8 +690,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultButton && !setDefaultButton.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          promptTextAreaEl.value = this.plugin.defaultPrompts.pdfPrompt;
-          this.plugin.settings.pdfPrompt = this.plugin.defaultPrompts.pdfPrompt;
+          this.plugin.settings.pdfPrompt = promptTextAreaEl.value = this.plugin.defaultPrompts.pdfPrompt;
           setDefaultButton.setDisabled(true);
           if (revertButton) {
             if (promptTextAreaEl.value !== initialPrompt) {
@@ -713,8 +710,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialPrompt !== null) {
-          promptTextAreaEl.value = initialPrompt;
-          // this.plugin.settings.pdfPrompt = initialPrompt;
+          this.plugin.settings.pdfPrompt = promptTextAreaEl.value = initialPrompt;
           if (revertButton) revertButton.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultButton) {
@@ -968,8 +964,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultButtonForSummary && !setDefaultButtonForSummary.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          promptTextAreaElForSummary.value = this.plugin.defaultPrompts.transcriptSummaryPrompt;
-          this.plugin.settings.transcriptSummaryPrompt = this.plugin.defaultPrompts.transcriptSummaryPrompt;
+          this.plugin.settings.transcriptSummaryPrompt = promptTextAreaElForSummary.value = this.plugin.defaultPrompts.transcriptSummaryPrompt;
           setDefaultButtonForSummary.setDisabled(true);
           if (revertButtonForSummary) {
             if (promptTextAreaElForSummary.value !== initialPromptForSummary) {
@@ -989,8 +984,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialPromptForSummary !== null) {
-          promptTextAreaElForSummary.value = initialPromptForSummary;
-          // this.plugin.settings.transcriptSummaryPrompt = initialPrompt;
+          this.plugin.settings.transcriptSummaryPrompt = promptTextAreaElForSummary.value = initialPromptForSummary;
           if (revertButtonForSummary) revertButtonForSummary.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultButtonForSummary) {
@@ -1080,8 +1074,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultRefineButton && !setDefaultRefineButton.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          refinePromptTextAreaEl.value = this.plugin.defaultPrompts.refineSummaryPrompt;
-          this.plugin.settings.refineSummaryPrompt = this.plugin.defaultPrompts.refineSummaryPrompt;
+          this.plugin.settings.refineSummaryPrompt = refinePromptTextAreaEl.value = this.plugin.defaultPrompts.refineSummaryPrompt;
           setDefaultRefineButton.setDisabled(true);
           if (revertRefineButton) {
             if (refinePromptTextAreaEl.value !== initialRefinePrompt) {
@@ -1101,8 +1094,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialRefinePrompt !== null) {
-          refinePromptTextAreaEl.value = initialRefinePrompt;
-          // this.plugin.settings.refineSummaryPrompt = initialRefinePrompt;
+          this.plugin.settings.refineSummaryPrompt = refinePromptTextAreaEl.value = initialRefinePrompt;
           if (revertRefineButton) revertRefineButton.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultRefineButton) {
