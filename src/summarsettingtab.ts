@@ -531,55 +531,11 @@ async activateTab(tabId: string): Promise<void> {
   async buildWebpageSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "Webpage Summary" });
 
-    // new Setting(containerEl)
-    //   .setName("System Prompt (for Web page summary)")
-    //   .setDesc("This prompt will be added to the beginning of every chat.")
-
-    // new Setting(containerEl)
-    //   .setHeading()
-    //   .addTextArea((text) => {
-    //     text
-    //       .setPlaceholder("Enter system prompt")
-    //       .setValue(this.plugin.settings.systemPrompt || "")
-    //       .onChange(async (value) => {
-    //         this.plugin.settings.systemPrompt = value;
-    //       });
-
-    //     const textAreaEl = text.inputEl;
-    //     textAreaEl.style.width = "100%";
-    //     textAreaEl.style.height = "150px";
-    //     textAreaEl.style.resize = "none";
-
-    //     // 간격을 좁히는 스타일 추가
-    //     const descriptionEl = containerEl.querySelector('.setting-item-description') as HTMLElement;
-    //     if (descriptionEl) {
-    //       descriptionEl.style.marginBottom = "1px"; // 설명과 textarea 사이 간격 조정
-    //     }
-    //     textAreaEl.style.marginTop = "1px"; // textarea의 위쪽 간격 조정          
-    //   })
-    //   ;
-
-    // new Setting(containerEl)
-    // .setName("OpenAI Model")
-    // .setDesc("Select the OpenAI model to use in the prompt.")
-    // .addDropdown(dropdown => 
-    //     dropdown
-    //         .addOptions({
-    //             "gpt-4o": "gpt-4o",
-    //             "o1-mini": "o1-mini",
-    //             "o3-mini": "o3-mini"
-    //         })
-    //         .setValue(this.plugin.settings.webModel)
-    //         .onChange(async (value) => {
-    //             this.plugin.settings.webModel = value;
-    //         })
-    // );
-
     new Setting(containerEl)
       .setName("Prompt (for Web page summary)")
       .setDesc("This prompt will guide the AI response.")
       .addDropdown(dropdown => {
-        const options = this.plugin.getAllModelKeyValues("webpage");
+        const options = this.plugin.getAllModelKeyValues("webModel");
         if (Object.keys(options).length === 0) {
           options['gpt-4o'] = 'gpt-4o'; 
           options['gpt-4.1'] = 'gpt-4.1';
@@ -594,22 +550,106 @@ async activateTab(tabId: string): Promise<void> {
           })
       });
 
-    new Setting(containerEl)
-      .setHeading()
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("Enter prompt")
-          .setValue(this.plugin.settings.webPrompt || "")
-          .onChange(async (value) => {
-            this.plugin.settings.webPrompt = value;
-          });
+    // --- 버튼 2개 (set default, revert) 및 텍스트에 따른 상태 관리 ---
+    let initialPrompt: string | null = null; // 탭 활성화 시의 초기값
+    let setDefaultButton: ButtonComponent | undefined;
+    let revertButton: ButtonComponent | undefined;
+    let promptTextAreaEl: HTMLTextAreaElement;
 
-        const textAreaEl = text.inputEl;
-        textAreaEl.style.width = "100%";
-        textAreaEl.style.height = "150px";
-        textAreaEl.style.resize = "none";
-      })
-      ;
+    const promptSettingButtons = new Setting(containerEl)
+      .setHeading();
+
+    // set default 버튼
+    promptSettingButtons.addButton((button) => {
+      setDefaultButton = button;
+      button.setButtonText("set default prompt")
+        .setDisabled(true)
+        .setClass("set-default-btn");
+      button.onClick(() => {
+        if (setDefaultButton && !setDefaultButton.buttonEl.hasAttribute('disabled')) {
+          // set default 클릭 시에도 revert 버튼은 활성화
+          promptTextAreaEl.value = this.plugin.defaultPrompts.webPrompt;
+          this.plugin.settings.webPrompt = this.plugin.defaultPrompts.webPrompt;
+          setDefaultButton.setDisabled(true);
+          if (revertButton) {
+            if (promptTextAreaEl.value !== initialPrompt) {
+              revertButton.setDisabled(false);
+            } else {
+              revertButton.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
+    // revert 버튼
+    promptSettingButtons.addButton((button) => {
+      revertButton = button;
+      button.setButtonText("revert")
+        .setDisabled(true)
+        .setClass("revert-btn");
+      button.onClick(() => {
+        if (initialPrompt !== null) {
+          promptTextAreaEl.value = initialPrompt;
+          // this.plugin.settings.webPrompt = initialPrompt;
+          if (revertButton) revertButton.setDisabled(true);
+          // setDefaultButton 상태 재조정
+          if (setDefaultButton) {
+            if (promptTextAreaEl.value !== this.plugin.defaultPrompts.webPrompt) {
+              setDefaultButton.setDisabled(false);
+            } else {
+              setDefaultButton.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
+
+    // 버튼과 textarea 사이에 줄바꿈 추가
+    const promptTextArea = new Setting(containerEl)
+      .setHeading();
+
+    // 텍스트에어리어 추가
+    promptTextArea.addTextArea((text) => {
+      const value = this.plugin.settings.webPrompt || "";
+      initialPrompt = value; // 탭 활성화 시의 초기값 저장
+      text
+        .setPlaceholder("Enter prompt")
+        .setValue(value)
+        .onChange(async (newValue) => {
+          this.plugin.settings.webPrompt = newValue;
+          // set default 버튼 상태
+          if (setDefaultButton) {
+            if (newValue !== this.plugin.defaultPrompts.webPrompt) {
+              setDefaultButton.setDisabled(false);
+            } else {
+              setDefaultButton.setDisabled(true);
+            }
+          }
+          // revert 버튼: 값이 초기값과 다르면 활성화, 같으면 비활성화
+          if (revertButton) {
+            if (newValue !== initialPrompt) {
+              revertButton.setDisabled(false);
+            } else {
+              revertButton.setDisabled(true);
+            }
+          }
+        });
+      promptTextAreaEl = text.inputEl;
+      promptTextAreaEl.style.width = "100%";
+      promptTextAreaEl.style.height = "150px";
+      promptTextAreaEl.style.resize = "none";
+      // 초기화 시 set default/revert 버튼 상태 조정
+      if (setDefaultButton) {
+        if (value !== this.plugin.defaultPrompts.webPrompt) {
+          setDefaultButton.setDisabled(false);
+        } else {
+          setDefaultButton.setDisabled(true);
+        }
+      }
+      if (revertButton) {
+        revertButton.setDisabled(true); // 탭 진입 시 revert는 항상 비활성화
+      }
+    });
   }
 
   async buildPdfSettings(containerEl: HTMLElement): Promise<void> {
@@ -620,7 +660,7 @@ async activateTab(tabId: string): Promise<void> {
       .setName("Prompt (for PDF to Markdown)")
       .setDesc("This prompt will guide the AI response.")
       .addDropdown(dropdown => {
-        const options = this.plugin.getAllModelKeyValues("pdf");
+        const options = this.plugin.getAllModelKeyValues("pdfModel");
         if (Object.keys(options).length === 0) {
           options['gpt-4o'] = 'gpt-4o';
           options['gpt-4.1'] = 'gpt-4.1';
@@ -633,21 +673,107 @@ async activateTab(tabId: string): Promise<void> {
             this.plugin.settings.pdfModel = value;
           });
       });      
-    new Setting(containerEl)
-      .setHeading()
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("Enter prompt")
-          .setValue(this.plugin.settings.pdfPrompt || "")
-          .onChange(async (value) => {
-            this.plugin.settings.pdfPrompt = value;
-          });
 
-        const textAreaEl = text.inputEl;
-        textAreaEl.style.width = "100%";
-        textAreaEl.style.height = "100px";
-        textAreaEl.style.resize = "none";
+    // --- 버튼 2개 (set default, revert) 및 텍스트에 따른 상태 관리 ---
+    let initialPrompt: string | null = null; // 탭 활성화 시의 초기값
+    let setDefaultButton: ButtonComponent | undefined;  
+    let revertButton: ButtonComponent | undefined;
+    let promptTextAreaEl: HTMLTextAreaElement;
+
+    const promptSettingButtons = new Setting(containerEl)
+      .setHeading();
+
+    // set default 버튼
+    promptSettingButtons.addButton((button) => {
+      setDefaultButton = button;
+      button.setButtonText("set default prompt")
+        .setDisabled(true)
+        .setClass("set-default-btn");
+      button.onClick(() => {
+        if (setDefaultButton && !setDefaultButton.buttonEl.hasAttribute('disabled')) {
+          // set default 클릭 시에도 revert 버튼은 활성화
+          promptTextAreaEl.value = this.plugin.defaultPrompts.pdfPrompt;
+          this.plugin.settings.pdfPrompt = this.plugin.defaultPrompts.pdfPrompt;
+          setDefaultButton.setDisabled(true);
+          if (revertButton) {
+            if (promptTextAreaEl.value !== initialPrompt) {
+              revertButton.setDisabled(false);
+            } else {
+              revertButton.setDisabled(true);
+            }
+          }
+        }
       });
+    });
+    // revert 버튼
+    promptSettingButtons.addButton((button) => {
+      revertButton = button;
+      button.setButtonText("revert")
+        .setDisabled(true)
+        .setClass("revert-btn");
+      button.onClick(() => {
+        if (initialPrompt !== null) {
+          promptTextAreaEl.value = initialPrompt;
+          // this.plugin.settings.pdfPrompt = initialPrompt;
+          if (revertButton) revertButton.setDisabled(true);
+          // setDefaultButton 상태 재조정
+          if (setDefaultButton) {
+            if (promptTextAreaEl.value !== this.plugin.defaultPrompts.pdfPrompt) {
+              setDefaultButton.setDisabled(false);
+            } else {
+              setDefaultButton.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
+
+    // 버튼과 textarea 사이에 줄바꿈 추가    
+    const promptTextArea = new Setting(containerEl)
+      .setHeading();
+
+    // 텍스트에어리어 추가
+    promptTextArea.addTextArea((text) => {
+      const value = this.plugin.settings.pdfPrompt || "";
+      initialPrompt = value; // 탭 활성화 시의 초기값 저장
+      text
+        .setPlaceholder("Enter prompt")
+        .setValue(value)
+        .onChange(async (newValue) => {
+          this.plugin.settings.pdfPrompt = newValue;
+          // set default 버튼 상태
+          if (setDefaultButton) {
+            if (newValue !== this.plugin.defaultPrompts.pdfPrompt) {
+              setDefaultButton.setDisabled(false);
+            } else {
+              setDefaultButton.setDisabled(true);
+            }
+          }
+          // revert 버튼: 값이 초기값과 다르면 활성화, 같으면 비활성화
+          if (revertButton) {
+            if (newValue !== initialPrompt) {
+              revertButton.setDisabled(false);
+            } else {
+              revertButton.setDisabled(true);
+            }
+          }
+        });
+      promptTextAreaEl = text.inputEl;
+      promptTextAreaEl.style.width = "100%";
+      promptTextAreaEl.style.height = "150px";
+      promptTextAreaEl.style.resize = "none";
+      // 초기화 시 set default/revert 버튼 상태 조정
+      if (setDefaultButton) {
+        if (value !== this.plugin.defaultPrompts.webPrompt) {
+          setDefaultButton.setDisabled(false);
+        } else {
+          setDefaultButton.setDisabled(true);
+        }
+      }
+      if (revertButton) {
+        revertButton.setDisabled(true); // 탭 진입 시 revert는 항상 비활성화
+      }
+    });
   }
 
   async buildRecordingSettings(containerEl: HTMLElement): Promise<void> {
@@ -720,8 +846,8 @@ async activateTab(tabId: string): Promise<void> {
       .setName("Save to a New Note")
       .setDesc("Enable this toggle button to save the summary results to a new note.")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.recordingResultNewNote).onChange(async (value) => {
-          this.plugin.settings.recordingResultNewNote = value;
+        toggle.setValue(this.plugin.settings.saveTranscriptAndRefineToNewNote).onChange(async (value) => {
+          this.plugin.settings.saveTranscriptAndRefineToNewNote = value;
         }));
 
     // Recording Unit
@@ -763,7 +889,7 @@ async activateTab(tabId: string): Promise<void> {
       .setName("Speech to Text Model")
       .setDesc("Select the STT model to transcribe the audio")
       .addDropdown(dropdown => {
-        const options = this.plugin.getAllModelKeyValues("speech_to_text");
+        const options = this.plugin.getAllModelKeyValues("sttModel");
         if (Object.keys(options).length === 0) {
           options['whisper-1'] = 'whisper-1';
           options['gpt-4o-mini-transcribe'] = 'gpt-4o-mini-transcribe';
@@ -773,9 +899,9 @@ async activateTab(tabId: string): Promise<void> {
 
         dropdown
           .addOptions(options)
-          .setValue(this.plugin.settings.transcriptSTT)
+          .setValue(this.plugin.settings.sttModel)
           .onChange(async (value) => {
-            this.plugin.settings.transcriptSTT = value;
+            this.plugin.settings.sttModel = value;
             const promptTextArea = containerEl.querySelector(".transcription-prompt-textarea") as HTMLTextAreaElement;
             if (promptTextArea) {
               promptTextArea.parentElement?.toggleClass("hidden", value !== "gpt-4o-mini-transcribe" && value !== "gpt-4o-transcribe");
@@ -787,9 +913,9 @@ async activateTab(tabId: string): Promise<void> {
       .addTextArea((text) => {
         text
           .setPlaceholder("Enter prompt for transcribing")
-          .setValue(this.plugin.settings.transcribingPrompt || "")
+          .setValue(this.plugin.settings.sttPrompt || "")
           .onChange(async (value) => {
-            this.plugin.settings.transcribingPrompt = value;
+            this.plugin.settings.sttPrompt = value;
           });
 
         const textAreaEl = text.inputEl;
@@ -799,8 +925,8 @@ async activateTab(tabId: string): Promise<void> {
         textAreaEl.style.resize = "none";
 
         // 초기 숨김 여부 설정
-        if (this.plugin.settings.transcriptSTT !== "gpt-4o-mini-transcribe" && 
-            this.plugin.settings.transcriptSTT !== "gpt-4o-transcribe") {
+        if (this.plugin.settings.sttModel !== "gpt-4o-mini-transcribe" && 
+            this.plugin.settings.sttModel !== "gpt-4o-transcribe") {
           textAreaEl.parentElement?.classList.add("hidden");
         }
       })
@@ -810,7 +936,7 @@ async activateTab(tabId: string): Promise<void> {
       .setName("Prompt (for summarizing recorded content))")
       .setDesc("This prompt will guide the AI response.")
       .addDropdown(dropdown => {
-        const options = this.plugin.getAllModelKeyValues("transcription");
+        const options = this.plugin.getAllModelKeyValues("transcriptSummaryModel");
         if (Object.keys(options).length === 0) {
           options['gpt-4o'] = 'gpt-4o'; 
           options['gpt-4.1'] = 'gpt-4.1';
@@ -820,28 +946,111 @@ async activateTab(tabId: string): Promise<void> {
 
         dropdown
           .addOptions(options)
-          .setValue(this.plugin.settings.transcriptModel)
+          .setValue(this.plugin.settings.transcriptSummaryModel)
           .onChange(async (value) => {
-            this.plugin.settings.transcriptModel = value;
+            this.plugin.settings.transcriptSummaryModel = value;
           })
       });
-    new Setting(containerEl)
-      .setHeading()
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("Enter prompt")
-          .setValue(this.plugin.settings.recordingPrompt || "")
-          .onChange(async (value) => {
-            this.plugin.settings.recordingPrompt = value;
-          });
 
-        const textAreaEl = text.inputEl;
-        textAreaEl.style.width = "100%";
-        textAreaEl.style.height = "150px";
-        textAreaEl.style.resize = "none";
+    // --- 버튼 2개 (set default, revert) 및 텍스트에 따른 상태 관리 ---
+    let initialPromptForSummary: string | null = null; // 탭 활성화 시의 초기값
+    let setDefaultButtonForSummary: ButtonComponent | undefined;
+    let revertButtonForSummary: ButtonComponent | undefined;
+    let promptTextAreaElForSummary: HTMLTextAreaElement;
+    const promptSettingButtonsForSummary = new Setting(containerEl)
+      .setHeading();
+    // set default 버튼
+    promptSettingButtonsForSummary.addButton((button) => {
+      setDefaultButtonForSummary = button;
+      button.setButtonText("set default prompt")
+        .setDisabled(true)
+        .setClass("set-default-btn");
+      button.onClick(() => {
+        if (setDefaultButtonForSummary && !setDefaultButtonForSummary.buttonEl.hasAttribute('disabled')) {
+          // set default 클릭 시에도 revert 버튼은 활성화
+          promptTextAreaElForSummary.value = this.plugin.defaultPrompts.transcriptSummaryPrompt;
+          this.plugin.settings.transcriptSummaryPrompt = this.plugin.defaultPrompts.transcriptSummaryPrompt;
+          setDefaultButtonForSummary.setDisabled(true);
+          if (revertButtonForSummary) {
+            if (promptTextAreaElForSummary.value !== initialPromptForSummary) {
+              revertButtonForSummary.setDisabled(false);
+            } else {
+              revertButtonForSummary.setDisabled(true);
+            }
+          }
+        }
       });
-    
+    });
+    // revert 버튼
+    promptSettingButtonsForSummary.addButton((button) => {
+      revertButtonForSummary = button;
+      button.setButtonText("revert")
+        .setDisabled(true)
+        .setClass("revert-btn");
+      button.onClick(() => {
+        if (initialPromptForSummary !== null) {
+          promptTextAreaElForSummary.value = initialPromptForSummary;
+          // this.plugin.settings.transcriptSummaryPrompt = initialPrompt;
+          if (revertButtonForSummary) revertButtonForSummary.setDisabled(true);
+          // setDefaultButton 상태 재조정
+          if (setDefaultButtonForSummary) {
+            if (promptTextAreaElForSummary.value !== this.plugin.defaultPrompts.transcriptSummaryPrompt) {
+              setDefaultButtonForSummary.setDisabled(false);
+            } else {
+              setDefaultButtonForSummary.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
+    // 버튼과 textarea 사이에 줄바꿈 추가
+    const promptTextAreaForSummary = new Setting(containerEl)
+      .setHeading();
+    // 텍스트에어리어 추가
+    promptTextAreaForSummary.addTextArea((text) => {
+      const value = this.plugin.settings.transcriptSummaryPrompt || "";
+      initialPromptForSummary = value; // 탭 활성화 시의 초기값 저장
+      text
+        .setPlaceholder("Enter prompt")
+        .setValue(value)
+        .onChange(async (newValue) => {
+          this.plugin.settings.transcriptSummaryPrompt = newValue;
+          // set default 버튼 상태
+          if (setDefaultButtonForSummary) {
+            if (newValue !== this.plugin.defaultPrompts.transcriptSummaryPrompt) {
+              setDefaultButtonForSummary.setDisabled(false);
+            } else {
+              setDefaultButtonForSummary.setDisabled(true);
+            }
+          }
+          // revert 버튼: 값이 초기값과 다르면 활성화, 같으면 비활성화
+          if (revertButtonForSummary) {
+            if (newValue !== initialPromptForSummary) {
+              revertButtonForSummary.setDisabled(false);
+            } else {
+              revertButtonForSummary.setDisabled(true);
+            }
+          }
+        });
+      promptTextAreaElForSummary = text.inputEl;
+      promptTextAreaElForSummary.style.width = "100%";
+      promptTextAreaElForSummary.style.height = "150px";
+      promptTextAreaElForSummary.style.resize = "none";
+      // 초기화 시 set default/revert 버튼 상태 조정
+      if (setDefaultButtonForSummary) {
+        if (value !== this.plugin.defaultPrompts.transcriptSummaryPrompt) {
+          setDefaultButtonForSummary.setDisabled(false);
+        } else {
+          setDefaultButtonForSummary.setDisabled(true);
+        }
+      }
+      if (revertButtonForSummary) {
+        revertButtonForSummary.setDisabled(true); // 탭 진입 시 revert는 항상 비활성화
+      }
+    });
+    /////////////////////////////////////////////////////
     containerEl.createEl("p"); 
+
     // Refining summary
     new Setting(containerEl)
         .setName("Refine summary based on transcription")
@@ -855,26 +1064,102 @@ async activateTab(tabId: string): Promise<void> {
             }
       }));
 
-    new Setting(containerEl)
-        .setHeading()
-        .addTextArea((text) => {
-          text
-            .setPlaceholder("Enter prompt")
-            .setValue(this.plugin.settings.refiningPrompt || "")
-            .onChange(async (value) => {
-              this.plugin.settings.refiningPrompt = value;
-            });
-  
-          const textAreaEl = text.inputEl;
-          textAreaEl.classList.add("refining-prompt-textarea");
-          textAreaEl.style.width = "100%";
-          textAreaEl.style.height = "150px";
-          textAreaEl.style.resize = "none";
-
-          if (!this.plugin.settings.refineSummary) {
-            textAreaEl.parentElement?.classList.add("hidden");
+    // --- 버튼 2개 (set default, revert) 및 텍스트에 따른 상태 관리 ---
+    let initialRefinePrompt: string | null = null; // 탭 활성화 시의 초기값
+    let setDefaultRefineButton: ButtonComponent | undefined;
+    let revertRefineButton: ButtonComponent | undefined;
+    let refinePromptTextAreaEl: HTMLTextAreaElement;
+    const refinePromptSettingButtons = new Setting(containerEl)
+      .setHeading();
+    // set default 버튼
+    refinePromptSettingButtons.addButton((button) => {
+      setDefaultRefineButton = button;
+      button.setButtonText("set default prompt")
+        .setDisabled(true)
+        .setClass("set-default-btn");
+      button.onClick(() => {
+        if (setDefaultRefineButton && !setDefaultRefineButton.buttonEl.hasAttribute('disabled')) {
+          // set default 클릭 시에도 revert 버튼은 활성화
+          refinePromptTextAreaEl.value = this.plugin.defaultPrompts.refineSummaryPrompt;
+          this.plugin.settings.refineSummaryPrompt = this.plugin.defaultPrompts.refineSummaryPrompt;
+          setDefaultRefineButton.setDisabled(true);
+          if (revertRefineButton) {
+            if (refinePromptTextAreaEl.value !== initialRefinePrompt) {
+              revertRefineButton.setDisabled(false);
+            } else {
+              revertRefineButton.setDisabled(true);
+            }
           }
+        }
       });
+    });
+    // revert 버튼
+    refinePromptSettingButtons.addButton((button) => {
+      revertRefineButton = button;
+      button.setButtonText("revert")
+        .setDisabled(true)
+        .setClass("revert-btn");
+      button.onClick(() => {
+        if (initialRefinePrompt !== null) {
+          refinePromptTextAreaEl.value = initialRefinePrompt;
+          // this.plugin.settings.refineSummaryPrompt = initialRefinePrompt;
+          if (revertRefineButton) revertRefineButton.setDisabled(true);
+          // setDefaultButton 상태 재조정
+          if (setDefaultRefineButton) {
+            if (refinePromptTextAreaEl.value !== this.plugin.defaultPrompts.refineSummaryPrompt) {
+              setDefaultRefineButton.setDisabled(false);
+            } else {
+              setDefaultRefineButton.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
+    // 버튼과 textarea 사이에 줄바꿈 추가
+    const refinePromptTextArea = new Setting(containerEl)
+      .setHeading();
+    // 텍스트에어리어 추가
+    refinePromptTextArea.addTextArea((text) => {
+      const value = this.plugin.settings.refineSummaryPrompt || "";
+      initialRefinePrompt = value; // 탭 활성화 시의 초기값 저장
+      text
+        .setPlaceholder("Enter prompt")
+        .setValue(value)
+        .onChange(async (newValue) => {
+          this.plugin.settings.refineSummaryPrompt = newValue;
+          // set default 버튼 상태
+          if (setDefaultRefineButton) {
+            if (newValue !== this.plugin.defaultPrompts.refineSummaryPrompt) {
+              setDefaultRefineButton.setDisabled(false);
+            } else {
+              setDefaultRefineButton.setDisabled(true);
+            }
+          }
+          // revert 버튼: 값이 초기값과 다르면 활성화, 같으면 비활성화
+          if (revertRefineButton) {
+            if (newValue !== initialRefinePrompt) {
+              revertRefineButton.setDisabled(false);
+            } else {
+              revertRefineButton.setDisabled(true);
+            }
+          }
+        });
+      refinePromptTextAreaEl = text.inputEl;
+      refinePromptTextAreaEl.style.width = "100%";
+      refinePromptTextAreaEl.style.height = "150px";
+      refinePromptTextAreaEl.style.resize = "none";
+      // 초기화 시 set default/revert 버튼 상태 조정
+      if (setDefaultRefineButton) {
+        if (value !== this.plugin.defaultPrompts.refineSummaryPrompt) {
+          setDefaultRefineButton.setDisabled(false);
+        } else {
+          setDefaultRefineButton.setDisabled(true);
+        }
+      }
+      if (revertRefineButton) {
+        revertRefineButton.setDisabled(true); // 탭 진입 시 revert는 항상 비활성화
+      }
+    });
   
   }
 
@@ -930,7 +1215,7 @@ async activateTab(tabId: string): Promise<void> {
       })
       
       .addDropdown(dropdown => {
-        const options = this.plugin.getAllModelKeyValues("custom");
+        const options = this.plugin.getAllModelKeyValues("customModel");
         if (Object.keys(options).length === 0) {
           options['gpt-4o'] = 'gpt-4o';
           options['gpt-4.1'] = 'gpt-4.1';

@@ -1,4 +1,5 @@
 export interface PluginSettings {
+  settingsSchemaVersion: string;
   openaiApiKey: string;
   googleApiKey: string;
 
@@ -15,23 +16,31 @@ export interface PluginSettings {
   /////
   webModel: string;
   pdfModel: string;
-  transcriptSTT: string;
-  transcribingPrompt: string;
-  transcriptModel: string;
-  // customModel: string;
-  /////
+  
+  autoRecordOnZoomMeeting: boolean;
   selectedDeviceId: string;
   recordingDir: string;
+  saveTranscriptAndRefineToNewNote: boolean; // recordingResultNewNote -> saveTranscriptAndRefineToNewNote : from 1.0.0
   recordingUnit: number;
   recordingLanguage: string;
-  recordingPrompt: string;
-  recordingResultNewNote: boolean;
+    
+  sttModel: string; // transcriptSTT -> sttModel : from 1.0.0
+  sttPrompt: string;  // transcribingPrompt -> sttPrompt : from 1.0.0
+
+  transcriptSummaryModel: string; // transcriptModel -> transcriptSummaryModel : from 1.0.0
+  transcriptSummaryPrompt: string; // recordingPrompt -> transcriptSummaryPrompt : from 1.0.0
+  
   refineSummary: boolean;
-  refiningPrompt: string;
+  refineSummaryPrompt: string; // refiningPrompt -> refineSummaryPrompt : from 1.0.0
+  
   /////
   testUrl: string;
   debugLevel: number;
   /////
+
+
+
+  // customModel: string;
   cmd_max: number;
   cmd_count: number;
   [key: string]: string | number | boolean;  
@@ -42,9 +51,16 @@ export interface PluginSettings {
   calendar_zoom_only: boolean;
   
   autoLaunchZoomOnSchedule: boolean;
-  autoRecordOnZoomMeeting: boolean;
 
   openaiApiEndpoint: string; // OpenAI API 엔드포인트 URL (기본값: https://api.openai.com)
+
+  //////////// deprecated variables
+  recordingResultNewNote: boolean; // before 1.0.0
+  transcriptSTT: string; // before 1.0.0
+  transcribingPrompt: string; // before 1.0.0
+  transcriptModel: string; // before 1.0.0
+  recordingPrompt: string; // before 1.0.0
+  refiningPrompt: string; // before 1.0.0
 }
 
 export interface OpenAIResponse {
@@ -65,25 +81,35 @@ export interface ModelInfo {
 // }
 
 export interface ModelList {
-    webpage: ModelInfo;
-    pdf: ModelInfo;
-    speech_to_text: ModelInfo;
-    transcription: ModelInfo;
-    custom: ModelInfo;
+    webModel: ModelInfo;
+    pdfModel: ModelInfo;
+    sttModel: ModelInfo;
+    transcriptSummaryModel: ModelInfo;
+    customModel: ModelInfo;
 }
 
 export interface ModelData {
     model_list: ModelList;
 }
 
-export type ModelCategory = 'webpage' | 'pdf' | 'speech_to_text' | 'transcription' | 'custom';
+export type ModelCategory = 'webModel' | 'pdfModel' | 'sttModel' | 'transcriptSummaryModel' | 'customModel';
+
+/////////
+
+export interface DefaultPrompts {
+    webPrompt: string;
+    pdfPrompt: string;
+    sttPrompt: string;
+    transcriptSummaryPrompt: string;
+    refineSummaryPrompt: string;
+}
 
 export interface PromptList {
-    web: string[];
-    pdf: string[];
-    speech_to_text: string[];
-    transcription: string[];
-    refininement: string[];
+    webPrompt: string[];
+    pdfPrompt: string[];
+    sttPrompt: string[];
+    transcriptSummaryPrompt: string[];
+    refineSummaryPrompt: string[];
 }
 
 export interface LangPromptData {
@@ -94,4 +120,4 @@ export interface PromptData {
     default_prompts: LangPromptData;
 }
 
-export type PromptCategory = 'web' | 'pdf' | 'speech_to_text' | 'transcription' | 'refininement';
+// export type PromptCategory = 'webPrompt' | 'pdfPrompt' | 'sttPrompt' | 'transcriptSummaryPrompt' | 'refineSummaryPrompt';

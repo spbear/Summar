@@ -1,5 +1,5 @@
 import { App, Plugin, Setting, Platform, Menu, TFile, TFolder, Modal, normalizePath, MarkdownView, Stat } from "obsidian";
-import { PluginSettings, ModelCategory, ModelInfo, ModelData, PromptData, LangPromptData } from "./types";
+import { PluginSettings, ModelCategory, ModelInfo, ModelData, PromptData, LangPromptData, DefaultPrompts } from "./types";  
 import { SummarDebug, extractDomain, parseHotkey } from "./globals";
 import { PluginUpdater } from "./pluginupdater";
 import { SummarView } from "./summarview"
@@ -15,6 +15,7 @@ import { StatusBar } from "./statusbar";
 
 export default class SummarPlugin extends Plugin {
   settings: PluginSettings = {
+    settingsSchemaVersion: "",
     openaiApiKey: "",
     openaiApiEndpoint: "",
 
@@ -28,24 +29,30 @@ export default class SummarPlugin extends Plugin {
     confluenceDomain: "",
 
     systemPrompt: "",
-    webPrompt: "",
-    pdfPrompt: "",
+    
     webModel: "",
+    webPrompt: "",
+    
     pdfModel: "",
+    pdfPrompt: "",
     
-    transcriptSTT: "",
-    transcribingPrompt: "",
-    transcriptModel: "",
-    
+
+    autoRecordOnZoomMeeting: false,
     selectedDeviceId: "",
     recordingDir: "",
+    saveTranscriptAndRefineToNewNote: true,
     recordingUnit: 15,
     recordingLanguage: "ko-KR",
-    recordingPrompt: "",
-    recordingResultNewNote: true,
+
+    sttModel: "",
+    sttPrompt: "",
+
+    transcriptSummaryModel: "",    
+    transcriptSummaryPrompt: "",
     refineSummary: true,
-    refiningPrompt: "",
+    refineSummaryPrompt: "",
     
+
     testUrl: "",
     debugLevel: 0,
     
@@ -57,7 +64,14 @@ export default class SummarPlugin extends Plugin {
     calendar_polling_interval: 600000,
     calendar_zoom_only: false,
     autoLaunchZoomOnSchedule: false,
-    autoRecordOnZoomMeeting: false
+
+    /// deprecated variables // before 1.0.0
+    recordingResultNewNote: true,
+    transcriptSTT: "",
+    transcribingPrompt: "",
+    transcriptModel: "",
+    recordingPrompt: "",
+    refiningPrompt: "",
   };
 
   resultContainer: HTMLTextAreaElement;
@@ -90,24 +104,32 @@ export default class SummarPlugin extends Plugin {
   PLUGIN_SETTINGS: string = "";  // 플러그인 디렉토리의 data.json
   PLUGIN_MODELS: string = "";  // 플러그인 디렉토리의 models.json
   PLUGIN_PROMPTS: string = "";  // 플러그인 디렉토리의 prompts.json
+  PLUGIN_SETTINGS_SCHEMA_VERSION = "1.0.0"; // 플러그인 설정 스키마 버전
   
   modelsByCategory: Record<ModelCategory, ModelInfo> = {
-        webpage: {},
-        pdf: {},
-        speech_to_text: {},
-        transcription: {},
-        custom: {}
+        webModel: {},
+        pdfModel: {},
+        sttModel: {},
+        transcriptSummaryModel: {},
+        customModel: {}
   };
 
   defaultModelsByCategory: Record<ModelCategory, string> = {
-    webpage: 'gpt-4o',
-    pdf: 'gpt-4o',
-    speech_to_text: 'whisper-1',
-    transcription: 'gpt-4o',
-    custom: 'gpt-4o'
+    webModel: 'gpt-4o',
+    pdfModel: 'gpt-4o',
+    sttModel: 'whisper-1',
+    transcriptSummaryModel: 'gpt-4o',
+    customModel: 'gpt-4o'
   };
 
-  defaultPrompts: LangPromptData = {};
+  defaultPrompts: DefaultPrompts = {
+    webPrompt: "",
+    pdfPrompt: "",
+    sttPrompt: "",
+    transcriptSummaryPrompt: "",
+    refineSummaryPrompt: ""
+  };
+
 
   async onload() {
     this.OBSIDIAN_PLUGIN_DIR = normalizePath("/.obsidian/plugins");
@@ -618,6 +640,24 @@ export default class SummarPlugin extends Plugin {
         } else {
           settings.confluenceDomain = "";
         }
+        if (settings.settingsSchemaVersion !== this.PLUGIN_SETTINGS_SCHEMA_VERSION) {
+          // 1.0.0 이전 버전의 설정 파일을 읽는 경우, 필요한 변환 작업을 수행합니다.
+          settings.saveTranscriptAndRefineToNewNote = settings.recordingResultNewNote;
+          settings.sttModel = settings.transcriptSTT;
+          settings.sttPrompt = settings.transcribingPrompt;
+          settings.transcriptSummaryModel = settings.transcriptModel;
+          settings.transcriptSummaryPrompt = settings.recordingPrompt;
+          settings.refineSummaryPrompt = settings.refiningPrompt;
+
+          settings.recordingResultNewNote = false; // 이전 버전의 설정을 제거합니다.
+          settings.transcriptSTT = ""; // 이전 버전의 설정을 제거합니다.
+          settings.transcribingPrompt = ""; // 이전 버전의 설정을 제거합니다.
+          settings.transcriptModel = ""; // 이전 버전의 설정을 제거합니다.
+          settings.recordingPrompt = ""; // 이전 버전의 설정을 제거합니다.
+          settings.refiningPrompt = ""; // 이전 버전의 설정을 제거합니다.
+  
+          settings.settingsSchemaVersion = this.PLUGIN_SETTINGS_SCHEMA_VERSION;
+        } 
         return settings;
       } catch (error) {
         SummarDebug.log(1, "Error reading settings file:", error);
@@ -651,7 +691,7 @@ export default class SummarPlugin extends Plugin {
         const modelData = JSON.parse(modelDataJson) as ModelData;
 
         if (modelData.model_list) {
-          const categories: ModelCategory[] = ['webpage', 'pdf', 'speech_to_text', 'transcription', 'custom'];
+          const categories: ModelCategory[] = ['webModel', 'pdfModel', 'sttModel', 'transcriptSummaryModel', 'customModel'];
 
           for (const category of categories) {
             if (modelData.model_list[category]) {
@@ -667,11 +707,11 @@ export default class SummarPlugin extends Plugin {
             }
           }
 
-          this.settings.webModel = this.getDefaultModel('webpage');
-          this.settings.pdfModel = this.getDefaultModel('pdf');
-          this.settings.transcriptSTT = this.getDefaultModel('speech_to_text');
-          this.settings.transcriptModel = this.getDefaultModel('transcription');
-          this.settings.customModel = this.getDefaultModel('custom');
+          this.settings.webModel = this.getDefaultModel('webModel');
+          this.settings.pdfModel = this.getDefaultModel('pdfModel');
+          this.settings.sttModel = this.getDefaultModel('sttModel');
+          this.settings.transcriptSummaryModel = this.getDefaultModel('transcriptSummaryModel');
+          this.settings.customModel = this.getDefaultModel('customModel');
         }
         // return { models: defaultModels, defaults: defaultValues };
       } catch (error) {
@@ -717,16 +757,14 @@ export default class SummarPlugin extends Plugin {
         const promptDataJson = await this.app.vault.adapter.read(this.PLUGIN_PROMPTS);
         const promptData = JSON.parse(promptDataJson) as PromptData;
         if (promptData.default_prompts) {
-          // console.log("=======\ndefault_prompts loaded");
-          this.defaultPrompts = promptData.default_prompts;
-          this.settings.webPrompt = this.defaultPrompts.ko.web.join("\n");
-          this.settings.pdfPrompt = this.defaultPrompts.ko.pdf.join("\n");
-          this.settings.recordingPrompt = this.defaultPrompts.ko.transcription.join("\n");
-          this.settings.refiningPrompt = this.defaultPrompts.ko.refininement.join("\n");
+          this.settings.webPrompt = this.defaultPrompts.webPrompt = promptData.default_prompts.ko.webPrompt.join("\n");
+          this.settings.pdfPrompt = this.defaultPrompts.pdfPrompt = promptData.default_prompts.ko.pdfPrompt.join("\n");
+          this.settings.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt = promptData.default_prompts.ko.transcriptSummaryPrompt.join("\n");
+          this.settings.refineSummaryPrompt = this.defaultPrompts.refineSummaryPrompt = promptData.default_prompts.ko.refineSummaryPrompt.join("\n");
           // console.log(`setting.webPrompt: \n${this.settings.webPrompt}`);
           // console.log(`setting.pdfPrompt: \n${this.settings.pdfPrompt}`);
-          // console.log(`setting.recordingPrompt: \n${this.settings.recordingPrompt}`);
-          // console.log(`setting.refiningPrompt: \n${this.settings.refiningPrompt}`);
+          // console.log(`setting.transcriptSummaryPrompt: \n${this.settings.transcriptSummaryPrompt}`);
+          // console.log(`setting.refineSummaryPrompt: \n${this.settings.refineSummaryPrompt}`);
         }
         else {
           console.log("=======\ndefault_prompts not found");

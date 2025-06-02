@@ -1,6 +1,6 @@
 {
   "model_list": {
-    "webpage": {
+    "webModel": {
       "default": "gpt-4o",
       "models": {
         "gpt-4o": "gpt-4o",
@@ -10,7 +10,7 @@
         "o3-mini": "o3-mini"
       }
     },
-    "pdf": {
+    "pdfModel": {
       "default": "gpt-4o",
       "models": {
         "gpt-4o": "gpt-4o",
@@ -18,7 +18,7 @@
         "gpt-4.1-mini": "gpt-4.1-mini"
       }
     },
-    "speech_to_text": {
+    "sttModel": {
       "default": "whisper-1",
       "models": {
         "whisper-1": "whisper-1",
@@ -27,7 +27,7 @@
         "gemini-2.0-flash": "gemini-2.0-flash"
       }
     },
-    "transcription": {
+    "transcriptSummaryModel": {
       "default": "gpt-4o",
       "models": {
         "gpt-4o": "gpt-4o",
@@ -37,7 +37,7 @@
         "o3-mini": "o3-mini"
       }
     },
-    "custom": {
+    "customModel": {
       "default": "gpt-4o",
       "models": {
         "gpt-4o": "gpt-4o",
