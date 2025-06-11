@@ -101,13 +101,16 @@ export class CalendarHandler {
                 if (code === 0) {
                     try {
                         const meetings: ZoomMeeting[] = JSON.parse(output.trim());
+                        SummarDebug.Notice(1, "캘린더 정보 불러오기 성공");
                         resolve(meetings);
                     } catch (error) {
                         SummarDebug.error(1, "JSON Parsing Error:", error);
+                        SummarDebug.Notice(0, "캘린더 정보 파싱 오류: " + (error?.message || error));
                         reject(new Error("Failed to parse Swift output as JSON"));
                     }
                 } else {
                     SummarDebug.error(1, "Swift Execution Error:", errorOutput);
+                    SummarDebug.Notice(0, "Swift 코드 실행 실패: " + errorOutput);
                     reject(new Error("Swift script execution failed"));
                 }
             });
