@@ -1,7 +1,7 @@
 import { Platform, normalizePath, FileSystemAdapter, Modal, App } from "obsidian";
 import { spawn, exec } from "child_process";
 import { promisify } from "util";
-import { SWIFT_SCRIPT_TEMPLATE, SummarDebug } from "./globals";
+import { SummarDebug } from "./globals";
 import { writeFileSync, unlinkSync } from "fs";
 import SummarPlugin from "./main";
 
@@ -65,14 +65,6 @@ export class CalendarHandler {
         SummarDebug.log(1, "Stopped CalendarHandler updates.");
     }
 
-    formatPrintf(template: string, ...args: any[]): string {
-        let i = 0;
-        return template.replace(/%[sd]/g, (match) => {
-            if (i >= args.length) return match; // 인자 부족 시 그대로 둠
-            return match === "%d" ? Number(args[i++]).toString() : String(args[i++]);
-        });
-    }
-
     /**
      * Checks if Xcode is installed and available on the system.
      * Returns true if installed, false otherwise.
@@ -99,17 +91,36 @@ export class CalendarHandler {
         }
 
         return new Promise((resolve, reject) => {
-
-            let calendarNames ="";
-            for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
-                calendarNames += "\"" + this.plugin.settings[`calendar_${i}`] + "\", ";
+            // calendar_count가 없거나 0이면 실행하지 않음
+            if (!this.plugin.settings.calendar_count || this.plugin.settings.calendar_count === 0) {
+                SummarDebug.log(1, "캘린더가 설정되지 않아 fetchZoomMeetings를 실행하지 않습니다.");
+                resolve([]);
+                return;
             }
 
-            const scriptPath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath() + "/.obsidian/plugins/summar/fetch_calendar.swift");
-            const scriptFile = this.formatPrintf(SWIFT_SCRIPT_TEMPLATE, this.plugin.settings.calendar_fetchdays, calendarNames);
-            writeFileSync(scriptPath, scriptFile, "utf-8");
+            // Build argument list for Swift
+            const args: string[] = [];
+            if (this.plugin.settings.calendar_fetchdays && Number.isInteger(this.plugin.settings.calendar_fetchdays)) {
+                args.push(`--fetch-days=${this.plugin.settings.calendar_fetchdays}`);
+            }
+            // 캘린더가 하나도 없으면 실행하지 않음
+            let calendarList: string[] = [];
+            for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
+                const cal = this.plugin.settings[`calendar_${i}`];
+                if (cal && typeof cal === 'string' && cal.trim().length > 0) {
+                    calendarList.push(cal.trim());
+                }
+            }
+            if (calendarList.length === 0) {
+                SummarDebug.log(1, "캘린더 목록이 비어 있어 fetchZoomMeetings를 실행하지 않습니다.");
+                resolve([]);
+                return;
+            }
 
-            const process = spawn("swift", [scriptPath]);
+            args.push(`--fetch-calendars=${calendarList.join(",")}`);
+            const scriptPath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath() + "/.obsidian/plugins/summar/fetch_calendar.swift");
+            const spawnArgs = [scriptPath, ...args];
+            const process = spawn("swift", spawnArgs);
             let output = "";
             let errorOutput = "";
 
@@ -219,29 +230,31 @@ export class CalendarHandler {
     displayEvents(display?: boolean, containerEl?: HTMLElement) {
         // 기본 containerEl 설정
         if (containerEl) {
-            this.eventContainer = containerEl; // 기본 컨테이너 엘리먼트를 참조하도록 수정
+            this.eventContainer = containerEl;
         }
 
         if (display !== undefined) {
             this.autoRecord = display;
         }
 
-        // 이전에 표시된 내용을 모두 삭제
-        this.eventContainer.innerHTML = "";
-        this.eventContainer.replaceChildren(); // 모든 자식 요소 제거
+        // 스피너와 메시지 표시
+        this.eventContainer.innerHTML = '<div class="event-loading"><div class="event-spinner"></div>Loading events...</div>';
 
-        // display가 true일 경우에만 이벤트 표시
-        // if (this.autoRecord) {
+        // 이벤트 렌더링(비동기)
+        setTimeout(() => {
+            this.eventContainer.innerHTML = "";
+            this.eventContainer.replaceChildren();
             this.events.forEach((event, index) => {
                 const eventEl = this.createEventElement(event, index);
+                // autoRecord가 true이고, 해당 이벤트에 zoom_link가 있을 때만 선택 효과
+                if (this.autoRecord && event.zoom_link && event.zoom_link.length > 0) {
+                    eventEl.classList.add("event-selected");
+                } else {
+                    eventEl.classList.remove("event-selected");
+                }
                 this.eventContainer.appendChild(eventEl);
             });
-        // }
-        if (this.autoRecord) {
-            this.eventContainer.style.opacity = "1";
-        } else {
-            this.eventContainer.style.opacity = "0.4";
-        }
+        }, 200); // 0.2초 후 실제 렌더링(실제 fetch라면 fetch 후에 호출)
     }
 
     createEventElement(event: CalendarEvent, index: number): HTMLElement {
@@ -255,7 +268,7 @@ export class CalendarHandler {
                 event.start.getMinutes().toString().padStart(2, "0");
 
             eventEl.classList.add("event");
-            // eventEl.innerHTML = `
+            // 강제 색상 지정 제거, 의미별 클래스만 부여
             let strInnerHTML = `
             <div class="event-title">📅 ${event.title}</div>
             <div class="event-time">⏳${event.start.toLocaleString()} - ⏳${event.end.toLocaleString()}</div>`;
@@ -263,7 +276,6 @@ export class CalendarHandler {
                 strInnerHTML += `<a href="${event.zoom_link}" class="event-zoom-link" target="_blank">🔗Join Zoom Meeting</a>`;
             }
             strInnerHTML += `<a href="#" class="event-obsidian-link">📝 Create Note in Obsidian</a>
-            <p>
         `;
             eventEl.innerHTML = strInnerHTML;
 
@@ -305,6 +317,60 @@ export class CalendarHandler {
         } catch (error) {
             SummarDebug.error(1, "Failed to launch Zoom meeting:", error);
         }
+    }
+
+    /**
+     * Fetches available macOS calendar names using the Swift script.
+     * Returns an array of calendar names, null if permission denied, or [] on error.
+     */
+    async getAvailableCalendars(): Promise<string[] | null> {
+        return new Promise((resolve) => {
+            const { spawn } = require('child_process');
+            const { normalizePath } = require('obsidian');
+            const { FileSystemAdapter } = require('obsidian');
+            const basePath = (this.plugin.app.vault.adapter as typeof FileSystemAdapter).getBasePath();
+            const scriptPath = normalizePath(basePath + "/.obsidian/plugins/summar/fetch_calendar.swift");
+            const process = spawn('swift', [scriptPath, '--list-calendars']);
+            let output = '';
+            let errorOutput = '';
+            process.stdout.on('data', (data: Buffer) => {
+                output += data.toString();
+            });
+            process.stderr.on('data', (data: Buffer) => {
+                errorOutput += data.toString();
+            });
+            process.on('close', (code: number) => {
+                const trimmed = output.trim();
+                if (trimmed === '-1') {
+                    SummarDebug.error(1, '[Calendar] Permission denied.');
+                    if (errorOutput) SummarDebug.error(1, '[Calendar][stderr]', errorOutput);
+                    resolve(null); // Permission error
+                    return;
+                }
+                try {
+                    const result = JSON.parse(trimmed);
+                    if (Array.isArray(result)) {
+                        if (result.length === 0) {
+                            SummarDebug.log(1, '[Calendar] Calendar list is empty.');
+                            if (errorOutput) SummarDebug.log(1, '[Calendar][stderr]', errorOutput);
+                        }
+                        resolve(result);
+                    } else {
+                        SummarDebug.log(1, '[Calendar] Unexpected result:', result);
+                        if (errorOutput) SummarDebug.log(1, '[Calendar][stderr]', errorOutput);
+                        resolve([]);
+                    }
+                } catch (e) {
+                    SummarDebug.error(1, '[Calendar] Failed to parse calendar list:', trimmed, e);
+                    if (errorOutput) SummarDebug.error(1, '[Calendar][stderr]', errorOutput);
+                    resolve([]);
+                }
+            });
+            process.on('error', (err: Error) => {
+                SummarDebug.error(1, '[Calendar] Failed to spawn Swift process:', err);
+                resolve([]);
+            });
+        });
     }
 }
 
