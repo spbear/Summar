@@ -73,7 +73,31 @@ export class CalendarHandler {
         });
     }
 
+    /**
+     * Checks if Xcode is installed and available on the system.
+     * Returns true if installed, false otherwise.
+     */
+    async checkXcodeInstalled(): Promise<boolean> {
+        return new Promise((resolve) => {
+            const { exec } = require("child_process");
+            exec("xcode-select -p", (error: Error | null, stdout: string, stderr: string) => {
+                if (error || !stdout || stdout.trim() === "") {
+                    resolve(false);
+                } else {
+                    resolve(true);
+                }
+            });
+        });
+    }
+
     async fetchZoomMeetings(): Promise<ZoomMeeting[]> {
+        // Check if Xcode is installed
+        const xcodeInstalled = await this.checkXcodeInstalled();
+        if (!xcodeInstalled) {
+            SummarDebug.Notice(0, `Xcode is not installed or not properly configured.\n\nCalendar integration via Swift requires Xcode.\n\nHow to install:\n1. Install Xcode from the App Store.\n2. After installation, run the following commands in Terminal:\n\n  sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer\n  sudo xcodebuild -runFirstLaunch\n\nRestart Obsidian after installation.`);
+            throw new Error("Xcode is not installed or not configured.");
+        }
+
         return new Promise((resolve, reject) => {
 
             let calendarNames ="";
@@ -101,16 +125,16 @@ export class CalendarHandler {
                 if (code === 0) {
                     try {
                         const meetings: ZoomMeeting[] = JSON.parse(output.trim());
-                        SummarDebug.Notice(1, "캘린더 정보 불러오기 성공");
+                        SummarDebug.Notice(1, "Successfully fetched calendar information.");
                         resolve(meetings);
                     } catch (error) {
                         SummarDebug.error(1, "JSON Parsing Error:", error);
-                        SummarDebug.Notice(0, "캘린더 정보 파싱 오류: " + (error?.message || error));
+                        SummarDebug.Notice(0, "Failed to parse calendar information: " + (error?.message || error));
                         reject(new Error("Failed to parse Swift output as JSON"));
                     }
                 } else {
                     SummarDebug.error(1, "Swift Execution Error:", errorOutput);
-                    SummarDebug.Notice(0, "Swift 코드 실행 실패: " + errorOutput);
+                    SummarDebug.Notice(0, "Swift script execution failed: " + errorOutput);
                     reject(new Error("Swift script execution failed"));
                 }
             });
@@ -256,11 +280,11 @@ export class CalendarHandler {
             // });
 
 
-            // ✅ Obsidian 내에서 새 탭으로 노트 열기
+            // ✅ Open note in new tab in Obsidian
             const obsidianLinkEl = eventEl.querySelector(".event-obsidian-link");
             obsidianLinkEl?.addEventListener("click", (e) => {
                 e.preventDefault();
-                this.plugin.app.workspace.openLinkText(formattedDate, "", true); // ✅ 새 탭에서 열기
+                this.plugin.app.workspace.openLinkText(formattedDate, "", true); // Open in new tab
             });
 
         }
@@ -268,19 +292,18 @@ export class CalendarHandler {
     }
 
     /**
-     * 전달받은 Zoom URL을 사용하여 Zoom 미팅을 실행하는 함수.
-     * macOS에서는 'open' 명령어를 사용합니다.
+     * Launches the given Zoom URL. On macOS, uses the 'open' command.
      */
     async launchZoomMeeting(url: string): Promise<void> {
         const execAsync = promisify(exec);
         try {
-            SummarDebug.log(1, `Zoom 미팅 실행 중: ${url}`);
+            SummarDebug.log(1, `Launching Zoom meeting: ${url}`);
             const { stdout, stderr } = await execAsync(`open "${url}"`);
             if (stderr && stderr.trim()) {
-                SummarDebug.error(1, "Zoom 미팅 실행 중 에러 발생:", stderr);
+                SummarDebug.error(1, "Error occurred while launching Zoom meeting:", stderr);
             }
         } catch (error) {
-            SummarDebug.error(1, "Zoom 미팅 실행 실패:", error);
+            SummarDebug.error(1, "Failed to launch Zoom meeting:", error);
         }
     }
 }

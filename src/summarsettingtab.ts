@@ -1397,6 +1397,11 @@ async activateTab(tabId: string): Promise<void> {
   async buildCalendarSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "Calendar integration" });
 
+    // Add Xcode requirement notice
+    containerEl.createEl("p", {
+      text: "Note: Calendar integration on macOS requires Xcode to be installed. Please install Xcode from the App Store and run the required setup commands in Terminal. See the error message for details if you encounter issues."
+    });
+
     new Setting(containerEl)
       .setName("Enter the macOS calendar to search for Zoom meetings")
       .setDesc("Leave blank to search all calendars.")
