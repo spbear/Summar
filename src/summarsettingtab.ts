@@ -1358,10 +1358,10 @@ async activateTab(tabId: string): Promise<void> {
   async buildCalendarSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl('h2', { text: 'Calendar integration' });
     containerEl.createEl('p', {
-      text: 'Note: Calendar integration on macOS requires Xcode to be installed. Please install Xcode from the App Store and run the required setup commands in Terminal. See the error message for details if you encounter issues.'
+      text: 'This feature works on macOS and integrates with the default macOS Calendar.'
     });
     new Setting(containerEl)
-      .setName('Enter the macOS calendar to search for Zoom meetings')
+      .setName('Enter the macOS calendar to search for events')
       .setDesc('Leave blank to search all calendars.')
       .addButton(button => button
         .setButtonText('Add Calendar')
@@ -1374,36 +1374,25 @@ async activateTab(tabId: string): Promise<void> {
             SummarDebug.Notice(0, 'You can only add up to 5 calendars.');
           }
         }));
+    // ...기존 캘린더 필드 생성 및 기타 설정...
     const calendarContainer = containerEl.createDiv();
     for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
       await this.createCalendarField(containerEl, i);
     }
-
+    // 'Show Zoom meetings only' 옵션 및 관련 UI/로직 삭제
     new Setting(containerEl)
-      .setName("Show Zoom meetings only")
-      .setDesc("When the toggle switch is on, only Zoom meetings are listed. When it is off, all events are displayed.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.calendar_zoom_only).onChange(async (value) => {
-          this.plugin.settings.calendar_zoom_only = value;
-          await this.plugin.calendarHandler.displayEvents();
-        }));
-
-    new Setting(containerEl)
-      .setName("Automatically launches Zoom meetings for calendar events.")
-      .setDesc("If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events")
+      .setName('Automatically launches Zoom meetings for calendar events.')
+      .setDesc('If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.autoLaunchZoomOnSchedule).onChange(async (value) => {
           this.plugin.settings.autoLaunchZoomOnSchedule = value;
           await this.plugin.calendarHandler.displayEvents(value);
-          // this.plugin.reservedStatus.update(value ? "⏰" : "", value ? "green" : "black");
           if (value) {
-            this.plugin.reservedStatus.setStatusbarIcon("calendar-clock", "red");
+            this.plugin.reservedStatus.setStatusbarIcon('calendar-clock', 'red');
           } else {
-            this.plugin.reservedStatus.setStatusbarIcon("calendar-x", "var(--text-muted)");
+            this.plugin.reservedStatus.setStatusbarIcon('calendar-x', 'var(--text-muted)');
           }
         }));
-
-    // const eventContainer = containerEl.createDiv();
     await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, containerEl.createDiv());
   }
 
