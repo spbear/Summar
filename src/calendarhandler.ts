@@ -260,46 +260,45 @@ export class CalendarHandler {
     createEventElement(event: CalendarEvent, index: number): HTMLElement {
         const eventEl = document.createElement("div");
 
-        if (!this.plugin.settings.calendar_zoom_only || (event.zoom_link && event.zoom_link.length >0 )) {
-            const formattedDate = event.start.getFullYear().toString().slice(2) +
-                String(event.start.getMonth() + 1).padStart(2, "0") +
-                event.start.getDate().toString().padStart(2, "0") + "-" +
-                event.start.getHours().toString().padStart(2, "0") +
-                event.start.getMinutes().toString().padStart(2, "0");
+        // Zoom only 옵션 관련 코드 전체 제거, 모든 이벤트를 그대로 표시
+        const formattedDate = event.start.getFullYear().toString().slice(2) +
+            String(event.start.getMonth() + 1).padStart(2, "0") +
+            event.start.getDate().toString().padStart(2, "0") + "-" +
+            event.start.getHours().toString().padStart(2, "0") +
+            event.start.getMinutes().toString().padStart(2, "0");
 
-            eventEl.classList.add("event");
-            // 강제 색상 지정 제거, 의미별 클래스만 부여
-            let strInnerHTML = `
-            <div class="event-title">📅 ${event.title}</div>
-            <div class="event-time">⏳${event.start.toLocaleString()} - ⏳${event.end.toLocaleString()}</div>`;
-            if (event.zoom_link && event.zoom_link.length > 0) {
-                strInnerHTML += `<a href="${event.zoom_link}" class="event-zoom-link" target="_blank">🔗Join Zoom Meeting</a>`;
-            }
-            strInnerHTML += `<a href="#" class="event-obsidian-link">📝 Create Note in Obsidian</a>
-        `;
-            eventEl.innerHTML = strInnerHTML;
-
-            // const zoomLinkEl = eventEl.querySelector(".event-zoom-link");
-            // zoomLinkEl?.addEventListener("click", async (e) => {
-
-            //     if (this.plugin.recordingManager.getRecorderState() !== "recording") {
-            //         new ConfirmModal(this.plugin.app, async (shouldRecord: boolean) => {
-            //             if (shouldRecord) {
-            //                 await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
-            //             }
-            //             }).open();
-            //     }
-            // });
-
-
-            // ✅ Open note in new tab in Obsidian
-            const obsidianLinkEl = eventEl.querySelector(".event-obsidian-link");
-            obsidianLinkEl?.addEventListener("click", (e) => {
-                e.preventDefault();
-                this.plugin.app.workspace.openLinkText(formattedDate, "", true); // Open in new tab
-            });
-
+        eventEl.classList.add("event");
+        // 강제 색상 지정 제거, 의미별 클래스만 부여
+        let strInnerHTML = `
+        <div class="event-title">📅 ${event.title}</div>
+        <div class="event-time">⏳${event.start.toLocaleString()} - ⏳${event.end.toLocaleString()}</div>`;
+        if (event.zoom_link && event.zoom_link.length > 0) {
+            strInnerHTML += `<a href="${event.zoom_link}" class="event-zoom-link" target="_blank">🔗Join Zoom Meeting</a>`;
         }
+        strInnerHTML += `<a href="#" class="event-obsidian-link">📝 Create Note in Obsidian</a>
+    `;
+        eventEl.innerHTML = strInnerHTML;
+
+        // const zoomLinkEl = eventEl.querySelector(".event-zoom-link");
+        // zoomLinkEl?.addEventListener("click", async (e) => {
+
+        //     if (this.plugin.recordingManager.getRecorderState() !== "recording") {
+        //         new ConfirmModal(this.plugin.app, async (shouldRecord: boolean) => {
+        //             if (shouldRecord) {
+        //                 await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
+        //             }
+        //             }).open();
+        //     }
+        // });
+
+
+        // ✅ Open note in new tab in Obsidian
+        const obsidianLinkEl = eventEl.querySelector(".event-obsidian-link");
+        obsidianLinkEl?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.plugin.app.workspace.openLinkText(formattedDate, "", true); // Open in new tab
+        });
+
         return eventEl;
     }
 

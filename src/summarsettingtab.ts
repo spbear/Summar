@@ -1358,11 +1358,11 @@ async activateTab(tabId: string): Promise<void> {
   async buildCalendarSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl('h2', { text: 'Calendar integration' });
     containerEl.createEl('p', {
-      text: 'Note: Calendar integration on macOS requires Xcode to be installed. Please install Xcode from the App Store and run the required setup commands in Terminal. See the error message for details if you encounter issues.'
+      text: 'This feature works on macOS and integrates with the default macOS Calendar.'
     });
     new Setting(containerEl)
-      .setName('Enter the macOS calendar to search for Zoom meetings')
-      .setDesc('Leave blank to search all calendars.')
+      .setName('Enter the macOS calendar to search for events')
+      .setDesc('Click Add Calendar and select a calendar to fetch events.')
       .addButton(button => button
         .setButtonText('Add Calendar')
         .onClick(async () => {
@@ -1374,78 +1374,76 @@ async activateTab(tabId: string): Promise<void> {
             SummarDebug.Notice(0, 'You can only add up to 5 calendars.');
           }
         }));
+    // 캘린더 목록을 한 번만 fetch
+    const calendars = await this.plugin.calendarHandler.getAvailableCalendars();
     const calendarContainer = containerEl.createDiv();
     for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
-      await this.createCalendarField(containerEl, i);
+      await this.createCalendarField(containerEl, i, calendars ?? undefined);
     }
-
     new Setting(containerEl)
-      .setName("Show Zoom meetings only")
-      .setDesc("When the toggle switch is on, only Zoom meetings are listed. When it is off, all events are displayed.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.calendar_zoom_only).onChange(async (value) => {
-          this.plugin.settings.calendar_zoom_only = value;
-          await this.plugin.calendarHandler.displayEvents();
-        }));
-
-    new Setting(containerEl)
-      .setName("Automatically launches Zoom meetings for calendar events.")
-      .setDesc("If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events")
+      .setName('Automatically launches Zoom meetings for calendar events.')
+      .setDesc('If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.autoLaunchZoomOnSchedule).onChange(async (value) => {
           this.plugin.settings.autoLaunchZoomOnSchedule = value;
           await this.plugin.calendarHandler.displayEvents(value);
-          // this.plugin.reservedStatus.update(value ? "⏰" : "", value ? "green" : "black");
           if (value) {
-            this.plugin.reservedStatus.setStatusbarIcon("calendar-clock", "red");
+            this.plugin.reservedStatus.setStatusbarIcon('calendar-clock', 'red');
           } else {
-            this.plugin.reservedStatus.setStatusbarIcon("calendar-x", "var(--text-muted)");
+            this.plugin.reservedStatus.setStatusbarIcon('calendar-x', 'var(--text-muted)');
           }
         }));
-
-    // const eventContainer = containerEl.createDiv();
     await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, containerEl.createDiv());
   }
 
-  async createCalendarField(containerEl: HTMLElement, index: number): Promise<void> {
+  async createCalendarField(containerEl: HTMLElement, index: number, calendars?: string[]): Promise<void> {
     const setting = new Setting(containerEl)
       .setHeading();
-    // 캘린더 목록 로딩 표시 (영문, DocumentFragment로)
-    const frag = document.createDocumentFragment();
-    const loadingDiv = document.createElement("div");
-    loadingDiv.className = "event-loading";
-    const spinner = document.createElement("div");
-    spinner.className = "event-spinner";
-    loadingDiv.appendChild(spinner);
-    loadingDiv.appendChild(document.createTextNode("Loading calendar list..."));
-    frag.appendChild(loadingDiv);
-    setting.setDesc(frag);
-    const calendars = await this.plugin.calendarHandler.getAvailableCalendars();
-    // 로딩 메시지 제거
-    setting.setDesc("");
-    if (calendars === null) {
-      setting.setDesc('Calendar access was denied. Please allow calendar access in System Preferences > Privacy.');
-      return;
-    }
-    if (calendars.length === 0) {
-      setting.setDesc('No calendars found. Please check macOS calendar access permissions.');
-    }
+
+    // 1. 기존 선택된 값 표시, 드롭다운은 disable 상태로 먼저 렌더링
+    const currentValue = String(this.plugin.settings[`calendar_${index}`] || '');
+    let dropdownComponent: any = null;
     setting.addDropdown((dropdown) => {
+      dropdownComponent = dropdown;
       dropdown.addOption('', 'Select calendar');
-      calendars.forEach((item, idx) => {
-        if (typeof item === 'string') {
-          dropdown.addOption(item, item);
-        }
-      });
-      dropdown.setValue(String(this.plugin.settings[`calendar_${index}`] || ''));
+      if (currentValue) {
+        dropdown.addOption(currentValue, currentValue);
+      }
+      dropdown.setValue(currentValue);
+      (dropdown as any).selectEl.disabled = true; // 최초엔 disable
       dropdown.onChange(async (value: string) => {
         this.plugin.settings[`calendar_${index}`] = value;
         await this.plugin.saveSettingsToFile();
         await this.plugin.calendarHandler.updateScheduledMeetings();
         await this.plugin.calendarHandler.displayEvents();
       });
-    })
-    .addExtraButton(button => button
+    });
+
+    // 캘린더 목록이 있으면 바로 사용, 없으면 fetch
+    const updateDropdownWithCalendars = (calendarsList: string[] | null) => {
+      if (dropdownComponent) {
+        const selectEl = (dropdownComponent as any).selectEl as HTMLSelectElement;
+        selectEl.disabled = false;
+        // 기존 옵션 모두 제거
+        while (selectEl.options.length > 0) selectEl.remove(0);
+        dropdownComponent.addOption('', 'Select calendar');
+        if (calendarsList && calendarsList.length > 0) {
+          calendarsList.forEach((item: string) => {
+            dropdownComponent.addOption(item, item);
+          });
+        }
+        dropdownComponent.setValue(currentValue);
+      }
+    };
+
+    if (calendars !== undefined) {
+      updateDropdownWithCalendars(calendars);
+    } else {
+      this.plugin.calendarHandler.getAvailableCalendars().then(updateDropdownWithCalendars);
+    }
+
+    // 삭제 버튼은 기존대로 유지
+    setting.addExtraButton(button => button
       .setIcon('trash-2')
       .setTooltip('Remove Calendar')
       .onClick(async () => {
