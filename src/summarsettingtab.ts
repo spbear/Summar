@@ -1355,51 +1355,14 @@ async activateTab(tabId: string): Promise<void> {
     containerEl.appendChild(optionRow);
   }
 
-  createCalendarField(containerEl: HTMLElement, index: number): void {
-    const setting = new Setting(containerEl)
-      // .setName(`Calendar ${index + 1}`)
-      .setHeading()
-      .addText((text) => {
-        text
-          .setPlaceholder("Enter Calendar Name")
-          .setValue(this.plugin.settings[`calendar_${index}`] as string)
-          .onChange((value) => {
-            this.plugin.settings[`calendar_${index}`] = value;
-          });
-        const textEl = text.inputEl;
-        textEl.style.width = "100%";
-        // Focus가 떠날 때 dirty flag 설정
-        textEl.addEventListener("blur", async () => {
-          // SummarDebug.Notice(3, "Calendar name changed. Please save the settings.");
-          await this.plugin.saveSettingsToFile();
-          await this.plugin.calendarHandler.updateScheduledMeetings();
-          await this.plugin.calendarHandler.displayEvents();
-        });
-      }
-      )
-      .addExtraButton(button => button
-        .setIcon(`trash-2`)
-        .setTooltip(`Remove Calendar`)
-        .onClick(async () => {
-          for (let i = index; i < this.plugin.settings.calendar_count; i++) {
-            this.plugin.settings[`calendar_${i}`] = this.plugin.settings[`calendar_${i + 1}`];
-          }
-          delete this.plugin.settings[`calendar_${this.plugin.settings.calendar_count}`];
-          this.plugin.settings.calendar_count -= 1;
-          this.display();
-          await this.plugin.saveSettingsToFile();
-          await this.plugin.calendarHandler.updateScheduledMeetings();
-          await this.plugin.calendarHandler.displayEvents();
-        })
-      );
-  }
-
   async buildCalendarSettings(containerEl: HTMLElement): Promise<void> {
-    containerEl.createEl("h2", { text: "Calendar integration" });
-
+    containerEl.createEl('h2', { text: 'Calendar integration' });
+    containerEl.createEl('p', {
+      text: 'Note: Calendar integration on macOS requires Xcode to be installed. Please install Xcode from the App Store and run the required setup commands in Terminal. See the error message for details if you encounter issues.'
+    });
     new Setting(containerEl)
-      .setName("Enter the macOS calendar to search for Zoom meetings")
-      .setDesc("Leave blank to search all calendars.")
+      .setName('Enter the macOS calendar to search for Zoom meetings')
+      .setDesc('Leave blank to search all calendars.')
       .addButton(button => button
         .setButtonText('Add Calendar')
         .onClick(async () => {
@@ -1411,10 +1374,9 @@ async activateTab(tabId: string): Promise<void> {
             SummarDebug.Notice(0, 'You can only add up to 5 calendars.');
           }
         }));
-
     const calendarContainer = containerEl.createDiv();
     for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
-      this.createCalendarField(containerEl, i);
+      await this.createCalendarField(containerEl, i);
     }
 
     new Setting(containerEl)
@@ -1445,5 +1407,59 @@ async activateTab(tabId: string): Promise<void> {
     await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, containerEl.createDiv());
   }
 
+  async createCalendarField(containerEl: HTMLElement, index: number): Promise<void> {
+    const setting = new Setting(containerEl)
+      .setHeading();
+    // 캘린더 목록 로딩 표시 (영문, DocumentFragment로)
+    const frag = document.createDocumentFragment();
+    const loadingDiv = document.createElement("div");
+    loadingDiv.className = "event-loading";
+    const spinner = document.createElement("div");
+    spinner.className = "event-spinner";
+    loadingDiv.appendChild(spinner);
+    loadingDiv.appendChild(document.createTextNode("Loading calendar list..."));
+    frag.appendChild(loadingDiv);
+    setting.setDesc(frag);
+    const calendars = await this.plugin.calendarHandler.getAvailableCalendars();
+    // 로딩 메시지 제거
+    setting.setDesc("");
+    if (calendars === null) {
+      setting.setDesc('Calendar access was denied. Please allow calendar access in System Preferences > Privacy.');
+      return;
+    }
+    if (calendars.length === 0) {
+      setting.setDesc('No calendars found. Please check macOS calendar access permissions.');
+    }
+    setting.addDropdown((dropdown) => {
+      dropdown.addOption('', 'Select calendar');
+      calendars.forEach((item, idx) => {
+        if (typeof item === 'string') {
+          dropdown.addOption(item, item);
+        }
+      });
+      dropdown.setValue(String(this.plugin.settings[`calendar_${index}`] || ''));
+      dropdown.onChange(async (value: string) => {
+        this.plugin.settings[`calendar_${index}`] = value;
+        await this.plugin.saveSettingsToFile();
+        await this.plugin.calendarHandler.updateScheduledMeetings();
+        await this.plugin.calendarHandler.displayEvents();
+      });
+    })
+    .addExtraButton(button => button
+      .setIcon('trash-2')
+      .setTooltip('Remove Calendar')
+      .onClick(async () => {
+        for (let i = index; i < this.plugin.settings.calendar_count; i++) {
+          this.plugin.settings[`calendar_${i}`] = this.plugin.settings[`calendar_${i + 1}`];
+        }
+        delete this.plugin.settings[`calendar_${this.plugin.settings.calendar_count}`];
+        this.plugin.settings.calendar_count -= 1;
+        this.display();
+        await this.plugin.saveSettingsToFile();
+        await this.plugin.calendarHandler.updateScheduledMeetings();
+        await this.plugin.calendarHandler.displayEvents();
+      })
+    );
+  }
 }
 
