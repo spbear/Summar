@@ -98,6 +98,7 @@ export class AudioHandler extends SummarViewContainer {
 		this.timer.start();
 
 		// Process files in parallel
+		const handler = this;
 		const transcriptionPromises = sortedFiles
 			.filter((file) => file.type.startsWith("audio/") || 
 				file.name.toLowerCase().endsWith(".mp3") ||
@@ -107,68 +108,81 @@ export class AudioHandler extends SummarViewContainer {
 				file.name.toLowerCase().endsWith(".webm"))
 			.map(async (file) => {
 				const fileName = file.name;
-
 				const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
 				SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
-
 				const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
 				const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
 
-				try {
-					if (this.plugin.settings.sttModel=== "gemini-2.0-flash") {
-						const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
-						const transcript = await this.callGeminiAPI(base64, mimeType) || "";
-						SummarDebug.log(3, transcript);
-						SummarDebug.log(1, 'seconds: ', seconds);
-						const strContent = this.adjustSrtTimestamps(transcript, seconds);
-						return strContent;
-/**
-					} else {
-						const ext = fileName.split(".").pop()?.toLowerCase();
-						const encoding = this.getEncodingFromExtension(ext);
-						const audioBase64 = await this.readFileAsBase64(audioFilePath);
-						const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
-						return transcript || "";
-/**/
-					} else {
-						const blob = file.slice(0, file.size, file.type);
-						const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
-						const data = await this.callWhisperTranscription(finalBody, contentType);
-						// response.text().then((text) => {
-						// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
-						// });
-
-						// 응답 확인
-						if (!data.segments || data.segments.length === 0) {
-							SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
-							if (data.text && data.text.length > 0) {
-								return data.text;
+				// 재시도 로직 래퍼
+				async function transcribeWithRetry() {
+					let lastError = null;
+					for (let attempt = 1; attempt <= 3; attempt++) {
+						try {
+							if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
+								const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
+								const transcript = await this.callGeminiAPI(base64, mimeType) || "";
+								SummarDebug.log(3, transcript);
+								SummarDebug.log(1, 'seconds: ', seconds);
+								const strContent = this.adjustSrtTimestamps(transcript, seconds);
+								return strContent;
+							} else if (this.plugin.settings.sttModel && this.plugin.settings.sttModel.toLowerCase().includes("google")) {
+								const ext = fileName.split(".").pop()?.toLowerCase();
+								const encoding = this.getEncodingFromExtension(ext);
+								const { base64: audioBase64 } = await this.readFileAsBase64(audioFilePath);
+								const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
+								return transcript || "";
 							} else {
-								SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
-								return "";
+								const blob = file.slice(0, file.size, file.type);
+								const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
+								const data = await this.callWhisperTranscription(finalBody, contentType);
+								// response.text().then((text) => {
+								// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
+								// });
+
+								// 응답 확인
+								if (!data.segments || data.segments.length === 0) {
+									SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
+									if (data.text && data.text.length > 0) {
+										return data.text;
+									} else {
+										SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
+										return "";
+									}
+								}
+								SummarDebug.log(3, data);
+								// SRT 포맷 변환
+								const srtContent = data.segments
+									.map((segment: any, index: number) => {
+										const start = formatTime(segment.start + seconds);
+										const end = formatTime(segment.end + seconds);
+										const text = segment.text.trim();
+
+										// return `${index + 1}\n${start} --> ${end}\n${text}\n`;
+										return `${start} --> ${end}\n${text}\n`;
+									})
+									.join("");
+
+								return srtContent;
+							}
+						} catch (error: any) {
+							lastError = error;
+							// 503 에러만 재시도, 그 외는 바로 break
+							if (error && (error.status === 503 || (error.message && error.message.includes("503")))) {
+								SummarDebug.error(1, `503 error on attempt ${attempt} for file ${fileName}, retrying...`, error);
+								if (attempt < 3) await new Promise(res => setTimeout(res, 1000 * attempt));
+								continue;
+							} else {
+								SummarDebug.error(1, `Error processing file ${fileName}:`, error);
+								break;
 							}
 						}
-						SummarDebug.log(3, data);
-						// SRT 포맷 변환
-						const srtContent = data.segments
-							.map((segment: any, index: number) => {
-								const start = formatTime(segment.start + seconds);
-								const end = formatTime(segment.end + seconds);
-								const text = segment.text.trim();
-
-								// return `${index + 1}\n${start} --> ${end}\n${text}\n`;
-								return `${start} --> ${end}\n${text}\n`;
-							})
-							.join("");
-
-						return srtContent;
 					}
-
-				} catch (error) {
-					SummarDebug.error(1, `Error processing file ${fileName}:`, error);
+					SummarDebug.error(1, `Failed to transcribe file ${fileName} after 3 attempts. Last error:`, lastError);
 					this.timer.stop();
 					return "";
 				}
+				// 실제 호출
+				return await transcribeWithRetry.call(this);
 			});
 
 		// Wait for all transcriptions to complete
@@ -242,8 +256,7 @@ export class AudioHandler extends SummarViewContainer {
 			  default: return null;
 			}
 		}
-	
-			
+
 	}
 
 
@@ -627,6 +640,4 @@ Your response must contain ONLY the SRT format transcript with no additional exp
 		}
 
 	}
-	
-	
 }
