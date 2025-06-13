@@ -12,7 +12,18 @@ export class AudioHandler extends SummarViewContainer {
 	}
 
 	async sendAudioData(files: FileList | File[], givenFolderPath: string = ""): Promise<{ transcriptedText: string, newFilePath: string }> {
-		this.updateResultText("convert audio to text using [" + this.plugin.settings.sttModel + "]");
+		// Only show the audio files that will actually be sent
+		const fileArray = Array.from(files);
+		const audioFiles = fileArray.filter(file =>
+			file.type.startsWith("audio/") ||
+			file.name.toLowerCase().endsWith(".mp3") ||
+			file.name.toLowerCase().endsWith(".wav") ||
+			file.name.toLowerCase().endsWith(".ogg") ||
+			file.name.toLowerCase().endsWith(".m4a") ||
+			file.name.toLowerCase().endsWith(".webm")
+		);
+		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
+		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settings.sttModel}] ...`);
 		this.enableNewNote(false);
 
 		let audioList = "";
@@ -27,10 +38,10 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		// Convert FileList to an array
-		const fileArray = Array.from(files);
+		const fileArray2 = Array.from(files);
 
 		// Sort files by their relative path (webkitRelativePath if available, otherwise file name)
-		const sortedFiles = fileArray.sort((a, b) => {
+		const sortedFiles = fileArray2.sort((a, b) => {
 			const pathA = (a as any).webkitRelativePath || a.name;
 			const pathB = (b as any).webkitRelativePath || b.name;
 			return pathA.localeCompare(pathB);
@@ -188,7 +199,14 @@ export class AudioHandler extends SummarViewContainer {
 		// Wait for all transcriptions to complete
 		const transcriptions = await Promise.all(transcriptionPromises);
 
-		// Combine all transcriptions
+        // 하나라도 실패(빈 문자열, null, undefined 등)한 경우 전체 실패로 간주
+        if (transcriptions.some(t => !t || t.trim() === "")) {
+            this.timer.stop();
+            this.updateResultText("\u274C 일부 오디오 파일의 전사에 실패했습니다. 모든 파일이 정상적으로 처리되어야 다음 단계로 진행합니다.\n\n로그를 확인해 주세요.");
+            throw new Error("One or more audio transcriptions failed. Aborting next steps.");
+        }
+
+        // Combine all transcriptions
 		transcriptedText = transcriptions.join("\n");
 
 		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
