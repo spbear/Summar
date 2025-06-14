@@ -110,91 +110,94 @@ export class AudioHandler extends SummarViewContainer {
 
 		// Process files in parallel
 		const handler = this;
-		const transcriptionPromises = sortedFiles
-			.filter((file) => file.type.startsWith("audio/") || 
-				file.name.toLowerCase().endsWith(".mp3") ||
-				file.name.toLowerCase().endsWith(".wav") ||
-				file.name.toLowerCase().endsWith(".ogg") ||
-				file.name.toLowerCase().endsWith(".m4a") ||
-				file.name.toLowerCase().endsWith(".webm"))
-			.map(async (file) => {
-				const fileName = file.name;
-				const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
-				SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
-				const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
-				const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
+		// 오디오 파일만 따로 배열로 추출
+		const audioSortedFiles = sortedFiles.filter((file) =>
+			file.type.startsWith("audio/") ||
+			file.name.toLowerCase().endsWith(".mp3") ||
+			file.name.toLowerCase().endsWith(".wav") ||
+			file.name.toLowerCase().endsWith(".ogg") ||
+			file.name.toLowerCase().endsWith(".m4a") ||
+			file.name.toLowerCase().endsWith(".webm")
+		);
+		// transcriptionPromises도 audioSortedFiles 기준으로 생성
+		const transcriptionPromises = audioSortedFiles.map(async (file) => {
+			const fileName = file.name;
+			const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
+			SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
+			const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
+			const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
 
-				// 재시도 로직 래퍼
-				async function transcribeWithRetry() {
-					let lastError = null;
-					for (let attempt = 1; attempt <= 3; attempt++) {
-						try {
-							if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
-								const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
-								const transcript = await this.callGeminiAPI(base64, mimeType) || "";
-								SummarDebug.log(3, transcript);
-								SummarDebug.log(1, 'seconds: ', seconds);
-								const strContent = this.adjustSrtTimestamps(transcript, seconds);
-								return strContent;
-							} else if (this.plugin.settings.sttModel && this.plugin.settings.sttModel.toLowerCase().includes("google")) {
-								const ext = fileName.split(".").pop()?.toLowerCase();
-								const encoding = this.getEncodingFromExtension(ext);
-								const { base64: audioBase64 } = await this.readFileAsBase64(audioFilePath);
-								const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
-								return transcript || "";
-							} else {
-								const blob = file.slice(0, file.size, file.type);
-								const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
-								const data = await this.callWhisperTranscription(finalBody, contentType);
-								// response.text().then((text) => {
-								// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
-								// });
+			// 재시도 로직 래퍼
+			async function transcribeWithRetry() {
+				let lastError = null;
+				for (let attempt = 1; attempt <= 3; attempt++) {
+					try {
+						if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
+							const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
+							const transcript = await this.callGeminiAPI(base64, mimeType) || "";
+							SummarDebug.log(3, transcript);
+							SummarDebug.log(1, 'seconds: ', seconds);
+							const strContent = this.adjustSrtTimestamps(transcript, seconds);
+							return strContent;
+						} else if (this.plugin.settings.sttModel && this.plugin.settings.sttModel.toLowerCase().includes("google")) {
+							const ext = fileName.split(".").pop()?.toLowerCase();
+							const encoding = this.getEncodingFromExtension(ext);
+							const { base64: audioBase64 } = await this.readFileAsBase64(audioFilePath);
+							const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
+							return transcript || "";
+						} else {
+							const blob = file.slice(0, file.size, file.type);
+							const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
+							const data = await this.callWhisperTranscription(finalBody, contentType);
+							// response.text().then((text) => {
+							// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
+							// });
 
-								// 응답 확인
-								if (!data.segments || data.segments.length === 0) {
-									SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
-									if (data.text && data.text.length > 0) {
-										return data.text;
-									} else {
-										SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
-										return "";
-									}
+							// 응답 확인
+							if (!data.segments || data.segments.length === 0) {
+								SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
+								if (data.text && data.text.length > 0) {
+									return data.text;
+								} else {
+									SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
+									return "";
 								}
-								SummarDebug.log(3, data);
-								// SRT 포맷 변환
-								const srtContent = data.segments
-									.map((segment: any, index: number) => {
-										const start = formatTime(segment.start + seconds);
-										const end = formatTime(segment.end + seconds);
-										const text = segment.text.trim();
-
-										// return `${index + 1}\n${start} --> ${end}\n${text}\n`;
-										return `${start} --> ${end}\n${text}\n`;
-									})
-									.join("");
-
-								return srtContent;
 							}
-						} catch (error: any) {
-							lastError = error;
-							// 503 에러만 재시도, 그 외는 바로 break
-							if (error && (error.status === 503 || (error.message && error.message.includes("503")))) {
-								SummarDebug.error(1, `503 error on attempt ${attempt} for file ${fileName}, retrying...`, error);
-								if (attempt < 3) await new Promise(res => setTimeout(res, 1000 * attempt));
-								continue;
-							} else {
-								SummarDebug.error(1, `Error processing file ${fileName}:`, error);
-								break;
-							}
+							SummarDebug.log(3, data);
+							// SRT 포맷 변환
+							const srtContent = data.segments
+								.map((segment: any, index: number) => {
+									const start = formatTime(segment.start + seconds);
+									const end = formatTime(segment.end + seconds);
+									const text = segment.text.trim();
+
+									// return `${index + 1}\n${start} --> ${end}\n${text}\n`;
+									return `${start} --> ${end}\n${text}\n`;
+								})
+								.join("");
+
+							return srtContent;
+						}
+					} catch (error: any) {
+						lastError = error;
+						// 503 에러만 재시도, 그 외는 바로 break
+						if (error && (error.status === 503 || (error.message && error.message.includes("503")))) {
+							SummarDebug.error(1, `503 error on attempt ${attempt} for file ${fileName}, retrying...`, error);
+							if (attempt < 3) await new Promise(res => setTimeout(res, 1000 * attempt));
+							continue;
+						} else {
+							SummarDebug.error(1, `Error processing file ${fileName}:`, error);
+							break;
 						}
 					}
-					SummarDebug.error(1, `Failed to transcribe file ${fileName} after 3 attempts. Last error:`, lastError);
-					this.timer.stop();
-					return "";
 				}
-				// 실제 호출
-				return await transcribeWithRetry.call(this);
-			});
+				SummarDebug.error(1, `Failed to transcribe file ${fileName} after 3 attempts. Last error:`, lastError);
+				this.timer.stop();
+				return "";
+			}
+			// 실제 호출
+			return await transcribeWithRetry.call(this);
+		});
 
 		// Wait for all transcriptions to complete
 		const transcriptions = await Promise.all(transcriptionPromises);
@@ -207,29 +210,37 @@ export class AudioHandler extends SummarViewContainer {
         }
 
         // Combine all transcriptions
-		transcriptedText = transcriptions.join("\n");
+        // transcriptedText = transcriptions.join("\n");
+        // 파일명별로 구분선과 함께 transcription을 합침
+        transcriptedText = audioSortedFiles.map((f, idx) => {
+            return `----- [${f.name}] -----\n${transcriptions[idx]}`;
+        }).join("\n\n");
 
-		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
+        // 파일명 리스트 추가 (transcriptHeader는 더 이상 사용하지 않음)
+        // const transcribedFileNames = audioSortedFiles.map(f => f.name).join("\n");
+        // const transcriptHeader = `Transcribed files:\n${transcribedFileNames}\n`;
 
-		const existingFile = this.plugin.app.vault.getAbstractFileByPath(`${baseFilePath} transcript.md`);
-		let newFilePath = "";
-		if (existingFile && existingFile instanceof TFile) {
-			// If the file exists, find a new unique filename
-			newFilePath = getAvailableFilePath(baseFilePath, " transcript.md", this.plugin);
-			SummarDebug.log(1, `File already exists. Created new file: ${newFilePath}`);
-		} else {
-			// If the file does not exist, create it
-			newFilePath = `${baseFilePath} transcript.md`;
-			SummarDebug.log(1, `File created: ${newFilePath}`);
-		}
-		await this.plugin.app.vault.create(newFilePath, `${audioList}\n${transcriptedText}`);
-		await this.plugin.app.workspace.openLinkText(
-			normalizePath(newFilePath),
-			"",
-			true
-		);
-		this.timer.stop();
-		return {transcriptedText, newFilePath};
+        const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
+
+        const existingFile = this.plugin.app.vault.getAbstractFileByPath(`${baseFilePath} transcript.md`);
+        let newFilePath = "";
+        if (existingFile && existingFile instanceof TFile) {
+            // If the file exists, find a new unique filename
+            newFilePath = getAvailableFilePath(baseFilePath, " transcript.md", this.plugin);
+            SummarDebug.log(1, `File already exists. Created new file: ${newFilePath}`);
+        } else {
+            // If the file does not exist, create it
+            newFilePath = `${baseFilePath} transcript.md`;
+            SummarDebug.log(1, `File created: ${newFilePath}`);
+        }
+        await this.plugin.app.vault.create(newFilePath, `${audioList}\n${transcriptedText}`);
+        await this.plugin.app.workspace.openLinkText(
+            normalizePath(newFilePath),
+            "",
+            true
+        );
+        this.timer.stop();
+        return {transcriptedText, newFilePath};
 
 		function formatTime(seconds: number): string {
 			const hours = Math.floor(seconds / 3600).toString().padStart(2, "0");
@@ -330,55 +341,57 @@ export class AudioHandler extends SummarViewContainer {
 	}
 
 	async buildMultipartFormData(blob: Blob, fileName: string, fileType: string): Promise<{ body: Blob, contentType: string }> {
-		const encoder = new TextEncoder();
-		const boundary = "----SummarFormBoundary" + Math.random().toString(16).slice(2);
-		const CRLF = "\r\n";
+        const encoder = new TextEncoder();
+        const boundary = "----SummarFormBoundary" + Math.random().toString(16).slice(2);
+        const CRLF = "\r\n";
 
-		const bodyParts: (Uint8Array | Blob | string)[] = [];
+        const bodyParts: (Uint8Array | Blob | string)[] = [];
 
-		function addField(name: string, value: string) {
-			bodyParts.push(
-				encoder.encode(`--${boundary}${CRLF}`),
-				encoder.encode(`Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}`),
-				encoder.encode(`${value}${CRLF}`)
-			);
-		}
+        function addField(name: string, value: string) {
+            if (value && value.trim() !== "") {
+                bodyParts.push(
+                    encoder.encode(`--${boundary}${CRLF}`),
+                    encoder.encode(`Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}`),
+                    encoder.encode(`${value}${CRLF}`)
+                );
+            }
+        }
 
-		function addFileField(name: string, filename: string, type: string, content: Uint8Array) {
-			bodyParts.push(
-				encoder.encode(`--${boundary}${CRLF}`),
-				encoder.encode(`Content-Disposition: form-data; name="${name}"; filename="${filename}"${CRLF}`),
-				encoder.encode(`Content-Type: ${type}${CRLF}${CRLF}`),
-				content,
-				encoder.encode(CRLF)
-			);
-		}
+        function addFileField(name: string, filename: string, type: string, content: Uint8Array) {
+            bodyParts.push(
+                encoder.encode(`--${boundary}${CRLF}`),
+                encoder.encode(`Content-Disposition: form-data; name="${name}"; filename="${filename}"${CRLF}`),
+                encoder.encode(`Content-Type: ${type}${CRLF}${CRLF}`),
+                content,
+                encoder.encode(CRLF)
+            );
+        }
 
-		const arrayBuffer = await blob.arrayBuffer();
-		const binaryContent = new Uint8Array(arrayBuffer);
+        const arrayBuffer = await blob.arrayBuffer();
+        const binaryContent = new Uint8Array(arrayBuffer);
 
-		addFileField("file", fileName, fileType, binaryContent);
-		// addField("model", this.plugin.settings.sttModel || "whisper-1");
-		addField("model", this.plugin.settings.sttModel || this.plugin.getDefaultModel("sttModel"));
+        addFileField("file", fileName, fileType, binaryContent);
+        addField("model", this.plugin.settings.sttModel || this.plugin.getDefaultModel("sttModel"));
 
-		if (this.plugin.settings.recordingLanguage) {
-			addField("language", this.mapLanguageToWhisperCode(this.plugin.settings.recordingLanguage));
-		}
+        if (this.plugin.settings.recordingLanguage) {
+            addField("language", this.mapLanguageToWhisperCode(this.plugin.settings.recordingLanguage));
+        }
 
-		addField("response_format", this.plugin.settings.sttModel === "whisper-1" ? "verbose_json" : "json");
+        addField("response_format", this.plugin.settings.sttModel === "whisper-1" ? "verbose_json" : "json");
 
-		if ((this.plugin.settings.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settings.sttModel === "gpt-4o-transcribe")
-			&& this.plugin.settings.sttPrompt) {
-			addField("prompt", this.plugin.settings.sttPrompt);
-		}
+        // prompt가 비어있지 않을 때만 추가
+        if ((this.plugin.settings.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settings.sttModel === "gpt-4o-transcribe")
+            && this.plugin.settings.sttPrompt && this.plugin.settings.sttPrompt.trim() !== "") {
+            addField("prompt", this.plugin.settings.sttPrompt);
+        }
 
-		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
+        bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
 
-		return {
-			body: new Blob(bodyParts, { type: `multipart/form-data; boundary=${boundary}` }),
-			contentType: `multipart/form-data; boundary=${boundary}`
-		};
-	}
+        return {
+            body: new Blob(bodyParts, { type: `multipart/form-data; boundary=${boundary}` }),
+            contentType: `multipart/form-data; boundary=${boundary}`
+        };
+    }
 
 	async callWhisperTranscription(requestbody: Blob, contentType: string): Promise<any> {
         // 엔드포인트 설정 (비어있으면 기본값)
