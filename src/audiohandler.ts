@@ -117,7 +117,7 @@ export class AudioHandler extends SummarViewContainer {
 				try {
 					if (this.plugin.settings.sttModel=== "gemini-2.0-flash") {
 						const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
-						const transcript = await this.callGeminiAPI(base64, mimeType) || "";
+						const transcript = await this.callGeminiTranscription(this.plugin.settings.sttModel, base64, mimeType) || "";
 						SummarDebug.log(3, transcript);
 						SummarDebug.log(1, 'seconds: ', seconds);
 						const strContent = this.adjustSrtTimestamps(transcript, seconds);
@@ -478,7 +478,7 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	}
 	
-	async callGeminiAPI(audioBase64: string, mimeType: string): Promise<string | null> {
+	async callGeminiTranscription(sttModel: string, audioBase64: string, mimeType: string): Promise<string | null> {
 		const apiKey = this.plugin.settings.googleApiKey;
 		if (!apiKey || apiKey.length === 0) {
 		  SummarDebug.Notice(1, "Google API key is missing. Please add your API key in the settings.");
@@ -486,7 +486,7 @@ export class AudioHandler extends SummarViewContainer {
 		  return null;
 		}
 
-        const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${sttModel}:generateContent`;
         
         // set the system instruction
         let systemInstruction = `You are an expert in audio-to-text transcription.
