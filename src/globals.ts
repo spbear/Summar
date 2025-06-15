@@ -80,6 +80,28 @@ export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bo
   }
 }
 
+export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, geminiApiKey: string, bodyContent: string): Promise<any> {
+  try {
+    SummarDebug.log(1, `geminiApiKey: ${geminiApiKey}`);
+    SummarDebug.log(2, `bodyContent: ${bodyContent}`);
+
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+
+    const response = await SummarRequestUrl(plugin, {
+      url: API_URL,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: bodyContent,
+    });
+    
+    return response;
+  } catch (error) {
+    SummarDebug.error(1, "Error fetching data from Gemini API:", error);
+    throw error; // Re-throw the error for higher-level handling
+  }
+}
 
 export class SummarDebug {
   private static debugLevel: number = 0;

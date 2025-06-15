@@ -124,6 +124,7 @@ export class AudioHandler extends SummarViewContainer {
 				const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
 				const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
 
+<<<<<<< HEAD
 				// 재시도 로직 래퍼
 				async function transcribeWithRetry() {
 					let lastError = null;
@@ -142,6 +143,37 @@ export class AudioHandler extends SummarViewContainer {
 								const { base64: audioBase64 } = await this.readFileAsBase64(audioFilePath);
 								const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
 								return transcript || "";
+=======
+				try {
+					if (this.plugin.settings.sttModel=== "gemini-2.0-flash") {
+						const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
+						const transcript = await this.callGeminiTranscription(this.plugin.settings.sttModel, base64, mimeType) || "";
+						SummarDebug.log(3, transcript);
+						SummarDebug.log(1, 'seconds: ', seconds);
+						const strContent = this.adjustSrtTimestamps(transcript, seconds);
+						return strContent;
+/**
+					} else {
+						const ext = fileName.split(".").pop()?.toLowerCase();
+						const encoding = this.getEncodingFromExtension(ext);
+						const audioBase64 = await this.readFileAsBase64(audioFilePath);
+						const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
+						return transcript || "";
+/**/
+					} else {
+						const blob = file.slice(0, file.size, file.type);
+						const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
+						const data = await this.callWhisperTranscription(finalBody, contentType);
+						// response.text().then((text) => {
+						// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
+						// });
+
+						// 응답 확인
+						if (!data.segments || data.segments.length === 0) {
+							SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
+							if (data.text && data.text.length > 0) {
+								return data.text;
+>>>>>>> mcwork
 							} else {
 								const blob = file.slice(0, file.size, file.type);
 								const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
@@ -509,7 +541,7 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	}
 	
-	async callGeminiAPI(audioBase64: string, mimeType: string): Promise<string | null> {
+	async callGeminiTranscription(sttModel: string, audioBase64: string, mimeType: string): Promise<string | null> {
 		const apiKey = this.plugin.settings.googleApiKey;
 		if (!apiKey || apiKey.length === 0) {
 		  SummarDebug.Notice(1, "Google API key is missing. Please add your API key in the settings.");
@@ -517,7 +549,7 @@ export class AudioHandler extends SummarViewContainer {
 		  return null;
 		}
 
-        const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${sttModel}:generateContent`;
         
         // set the system instruction
         let systemInstruction = `You are an expert in audio-to-text transcription.
