@@ -72,6 +72,7 @@ export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bo
         "Authorization": `Bearer ${openaiApiKey}`
       },
       body: bodyContent,
+      throw: false
     });
     return response;
   } catch (error) {
@@ -94,12 +95,145 @@ export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, gem
         "Content-Type": "application/json"
       },
       body: bodyContent,
+      throw: false,
     });
     
     return response;
   } catch (error) {
     SummarDebug.error(1, "Error fetching data from Gemini API:", error);
     throw error; // Re-throw the error for higher-level handling
+  }
+}
+
+export function getProviderFromModel(plugin: SummarPlugin, modelName: string): { aiProvider:string, aiKey: string} {
+  if (!modelName || typeof modelName !== 'string') {
+    throw new Error("Model name must be a non-empty string");
+  }
+
+  const model = modelName.toLowerCase().trim();
+
+  if (model.includes('gpt') || model.includes('davinci') || model.includes('curie') || 
+      model.includes('babbage') || model.includes('ada')) {
+    return { aiProvider:'openai', aiKey: plugin.settings.openaiApiKey || '' };
+  }
+  
+  if (model.includes('gemini') || model.includes('bison') || model.includes('palm')) {
+    return { aiProvider:'gemini', aiKey: plugin.settings.googleApiKey || '' };
+  }
+  
+  if (model.includes('claude')) {
+    return { aiProvider: 'anthropic', aiKey: '' };
+  }
+  
+  if (model.includes('azure')) {
+    return { aiProvider: 'azure', aiKey: '' };
+  }
+  
+  if (model.includes('command')) {
+    return { aiProvider: 'cohere', aiKey: '' };
+  }
+
+  return { aiProvider: 'unknown', aiKey: '' };
+}
+
+export function aiResponse(plugin: SummarPlugin, aiModel: string, response:any): { responseStatus: number, responseJson: any, responseText?: string } {
+  const { aiProvider } = getProviderFromModel(plugin, aiModel);
+  try {
+    if (aiProvider === 'openai') {
+      if (response.json &&
+        response.json.choices &&
+        response.json.choices.length > 0 &&
+        response.json.choices[0].message &&
+        response.json.choices[0].message.content
+      ) {
+        SummarDebug.log(1, `OpenAI API response: \n${JSON.stringify(response.json)}`);
+        return {
+          responseStatus: response.status,
+          responseJson: response.json,
+          responseText: response.json.choices[0].message.content || ''
+        };
+      } else {
+        SummarDebug.log(1, `OpenAI API response without content: \n${JSON.stringify(response.json)}`);
+        return {
+          responseStatus: response.status,
+          responseJson: response.json,
+          responseText: response.json.error ? response.json.error.message : 'No content available'
+        }
+      }
+    } else if (aiProvider === 'gemini') {
+      if (response.json &&
+        response.json.candidates &&
+        response.json.candidates.length > 0 &&
+        response.json.candidates[0].content &&
+        response.json.candidates[0].content.parts &&
+        response.json.candidates[0].content.parts.length > 0 &&
+        response.json.candidates[0].content.parts[0].text
+      ) {
+        SummarDebug.log(1, `Gemini API response: \n${JSON.stringify(response.json)}`);
+        return {
+          responseStatus: response.status,
+          responseJson: response.json,
+          responseText: response.json.candidates[0].content.parts[0].text || ''
+        };
+      } else {
+        SummarDebug.log(1, `Gemini API response without content: \n${JSON.stringify(response.json)}`);
+        return {
+          responseStatus: response.status,
+          responseJson: response.json,
+          responseText: response.json.error ? response.json.error.message : 'No content available'
+        }
+      }
+    }
+    SummarDebug.log(1, `API responses error: \n${JSON.stringify(response.json)}`);
+    return {
+      responseStatus: response.status,
+      responseJson: response.json,
+    };
+  } catch (error) {
+    SummarDebug.error(1, `Error processing ${aiProvider} API response:`, error);
+    throw new Error(`Failed to process ${aiProvider} API response: ${error.message}`);
+  }
+}
+
+export async function fetchAIAPI(
+  plugin: SummarPlugin, 
+  aiModel: string,
+  messages: string[], 
+): Promise<any> {
+  const { aiProvider, aiKey } = getProviderFromModel(plugin, aiModel);
+
+  try {  
+    if (messages && messages.length > 0) {
+      if (aiProvider === 'openai') {
+SummarDebug.log(1, `fetchAIAPI() - Using OpenAI API with model: ${aiModel}`);
+        const bodyContent = JSON.stringify({
+          model: aiModel,
+          messages: [
+            { role: "user", content: messages[0] },
+          ],
+        });
+        return await fetchOpenai(plugin, aiKey, bodyContent);
+      }
+      else if (aiProvider === 'gemini') {
+        const contents = messages.map(message => ({
+          role: "user",
+          parts: [
+            {
+              text: message
+            }
+          ]
+        }));
+        
+        const bodyContent = JSON.stringify({ 
+          contents: contents,
+        });
+        return await fetchGemini(plugin, aiModel, aiKey, bodyContent);
+      }
+    }
+    throw new Error(`Unsupported provider: ${aiProvider}`);
+  } catch (error) {
+    SummarDebug.error(1, `Error calling ${aiProvider} API:`, error);
+    throw error;
   }
 }
 
