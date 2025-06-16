@@ -1,8 +1,9 @@
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, fetchOpenai } from "./globals";
+import { SummarViewContainer, SummarDebug, fetchOpenai, fetchAIAPI, aiResponse, getProviderFromModel } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { MarkdownView } from "obsidian";
+import { text } from "stream/consumers";
 
 export class CustomCommandHandler extends SummarViewContainer {
 	private timer: SummarTimer;
@@ -11,7 +12,6 @@ export class CustomCommandHandler extends SummarViewContainer {
 		super(plugin);
 		this.timer = new SummarTimer(plugin);
 	}
-
 
 	/*
 	 * fetchAndSummarize 함수는 URL을 가져와서 요약을 생성합니다.
@@ -33,11 +33,18 @@ export class CustomCommandHandler extends SummarViewContainer {
 		const cmdPrompt = settings[`cmd_prompt_${cmdIndex}`] || '';
 		const appendToNote = !!settings[`cmd_append_to_note_${cmdIndex}`];
 		const copyToClipboard = !!settings[`cmd_copy_to_clipboard_${cmdIndex}`];
-		const { openaiApiKey } = settings;
+		const { aiProvider, aiKey } = getProviderFromModel(this.plugin, cmdModel as string);
 
-		if (!openaiApiKey) {
+		if (aiProvider ==='openai' && (!aiKey || aiKey.length === 0)) {
 			SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
 			this.updateResultText("Please configure OpenAI API key in the plugin settings.");
+			this.enableNewNote(false);
+			return;
+		}
+
+		if (aiProvider ==='gemini' && (!aiKey || aiKey.length === 0)) {
+			SummarDebug.Notice(0, "Please configure Gemini API key in the plugin settings.", 0);
+			this.updateResultText("Please configure Gemini API key in the plugin settings.");
 			this.enableNewNote(false);
 			return;
 		}
@@ -48,34 +55,23 @@ export class CustomCommandHandler extends SummarViewContainer {
 		try {
 			this.timer.start();
 
-			const body_content = JSON.stringify({
-				model: cmdModel,
-				messages: [
-					// { role: "system", content: systemPrompt },
-					{ role: "user", content: `${cmdPrompt}\n\n${selectedText}` },
-				],
-				// max_tokens: 16384,
-			});
+			const message = `${cmdPrompt}\n\n${selectedText}`;
+			const response = await fetchAIAPI(this.plugin, cmdModel as string, [message]);
 
-			// this.updateResultText( "Summarizing...");
-
-			const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
 			this.timer.stop();
 
+			const { responseStatus, responseText } = aiResponse(this.plugin, cmdModel as string, response);
 
-			if (aiResponse.status !== 200) {
-				const errorText = aiResponse.json.message;
-				SummarDebug.error(1, "OpenAI API Error:", errorText);
-				this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+			if (responseStatus !== 200) {
+				const errorText = responseText || "Unknown error occurred.";
+				SummarDebug.error(1, "AI API Error:", errorText);
+				this.updateResultText(`Error: ${responseStatus} - ${errorText}`);
 				this.enableNewNote(false);
 
 				return;
 			}
 
-			// const aiData = (await aiResponse.json()) as OpenAIResponse;
-			const aiData = aiResponse.json;
-			if (aiData.choices && aiData.choices.length > 0) {
-				const responseText = aiData.choices[0].message.content || "No result generated.";
+			if (responseText && responseText.length > 0) {
 				this.updateResultText(responseText);
 				this.enableNewNote(true);
 
