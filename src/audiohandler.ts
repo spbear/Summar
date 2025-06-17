@@ -12,7 +12,18 @@ export class AudioHandler extends SummarViewContainer {
 	}
 
 	async sendAudioData(files: FileList | File[], givenFolderPath: string = ""): Promise<{ transcriptedText: string, newFilePath: string }> {
-		this.updateResultText("convert audio to text using [" + this.plugin.settings.sttModel + "]");
+		// Only show the audio files that will actually be sent
+		const fileArray = Array.from(files);
+		const audioFiles = fileArray.filter(file =>
+			file.type.startsWith("audio/") ||
+			file.name.toLowerCase().endsWith(".mp3") ||
+			file.name.toLowerCase().endsWith(".wav") ||
+			file.name.toLowerCase().endsWith(".ogg") ||
+			file.name.toLowerCase().endsWith(".m4a") ||
+			file.name.toLowerCase().endsWith(".webm")
+		);
+		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
+		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settings.sttModel}] ...`);
 		this.enableNewNote(false);
 
 		let audioList = "";
@@ -27,10 +38,10 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		// Convert FileList to an array
-		const fileArray = Array.from(files);
+		const fileArray2 = Array.from(files);
 
 		// Sort files by their relative path (webkitRelativePath if available, otherwise file name)
-		const sortedFiles = fileArray.sort((a, b) => {
+		const sortedFiles = fileArray2.sort((a, b) => {
 			const pathA = (a as any).webkitRelativePath || a.name;
 			const pathB = (b as any).webkitRelativePath || b.name;
 			return pathA.localeCompare(pathB);
@@ -62,12 +73,7 @@ export class AudioHandler extends SummarViewContainer {
 		for (const [index, file] of sortedFiles.entries()) {
 			const filePath = (file as any).webkitRelativePath || file.name;
 			SummarDebug.log(1, `File ${index + 1}: ${filePath}`);
-			if (file.type.startsWith("audio/") || 
-				file.name.toLowerCase().endsWith(".mp3") ||
-				file.name.toLowerCase().endsWith(".wav") ||
-				file.name.toLowerCase().endsWith(".ogg") ||
-				file.name.toLowerCase().endsWith(".m4a") ||
-			    file.name.toLowerCase().endsWith(".webm")) {
+			if (isAudioFile(file)) {
 				const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
 				SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
 
@@ -98,84 +104,134 @@ export class AudioHandler extends SummarViewContainer {
 		this.timer.start();
 
 		// Process files in parallel
-		const transcriptionPromises = sortedFiles
-			.filter((file) => file.type.startsWith("audio/") || 
-				file.name.toLowerCase().endsWith(".mp3") ||
-				file.name.toLowerCase().endsWith(".wav") ||
-				file.name.toLowerCase().endsWith(".ogg") ||
-				file.name.toLowerCase().endsWith(".m4a") ||
-				file.name.toLowerCase().endsWith(".webm"))
-			.map(async (file) => {
-				const fileName = file.name;
+		const handler = this;
+		// 최대 동시 요청 개수
+		const MAX_CONCURRENT = 2;
 
-				const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
-				SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
-
-				const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
-				const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
-
-				try {
-					if (this.plugin.settings.sttModel=== "gemini-2.0-flash") {
-						const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
-						const transcript = await this.callGeminiTranscription(this.plugin.settings.sttModel, base64, mimeType) || "";
-						SummarDebug.log(3, transcript);
-						SummarDebug.log(1, 'seconds: ', seconds);
-						const strContent = this.adjustSrtTimestamps(transcript, seconds);
-						return strContent;
-/**
-					} else {
-						const ext = fileName.split(".").pop()?.toLowerCase();
-						const encoding = this.getEncodingFromExtension(ext);
-						const audioBase64 = await this.readFileAsBase64(audioFilePath);
-						const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
-						return transcript || "";
-/**/
-					} else {
-						const blob = file.slice(0, file.size, file.type);
-						const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
-						const data = await this.callWhisperTranscription(finalBody, contentType);
-						// response.text().then((text) => {
-						// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
-						// });
-
-						// 응답 확인
-						if (!data.segments || data.segments.length === 0) {
-							SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
-							if (data.text && data.text.length > 0) {
-								return data.text;
-							} else {
-								SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
-								return "";
-							}
-						}
-						SummarDebug.log(3, data);
-						// SRT 포맷 변환
-						const srtContent = data.segments
-							.map((segment: any, index: number) => {
-								const start = formatTime(segment.start + seconds);
-								const end = formatTime(segment.end + seconds);
-								const text = segment.text.trim();
-
-								// return `${index + 1}\n${start} --> ${end}\n${text}\n`;
-								return `${start} --> ${end}\n${text}\n`;
-							})
-							.join("");
-
-						return srtContent;
+		// Promise pool로 동시 transcription 제한 (stock 현상 없는 안전한 패턴)
+		async function runWithConcurrencyLimit(tasks: (() => Promise<any>)[], limit: number): Promise<any[]> {
+			const results: any[] = [];
+			let next = 0;
+			let active = 0;
+			return new Promise((resolve, reject) => {
+				function runNext() {
+					if (next >= tasks.length && active === 0) {
+						resolve(results);
+						return;
 					}
-
-				} catch (error) {
-					SummarDebug.error(1, `Error processing file ${fileName}:`, error);
-					this.timer.stop();
-					return "";
+					while (active < limit && next < tasks.length) {
+						const current = next++;
+						active++;
+						tasks[current]().then((result) => {
+							results[current] = result;
+							active--;
+							runNext();
+						}).catch(reject);
+					}
 				}
+				runNext();
 			});
+		}
+
+		// transcriptionPromises를 함수 배열로 변경
+		const audioSortedFiles = sortedFiles.filter(isAudioFile);
+		const transcriptionTasks = audioSortedFiles.map((file) => async () => {
+			const fileName = file.name;
+			const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
+			SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
+			const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
+			const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
+
+			// 재시도 로직 래퍼
+			async function transcribeWithRetry() {
+				let lastError = null;
+				for (let attempt = 1; attempt <= 3; attempt++) {
+					try {
+						if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
+							const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
+							const transcript = await this.callGeminiTranscription(base64, mimeType) || "";
+							SummarDebug.log(3, transcript);
+							SummarDebug.log(1, 'seconds: ', seconds);
+							const strContent = this.adjustSrtTimestamps(transcript, seconds);
+							return strContent;
+						} else if (this.plugin.settings.sttModel && this.plugin.settings.sttModel.toLowerCase().includes("google")) {
+							const ext = fileName.split(".").pop()?.toLowerCase();
+							const encoding = this.getEncodingFromExtension(ext);
+							const { base64: audioBase64 } = await this.readFileAsBase64(audioFilePath);
+							const transcript = await this.callGoogleTranscription(audioBase64, encoding as string);
+							return transcript || "";
+						} else {
+							const blob = file.slice(0, file.size, file.type);
+							const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
+							const data = await this.callWhisperTranscription(finalBody, contentType);
+							// response.text().then((text) => {
+							// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
+							// });
+
+							// 응답 확인
+							if (!data.segments || data.segments.length === 0) {
+								SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
+								if (data.text && data.text.length > 0) {
+									return data.text;
+								} else {
+									SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
+									return "";
+								}
+							}
+							SummarDebug.log(3, data);
+							// SRT 포맷 변환
+							const srtContent = data.segments
+								.map((segment: any, index: number) => {
+									const start = formatTime(segment.start + seconds);
+									const end = formatTime(segment.end + seconds);
+									const text = segment.text.trim();
+
+									// return `${index + 1}\n${start} --> ${end}\n${text}\n`;
+									return `${start} --> ${end}\n${text}\n`;
+								})
+								.join("");
+
+							return srtContent;
+						}
+					} catch (error: any) {
+						lastError = error;
+						// 503 에러만 재시도, 그 외는 바로 break
+						if (error && (error.status === 503 || (error.message && error.message.includes("503")))) {
+							SummarDebug.error(1, `503 error on attempt ${attempt} for file ${fileName}, retrying...`, error);
+							if (attempt < 3) await new Promise(res => setTimeout(res, 1000 * attempt));
+							continue;
+						} else {
+							SummarDebug.error(1, `Error processing file ${fileName}:`, error);
+							break;
+						}
+					}
+				}
+				SummarDebug.error(1, `Failed to transcribe file ${fileName} after 3 attempts. Last error:`, lastError);
+				this.timer.stop();
+				return "";
+			}
+			// 실제 호출
+			return await transcribeWithRetry.call(this);
+		});
 
 		// Wait for all transcriptions to complete
-		const transcriptions = await Promise.all(transcriptionPromises);
+		const transcriptions = await runWithConcurrencyLimit(transcriptionTasks, MAX_CONCURRENT);
 
-		// Combine all transcriptions
-		transcriptedText = transcriptions.join("\n");
+        // 하나라도 실패(빈 문자열, null, undefined 등)한 경우 전체 실패로 간주
+        if (transcriptions.some(t => !t || t.trim() === "")) {
+            this.timer.stop();
+            this.updateResultText("\u274C Transcription failed for some audio files. All files must be processed successfully to proceed.\n\nPlease check the log.");
+            throw new Error("One or more audio transcriptions failed. Aborting next steps.");
+        }
+
+        // Combine all transcriptions with filename headers
+		transcriptedText = sortedFiles
+			.filter(isAudioFile)
+			.map((file, idx) => {
+				const header = `----- [${file.name}] ------\n`;
+				return header + (transcriptions[idx] || "");
+			})
+			.join("\n");
 
 		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
 
@@ -242,8 +298,7 @@ export class AudioHandler extends SummarViewContainer {
 			  default: return null;
 			}
 		}
-	
-			
+
 	}
 
 
@@ -627,6 +682,13 @@ Your response must contain ONLY the SRT format transcript with no additional exp
 		}
 
 	}
-	
-	
+
+}
+
+// 오디오 파일 여부를 판별하는 유틸 함수 (File, TFile 모두 지원)
+function isAudioFile(file: { name: string, type?: string }): boolean {
+    const audioExtensions = ["mp3", "wav", "ogg", "m4a", "webm"];
+    if (file.type && file.type.startsWith("audio/")) return true;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    return ext ? audioExtensions.includes(ext) : false;
 }
