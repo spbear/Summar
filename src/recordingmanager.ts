@@ -1,7 +1,7 @@
 import { normalizePath, Platform, Notice } from "obsidian";
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarDebug, SummarViewContainer, fetchOpenai, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath } from "./globals";
+import { SummarDebug, SummarViewContainer, fetchOpenai, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath, SummarAI } from "./globals";
 import { NativeAudioRecorder } from "./audiorecorder";
 import { RecordingTimer } from "./recordingtimer";
 import { SummarTimer } from "./summartimer";
@@ -46,37 +46,48 @@ export class AudioRecordingManager extends SummarViewContainer {
 		SummarDebug.log(1, `newFilePath: ${newFilePath}`);
 
 		const transcriptSummaryPrompt = this.plugin.settings.transcriptSummaryPrompt;
-		const openaiApiKey = this.plugin.settings.openaiApiKey;
+		// const openaiApiKey = this.plugin.settings.openaiApiKey;
 
 		let summary = "";
 
 		try {
-			const body_content = JSON.stringify({
-				model: this.plugin.settings.transcriptSummaryModel,
-				messages: [
-					// { role: "system", content: systemPrompt },
-					{ role: "user", content: `${transcriptSummaryPrompt}\n\n${transcripted}` },
-				],
-				// max_tokens: 16384,
-			});
+			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
+			if (!summarai.hasKey(true)) return '';
+
+			// const body_content = JSON.stringify({
+			// 	model: this.plugin.settings.transcriptSummaryModel,
+			// 	messages: [
+			// 		// { role: "system", content: systemPrompt },
+			// 		{ role: "user", content: `${transcriptSummaryPrompt}\n\n${transcripted}` },
+			// 	],
+			// 	// max_tokens: 16384,
+			// });
 			this.updateResultText("Summarizing...");
 			this.enableNewNote(false);
 			this.timer.start();
-			const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
+			// const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
+			const message = `${transcriptSummaryPrompt}\n\n${transcripted}`;
+			await summarai.fetch([message]);
+			const status = summarai.response.status;
+			const summary = summarai.response.text;
 
-			if (aiResponse.status !== 200) {
-				const errorText = aiResponse.text;
-				SummarDebug.error(1, "OpenAI API Error:", errorText);
-				this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+			// if (aiResponse.status !== 200) {
+			if (status !== 200) {
+				// const errorText = aiResponse.text;
+				// SummarDebug.error(1, "OpenAI API Error:", errorText);
+				SummarDebug.error(1, "OpenAI API Error:", summary);
+				// this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+				this.updateResultText(`Error: ${status} - ${summary}`);
 				this.enableNewNote(false);
 
 				this.timer.stop();
 				return summary;
 			}
 
-			const aiData = aiResponse.json;
-			if (aiData.choices && aiData.choices.length > 0) {
-				summary = aiData.choices[0].message.content || "No summary generated.";
+			// const aiData = aiResponse.json;
+			// if (aiData.choices && aiData.choices.length > 0) {
+			if (summary && summary.length > 0) {
+				// summary = aiData.choices[0].message.content || "No summary generated.";
 
 				let summaryCandidate = "";
 				if (newFilePath.toLowerCase().includes(" transcript.md")) {
@@ -131,41 +142,57 @@ export class AudioRecordingManager extends SummarViewContainer {
 		this.enableNewNote(false);
 
 		const refineSummaryPrompt = this.plugin.settings.refineSummaryPrompt;
-		const openaiApiKey = this.plugin.settings.openaiApiKey;
+		// const openaiApiKey = this.plugin.settings.openaiApiKey;
 
 		try {
-			const jsonBuilder = new JsonBuilder();
-			jsonBuilder.addData("model", this.plugin.settings.transcriptSummaryModel);
-			jsonBuilder.addToArray("messages", {
-				role: "user",
-				content: refineSummaryPrompt,
-			});
-			jsonBuilder.addToArray("messages", {
-				role: "user",
-				content: `=====회의록 요약본 시작=====\n\n${summarized}\n\n=====회의록 요약본 끝=====\n\n=====원본 transcript 시작=====\n\n${transcripted}\n\n====원본 transcript 끝====`,
-			});
+			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
+			if (!summarai.hasKey(true)) return '';
+			const messages: string[] = [];
+			messages.push(refineSummaryPrompt);
+			messages.push(`=====회의록 요약본 시작=====\n\n${summarized}\n\n=====회의록 요약본 끝=====\n\n=====원본 transcript 시작=====\n\n${transcripted}\n\n====원본 transcript 끝====`);
 
-			const body_content = jsonBuilder.toString();
+			SummarDebug.log(1, `messages1\n${messages[0]}`);
+			SummarDebug.log(1, `messages2\n${messages[1]}`);
+			
+			// const jsonBuilder = new JsonBuilder();
+			// jsonBuilder.addData("model", this.plugin.settings.transcriptSummaryModel);
+			// jsonBuilder.addToArray("messages", {
+			// 	role: "user",
+			// 	content: refineSummaryPrompt,
+			// });
+			// jsonBuilder.addToArray("messages", {
+			// 	role: "user",
+			// 	content: `=====회의록 요약본 시작=====\n\n${summarized}\n\n=====회의록 요약본 끝=====\n\n=====원본 transcript 시작=====\n\n${transcripted}\n\n====원본 transcript 끝====`,
+			// });
+
+			// const body_content = jsonBuilder.toString();
 
 			this.updateResultText("Refining...");
 			this.enableNewNote(false);
 			this.timer.start();
 
-			const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
+			// const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
+			await summarai.fetch(messages);
+			const status = summarai.response.status;
+			refined = summarai.response.text;
 
-			if (aiResponse.status !== 200) {
-				const errorText = aiResponse.text;
-				SummarDebug.error(1, "OpenAI API Error:", errorText);
-				this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+			// if (aiResponse.status !== 200) {
+			if (status !== 200) {
+				// const errorText = aiResponse.text;		
+				// SummarDebug.error(1, "OpenAI API Error:", errorText);
+				SummarDebug.error(1, "OpenAI API Error:", refined);
+				// this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+				this.updateResultText(`Error: ${status} - ${refined}`);
 				this.enableNewNote(false);
 
 				this.timer.stop();
 				return refined;
 			}
 
-			const aiData = aiResponse.json;
-			if (aiData.choices && aiData.choices.length > 0) {
-				refined = aiData.choices[0].message.content || "Request failed.";
+			// const aiData = aiResponse.json;
+			// if (aiData.choices && aiData.choices.length > 0) {
+			if (refined && refined.length > 0) {
+				// refined = aiData.choices[0].message.content || "Request failed.";
 
 				let refinementCandidate = "";
 				if (newFilePath.toLowerCase().includes(" summary")) {
