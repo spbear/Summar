@@ -1,6 +1,6 @@
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, fetchOpenai, fetchAIAPI, aiResponse, getProviderFromModel } from "./globals";
+import { SummarViewContainer, SummarDebug, fetchOpenai, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { MarkdownView } from "obsidian";
 import { text } from "stream/consumers";
@@ -33,21 +33,24 @@ export class CustomCommandHandler extends SummarViewContainer {
 		const cmdPrompt = settings[`cmd_prompt_${cmdIndex}`] || '';
 		const appendToNote = !!settings[`cmd_append_to_note_${cmdIndex}`];
 		const copyToClipboard = !!settings[`cmd_copy_to_clipboard_${cmdIndex}`];
-		const { aiProvider, aiKey } = getProviderFromModel(this.plugin, cmdModel as string);
 
-		if (aiProvider ==='openai' && (!aiKey || aiKey.length === 0)) {
-			SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
-			this.updateResultText("Please configure OpenAI API key in the plugin settings.");
-			this.enableNewNote(false);
-			return;
-		}
+		const summarai = new SummarAI(this.plugin, cmdModel as string);
 
-		if (aiProvider ==='gemini' && (!aiKey || aiKey.length === 0)) {
-			SummarDebug.Notice(0, "Please configure Gemini API key in the plugin settings.", 0);
-			this.updateResultText("Please configure Gemini API key in the plugin settings.");
-			this.enableNewNote(false);
-			return;
-		}
+		if (!summarai.hasKey(true)) return;
+
+		// if (aiProvider ==='openai' && (!aiKey || aiKey.length === 0)) {
+		// 	SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
+		// 	this.updateResultText("Please configure OpenAI API key in the plugin settings.");
+		// 	this.enableNewNote(false);
+		// 	return;
+		// }
+
+		// if (aiProvider ==='gemini' && (!aiKey || aiKey.length === 0)) {
+		// 	SummarDebug.Notice(0, "Please configure Gemini API key in the plugin settings.", 0);
+		// 	this.updateResultText("Please configure Gemini API key in the plugin settings.");
+		// 	this.enableNewNote(false);
+		// 	return;
+		// }
 
 		this.updateResultText("execute prompt with selected text...");
 		this.enableNewNote(false);
@@ -56,11 +59,11 @@ export class CustomCommandHandler extends SummarViewContainer {
 			this.timer.start();
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
-			const response = await fetchAIAPI(this.plugin, cmdModel as string, [message]);
 
+			await summarai.fetch([message]);
+			const responseStatus = summarai.response.status;
+			const responseText = summarai.response.text;
 			this.timer.stop();
-
-			const { responseStatus, responseText } = aiResponse(this.plugin, cmdModel as string, response);
 
 			if (responseStatus !== 200) {
 				const errorText = responseText || "Unknown error occurred.";

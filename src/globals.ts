@@ -4,6 +4,7 @@ import { Device } from '@capacitor/device';
 
 import SummarPlugin from "./main";
 import { PluginSettings } from "./types";
+import exp from "constants";
 
 // SWIFT_SCRIPT_TEMPLATE 삭제됨. 이제 외부 Swift 파일을 사용하세요.
 
@@ -55,7 +56,7 @@ export class SummarViewContainer {
   } 
 }
 
-export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bodyContent: string): Promise<any> {
+export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bodyContent: string, throwFlag: boolean = true): Promise<any> {
   try {
     SummarDebug.log(1, `openaiApiKey: ${openaiApiKey}`);
     SummarDebug.log(2, `bodyContent: ${bodyContent}`);
@@ -72,7 +73,7 @@ export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bo
         "Authorization": `Bearer ${openaiApiKey}`
       },
       body: bodyContent,
-      throw: false
+      throw: throwFlag,
     });
     return response;
   } catch (error) {
@@ -81,7 +82,7 @@ export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bo
   }
 }
 
-export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, geminiApiKey: string, bodyContent: string): Promise<any> {
+export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, geminiApiKey: string, bodyContent: string, throwFlag: boolean = true): Promise<any> {
   try {
     SummarDebug.log(1, `geminiApiKey: ${geminiApiKey}`);
     SummarDebug.log(2, `bodyContent: ${bodyContent}`);
@@ -95,7 +96,7 @@ export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, gem
         "Content-Type": "application/json"
       },
       body: bodyContent,
-      throw: false,
+      throw: throwFlag,
     });
     
     return response;
@@ -105,137 +106,155 @@ export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, gem
   }
 }
 
-export function getProviderFromModel(plugin: SummarPlugin, modelName: string): { aiProvider:string, aiKey: string} {
-  if (!modelName || typeof modelName !== 'string') {
-    throw new Error("Model name must be a non-empty string");
-  }
+export interface SummarAIResponse {
+  status: number;
+  json: any;
+  text: string;
+}
 
-  const model = modelName.toLowerCase().trim();
+export class SummarAI extends SummarViewContainer {
+  aiModel: string = '';
+  aiProvider: string = '';
+  aiKey: string = '';
+  response: SummarAIResponse = { status: 0, json: null, text: '' };
+  
 
-  if (model.includes('gpt') || model.includes('davinci') || model.includes('curie') || 
+  constructor(plugin: SummarPlugin, aiModel: string) {
+    super(plugin);
+    this.aiModel = aiModel;
+
+    const model = aiModel.toLowerCase().trim();
+
+    if (model.includes('gpt') || model.includes('davinci') || model.includes('curie') ||
       model.includes('babbage') || model.includes('ada')) {
-    return { aiProvider:'openai', aiKey: plugin.settings.openaiApiKey || '' };
-  }
-  
-  if (model.includes('gemini') || model.includes('bison') || model.includes('palm')) {
-    return { aiProvider:'gemini', aiKey: plugin.settings.googleApiKey || '' };
-  }
-  
-  if (model.includes('claude')) {
-    return { aiProvider: 'anthropic', aiKey: '' };
-  }
-  
-  if (model.includes('azure')) {
-    return { aiProvider: 'azure', aiKey: '' };
-  }
-  
-  if (model.includes('command')) {
-    return { aiProvider: 'cohere', aiKey: '' };
+      this.aiProvider = 'openai';
+      this.aiKey = plugin.settings.openaiApiKey;
+    } else if (model.includes('gemini') || model.includes('bison') || model.includes('palm')) {
+      this.aiProvider = 'gemini';
+      this.aiKey = plugin.settings.googleApiKey;
+    } else if (model.includes('claude')) {
+      this.aiProvider = 'anthropic';
+      this.aiKey = '';
+    } else if (model.includes('azure')) {
+      this.aiProvider = 'azure';
+      this.aiKey = '';
+    } else if (model.includes('command')) {
+      this.aiProvider = 'cohere';
+      this.aiKey = '';
+    } else {
+      this.aiProvider = 'unknown';
+      this.aiKey = '';
+    }
+    SummarDebug.log(3, `SummarAI initialized with model: ${this.aiModel}, provider: ${this.aiProvider}, key: ${this.aiKey}`);
   }
 
-  return { aiProvider: 'unknown', aiKey: '' };
-}
+  hasKey(errDisplay?: boolean): boolean {
+    if (this.aiKey && this.aiKey.length > 0) {
+      return true;
+    } else if (errDisplay) {
+      const errorMessage = `Please configure ${this.aiProvider} API key in the plugin settings.`;
+			this.updateResultText(errorMessage);
+			this.enableNewNote(false);
 
-export function aiResponse(plugin: SummarPlugin, aiModel: string, response:any): { responseStatus: number, responseJson: any, responseText?: string } {
-  const { aiProvider } = getProviderFromModel(plugin, aiModel);
-  try {
-    if (aiProvider === 'openai') {
-      if (response.json &&
-        response.json.choices &&
-        response.json.choices.length > 0 &&
-        response.json.choices[0].message &&
-        response.json.choices[0].message.content
-      ) {
-        SummarDebug.log(1, `OpenAI API response: \n${JSON.stringify(response.json)}`);
-        return {
-          responseStatus: response.status,
-          responseJson: response.json,
-          responseText: response.json.choices[0].message.content || ''
-        };
-      } else {
-        SummarDebug.log(1, `OpenAI API response without content: \n${JSON.stringify(response.json)}`);
-        return {
-          responseStatus: response.status,
-          responseJson: response.json,
-          responseText: response.json.error ? response.json.error.message : 'No content available'
+      const fragment = document.createDocumentFragment();
+      const link = document.createElement("a");
+      link.textContent = `${this.aiProvider} key is missing. Please add your API key in the settings.`;
+      link.href = "#";
+      link.style.cursor = "pointer";
+      link.style.color = "var(--text-accent)"; // 링크 색상 설정 (옵션)
+      link.addEventListener("click", (event) => {
+        event.preventDefault(); // 기본 동작 방지
+        showSettingsTab(this.plugin, 'common-tab');
+      });
+      fragment.appendChild(link);
+      SummarDebug.Notice(0, fragment, 0);      
+    }
+    return false
+  }
+
+  async fetch( messages: string[] ): Promise<boolean> {
+    try {
+      if (messages && messages.length > 0) {
+        if (this.aiProvider === 'openai') {
+          SummarDebug.log(1, `SummarAI.fetch() - Using OpenAI API with model: ${this.aiModel}`);
+          
+          const openaiMessages = messages.map(message => ({
+            role: "user",
+            content: message
+          }));
+          const bodyContent = JSON.stringify({
+            model: this.aiModel,
+            messages: openaiMessages,
+          });
+
+          const response = await fetchOpenai(this.plugin, this.aiKey, bodyContent, false);
+          if (response.json &&
+            response.json.choices &&
+            response.json.choices.length > 0 &&
+            response.json.choices[0].message &&
+            response.json.choices[0].message.content
+          ) {
+            SummarDebug.log(1, `OpenAI API response: \n${JSON.stringify(response.json)}`);
+            this.response.status = response.status;
+            this.response.json = response.json;
+            this.response.text = response.json.choices[0].message.content || '';
+            return true;
+          } else {
+            SummarDebug.log(1, `OpenAI API response without content: \n${JSON.stringify(response.json)}`);
+            this.response.status = response.status;
+            this.response.json = response.json;
+            this.response.text = response.json.error ? response.json.error.message : 'No content available';
+            return false
+          }
+        }
+        else if (this.aiProvider === 'gemini') {
+          SummarDebug.log(1, `SummarAI.fetch() - Using Gemini API with model: ${this.aiModel}`);
+          const contents = messages.map(message => ({
+            role: "user",
+            parts: [
+              {
+                text: message
+              }
+            ]
+          }));
+
+          const bodyContent = JSON.stringify({
+            contents: contents,
+          });
+          const response = await fetchGemini(this.plugin, this.aiModel, this.aiKey, bodyContent, false);
+          if (response.json &&
+            response.json.candidates &&
+            response.json.candidates.length > 0 &&
+            response.json.candidates[0].content &&
+            response.json.candidates[0].content.parts &&
+            response.json.candidates[0].content.parts.length > 0 &&
+            response.json.candidates[0].content.parts[0].text
+          ) {
+            SummarDebug.log(1, `Gemini API response: \n${JSON.stringify(response.json)}`);
+            this.response.status = response.status;
+            this.response.json = response.json;
+            this.response.text = response.json.candidates[0].content.parts[0].text || '';
+            return true;
+          } else {
+            SummarDebug.log(1, `Gemini API response without content: \n${JSON.stringify(response.json)}`);
+            this.response.status = response.status;
+            this.response.json = response.json;
+            this.response.text = response.json.error ? response.json.error.message : 'No content available';
+            return false
+          }
+          SummarDebug.log(1, `API responses error: \n${JSON.stringify(response.json)}`);
         }
       }
-    } else if (aiProvider === 'gemini') {
-      if (response.json &&
-        response.json.candidates &&
-        response.json.candidates.length > 0 &&
-        response.json.candidates[0].content &&
-        response.json.candidates[0].content.parts &&
-        response.json.candidates[0].content.parts.length > 0 &&
-        response.json.candidates[0].content.parts[0].text
-      ) {
-        SummarDebug.log(1, `Gemini API response: \n${JSON.stringify(response.json)}`);
-        return {
-          responseStatus: response.status,
-          responseJson: response.json,
-          responseText: response.json.candidates[0].content.parts[0].text || ''
-        };
-      } else {
-        SummarDebug.log(1, `Gemini API response without content: \n${JSON.stringify(response.json)}`);
-        return {
-          responseStatus: response.status,
-          responseJson: response.json,
-          responseText: response.json.error ? response.json.error.message : 'No content available'
-        }
-      }
+      throw new Error(`Unsupported provider: ${this.aiProvider}`);
+    } catch (error) {
+      SummarDebug.error(1, `Error calling ${this.aiProvider} API:`, error);
+      throw error;
     }
-    SummarDebug.log(1, `API responses error: \n${JSON.stringify(response.json)}`);
-    return {
-      responseStatus: response.status,
-      responseJson: response.json,
-    };
-  } catch (error) {
-    SummarDebug.error(1, `Error processing ${aiProvider} API response:`, error);
-    throw new Error(`Failed to process ${aiProvider} API response: ${error.message}`);
+    return false;
   }
+
 }
 
-export async function fetchAIAPI(
-  plugin: SummarPlugin, 
-  aiModel: string,
-  messages: string[], 
-): Promise<any> {
-  const { aiProvider, aiKey } = getProviderFromModel(plugin, aiModel);
-
-  try {  
-    if (messages && messages.length > 0) {
-      if (aiProvider === 'openai') {
-SummarDebug.log(1, `fetchAIAPI() - Using OpenAI API with model: ${aiModel}`);
-        const bodyContent = JSON.stringify({
-          model: aiModel,
-          messages: [
-            { role: "user", content: messages[0] },
-          ],
-        });
-        return await fetchOpenai(plugin, aiKey, bodyContent);
-      }
-      else if (aiProvider === 'gemini') {
-        const contents = messages.map(message => ({
-          role: "user",
-          parts: [
-            {
-              text: message
-            }
-          ]
-        }));
-        
-        const bodyContent = JSON.stringify({ 
-          contents: contents,
-        });
-        return await fetchGemini(plugin, aiModel, aiKey, bodyContent);
-      }
-    }
-    throw new Error(`Unsupported provider: ${aiProvider}`);
-  } catch (error) {
-    SummarDebug.error(1, `Error calling ${aiProvider} API:`, error);
-    throw error;
-  }
-}
 
 export class SummarDebug {
   private static debugLevel: number = 0;

@@ -32,7 +32,7 @@ export class PdfHandler extends SummarViewContainer {
 		const pdftopng = new PdfToPng(this.plugin);
 		try {
 			if (!(await pdftopng.isPopplerInstalled())) {
-				SummarDebug.Notice(0, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
+				SummarDebug.Notice(0, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.", 0);
 				this.updateResultText("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 				this.enableNewNote(false);
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
