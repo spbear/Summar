@@ -106,7 +106,7 @@ export class AudioHandler extends SummarViewContainer {
 		// Process files in parallel
 		const handler = this;
 		// 최대 동시 요청 개수
-		const MAX_CONCURRENT = 4;
+		const MAX_CONCURRENT = 2;
 
 		// Promise pool로 동시 transcription 제한 (stock 현상 없는 안전한 패턴)
 		async function runWithConcurrencyLimit(tasks: (() => Promise<any>)[], limit: number): Promise<any[]> {
