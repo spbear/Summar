@@ -208,7 +208,7 @@ export class AudioHandler extends SummarViewContainer {
 				}
 				SummarDebug.error(1, `Failed to transcribe file ${fileName} after 3 attempts. Last error:`, lastError);
 				this.timer.stop();
-				return "";
+				return { __isTranscribeError: true, error: lastError };
 			}
 			// 실제 호출
 			return await transcribeWithRetry.call(this);
@@ -217,10 +217,28 @@ export class AudioHandler extends SummarViewContainer {
 		// Wait for all transcriptions to complete
 		const transcriptions = await runWithConcurrencyLimit(transcriptionTasks, MAX_CONCURRENT);
 
-        // 하나라도 실패(빈 문자열, null, undefined 등)한 경우 전체 실패로 간주
-        if (transcriptions.some(t => !t || t.trim() === "")) {
+        // 실패 파일 정보 수집
+        const failedFiles: { name: string, error: any }[] = [];
+        audioSortedFiles.forEach((file, idx) => {
+            const t = transcriptions[idx];
+            const isEmpty = (typeof t === 'string') ? t.trim() === "" : !t;
+            if (!t || isEmpty) {
+                if (typeof t === 'object' && t !== null && t.__isTranscribeError) {
+                    failedFiles.push({ name: file.name, error: t.error });
+                } else {
+                    failedFiles.push({ name: file.name, error: null });
+                }
+            }
+        });
+
+        if (failedFiles.length > 0) {
             this.timer.stop();
-            this.updateResultText("\u274C Transcription failed for some audio files. All files must be processed successfully to proceed.\n\nPlease check the log.");
+            let errorMsg = '\u274C Failed to transcribe some audio files. All files must be processed successfully to proceed.\n';
+            errorMsg += failedFiles.map(f => {
+                let errStr = f.error ? (f.error.status ? `[${f.error.status}] ` : '') + (f.error.message || f.error.toString?.() || f.error) : 'Unknown error';
+                return `- ${f.name}: ${errStr}`;
+            }).join('\n');
+            this.updateResultText(errorMsg);
             throw new Error("One or more audio transcriptions failed. Aborting next steps.");
         }
 
@@ -229,7 +247,9 @@ export class AudioHandler extends SummarViewContainer {
 			.filter(isAudioFile)
 			.map((file, idx) => {
 				const header = `----- [${file.name}] ------\n`;
-				return header + (transcriptions[idx] || "");
+				const t = transcriptions[idx];
+				// string이 아니면 빈 문자열로 대체
+				return header + (typeof t === "string" ? t : "");
 			})
 			.join("\n");
 
@@ -533,7 +553,7 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	}
 	
-	async callGeminiTranscription(sttModel: string, audioBase64: string, mimeType: string): Promise<string | null> {
+	async callGeminiTranscription(base64: string, mimeType: string): Promise<string | null> {
 		const apiKey = this.plugin.settings.googleApiKey;
 		if (!apiKey || apiKey.length === 0) {
 		  SummarDebug.Notice(1, "Google API key is missing. Please add your API key in the settings.");
@@ -541,74 +561,55 @@ export class AudioHandler extends SummarViewContainer {
 		  return null;
 		}
 
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${sttModel}:generateContent`;
-        
-        // set the system instruction
-        let systemInstruction = `You are an expert in audio-to-text transcription.
-
-1. Accurately transcribe the provided audio content into text.
-2. You MUST output the transcription in SRT (SubRip Text) format only.
-3. Split each subtitle entry into segments of 2-3 seconds.
-4. Follow this strict SRT format for every output:
-   - ommit Sequential number
-   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)
-   - Text content
-   - Blank line (to separate from next entry)
-
-5. Include appropriate punctuation and paragraphing according to the language's grammar and context.
-6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.
-7. If multiple speakers are present, clearly indicate speaker changes (e.g., "Speaker 1: Hello").
-
-Your response must contain ONLY the SRT format transcript with no additional explanation or text.`;
-
-        // add language information if available
+		const sttModel = this.plugin.settings.sttModel;
+		const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${sttModel}:generateContent`;
+		let systemInstruction = `You are an expert in audio-to-text transcription.\n\n1. Accurately transcribe the provided audio content into text.\n2. You MUST output the transcription in SRT (SubRip Text) format only.\n3. Split each subtitle entry into segments of 2-3 seconds.\n4. Follow this strict SRT format for every output:\n   - ommit Sequential number\n   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)\n   - Text content\n   - Blank line (to separate from next entry)\n\n5. Include appropriate punctuation and paragraphing according to the language's grammar and context.\n6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.\n7. If multiple speakers are present, clearly indicate speaker changes (e.g., "Speaker 1: Hello").\n\nYour response must contain ONLY the SRT format transcript with no additional explanation or text.`;
 		if (this.plugin.settings.recordingLanguage) {
 			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settings.recordingLanguage)}.`;
 		}
-
-        try {
-            const response = await SummarRequestUrl(this.plugin, {
-                url: `${API_URL}?key=${this.plugin.settings.googleApiKey}`,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
+		try {
+			const response = await SummarRequestUrl(this.plugin, {
+				url: `${API_URL}?key=${this.plugin.settings.googleApiKey}`,
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					contents: [{
+						parts: [
 							{ text: systemInstruction },
 							{
 								inlineData: {
 									mimeType: mimeType,
-									data: audioBase64
+									data: base64
 								}
 							}
 						]
-                    }],
-                })
-            });
-            
-            // checking the response status
-            if (response.status !== 200) {
-                throw new Error(`API 오류 (${response.status}): ${response.text}`);
-            }
-            
-            const data = response.json;
-            
-            // extraxting the transcription text from the response
-            if (data.candidates && data.candidates.length > 0 && 
-                data.candidates[0].content && 
-                data.candidates[0].content.parts && 
-                data.candidates[0].content.parts.length > 0) {
-                return data.candidates[0].content.parts[0].text;
-            } else {
-                throw new Error('candidates not found in the response');
-            }
-        } catch (error) {
+					}],
+				})
+			});
+			if (response.status !== 200) {
+				throw new Error(`API 오류 (${response.status}): ${response.text}`);
+			}
+			const data = response.json;
+			if (data.candidates && data.candidates.length > 0 && 
+				data.candidates[0].content && 
+				data.candidates[0].content.parts && 
+				data.candidates[0].content.parts.length > 0) {
+				const result = data.candidates[0].content.parts[0].text;
+				if (typeof result === 'string') {
+					return result;
+				} else {
+					throw new Error('Gemini API returned non-string result');
+				}
+			} else {
+				throw new Error('candidates not found in the response');
+			}
+		} catch (error) {
 			SummarDebug.error(1, "Error calling Gemini API:", error);
-            throw new Error(`Error calling gemini api: ${error.message}`);
-        }
-    }
+			throw new Error(`Error calling gemini api: ${error.message}`);
+		}
+	}
 
 
 

@@ -113,11 +113,11 @@ export default class SummarPlugin extends Plugin {
   };
 
   defaultModelsByCategory: Record<ModelCategory, string> = {
-    webModel: 'gpt-4o',
-    pdfModel: 'gpt-4o',
+    webModel: 'gpt-4.1-mini',
+    pdfModel: 'gpt-4.1-mini',
     sttModel: 'whisper-1',
-    transcriptSummaryModel: 'gpt-4o',
-    customModel: 'gpt-4o'
+    transcriptSummaryModel: 'gpt-4.1-mini',
+    customModel: 'gpt-4.1-mini'
   };
 
   defaultPrompts: DefaultPrompts = {
