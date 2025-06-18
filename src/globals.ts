@@ -60,30 +60,20 @@ export async function fetchOpenai(
   plugin: SummarPlugin, 
   openaiApiKey: string, 
   bodyContent: string | ArrayBuffer, 
-  throwFlag: boolean = true, 
-  contentType: string = 'application/json',
-  apiUrl?: string
+  throwFlag: boolean = true
 ): Promise<any> {
   try {
     SummarDebug.log(1, `openaiApiKey: ${openaiApiKey}`);
     SummarDebug.log(2, `bodyContent: ${bodyContent}`);
-    SummarDebug.log(3, `contentType: ${contentType}`);
-    SummarDebug.log(4, `apiUrl: ${apiUrl}`);
 
-    // 엔드포인트 설정 (비어있으면 기본값)
-    let url = '';
-    if (apiUrl && apiUrl.trim().length > 0) {
-      url = apiUrl.trim();
-    } else {
-      const endpoint = plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
-      url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
-    }
+    const endpoint = plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+    const url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
 
     const response = await SummarRequestUrl(plugin, {
       url: url,
       method: "POST",
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": 'application/json' ,
         "Authorization": `Bearer ${openaiApiKey}`
       },
       body: bodyContent,
@@ -101,8 +91,7 @@ export async function fetchGemini(
   geminiModel: string, 
   geminiApiKey: string, 
   bodyContent: string, 
-  throwFlag: boolean = true, 
-  contentType: string = 'application/json' 
+  throwFlag: boolean = true
 ): Promise<any> {
   try {
     SummarDebug.log(1, `geminiApiKey: ${geminiApiKey}`);
@@ -114,7 +103,7 @@ export async function fetchGemini(
       url: API_URL,
       method: "POST",
       headers: {
-        "Content-Type": contentType
+        "Content-Type": 'application/json' 
       },
       body: bodyContent,
       throw: throwFlag,
@@ -223,14 +212,13 @@ export class SummarAI extends SummarViewContainer {
     return false;
   }
 
-  async fetchWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
+  async fetchWithBody( bodyContent: string ): Promise<boolean> {
     try {
-      // if ( bodyContent && bodyContent.length > 0 ) {
-      if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
+      if ( bodyContent && bodyContent.length > 0 ) {
         if (this.aiProvider === 'openai') {
           SummarDebug.log(1, `SummarAI.fetch() - Using OpenAI API with model: ${this.aiModel}`);
           
-          const response = await fetchOpenai(this.plugin, this.aiKey, bodyContent, false, contentType, apiUrl);
+          const response = await fetchOpenai(this.plugin, this.aiKey, bodyContent, false);
           if (response.json &&
             response.json.choices &&
             response.json.choices.length > 0 &&
@@ -253,7 +241,7 @@ export class SummarAI extends SummarViewContainer {
         else if (this.aiProvider === 'gemini') {
           SummarDebug.log(1, `SummarAI.fetch() - Using Gemini API with model: ${this.aiModel}`);
 
-          const response = await fetchGemini(this.plugin, this.aiModel, this.aiKey, bodyContent as string, false, contentType);
+          const response = await fetchGemini(this.plugin, this.aiModel, this.aiKey, bodyContent as string, false);
           if (response.json &&
             response.json.candidates &&
             response.json.candidates.length > 0 &&
@@ -313,6 +301,16 @@ export class SummarDebug {
   }
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam | string, throwFlag: boolean = true): RequestUrlResponsePromise {
   let requestParam: RequestUrlParam;
   
@@ -330,8 +328,6 @@ export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam 
 
   // User-Agent 헤더 추가
   requestParam.headers = { ...requestParam.headers, "user-agent": `Obsidian-Summar/${plugin.manifest.version}` };
-
-
   
   // curl 디버깅 로그 출력
   let curlDebug = `curl -X ${requestParam.method} "${requestParam.url}" \\`;
@@ -342,8 +338,7 @@ export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam 
     if (typeof requestParam.body === "string") {
       curlDebug += `\n-d '${requestParam.body}' \\`;
     } else if (requestParam.body instanceof ArrayBuffer) {
-      const byteArray = new Uint8Array(requestParam.body);
-      const base64String = btoa(String.fromCharCode(...byteArray));
+      const base64String = arrayBufferToBase64(requestParam.body); 
       curlDebug += `\n--data-binary '${base64String}' \\`;
     }
   }

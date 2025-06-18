@@ -163,10 +163,9 @@ export class AudioHandler extends SummarViewContainer {
 						} else {
 							const blob = file.slice(0, file.size, file.type);
 							const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
+
 							const data = await this.callWhisperTranscription(finalBody, contentType);
-							// response.text().then((text) => {
-							// 	SummarDebug.log(3, `Response sendAudioData: ${text}`);
-							// });
+							SummarDebug.log(1, `sendAudioData() - 1st response data: ${JSON.stringify(data)}`);							
 
 							// 응답 확인
 							if (!data.segments || data.segments.length === 0) {
@@ -178,14 +177,6 @@ export class AudioHandler extends SummarViewContainer {
 									return "";
 								}
 							}
-
-							// if (data && data.length > 0) {
-							// 	SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
-							// 	return data.text;
-							// } else {
-							// 	SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
-							// 	return "";
-							// }
 
 							SummarDebug.log(3, data);
 							// SRT 포맷 변환
@@ -438,26 +429,17 @@ export class AudioHandler extends SummarViewContainer {
         const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
         const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
 
-		// const sttModel = this.plugin.settings.sttModel;
-		// const summarai = new SummarAI(this.plugin, sttModel);
-		// if (!summarai.hasKey(true)) return '';
-
-        const response = await requestUrl({
-            url: url,
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${this.plugin.settings.openaiApiKey}`,
-                "Content-Type": contentType,
-            },
+		const response = await SummarRequestUrl(this.plugin, {
+			url: url,
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${this.plugin.settings.openaiApiKey}`,
+				"Content-Type": contentType,
+			},
             body: await requestbody.arrayBuffer(),
-        });
-        return response.json;
-
-
-		// await summarai.fetchWithBody(await requestbody.arrayBuffer(), contentType, url);
-
-		// const response = await summarai.response.text;
-		// return response;
+			throw: false
+		});
+		return response.json;
     }
 
 	////////////////////////////
