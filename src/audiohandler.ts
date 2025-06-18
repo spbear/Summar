@@ -1,6 +1,6 @@
 import { TFile, TFolder, normalizePath, requestUrl, RequestUrlParam } from "obsidian";
 import SummarPlugin from "./main";
-import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath } from "./globals";
+import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 
 export class AudioHandler extends SummarViewContainer {
@@ -178,6 +178,15 @@ export class AudioHandler extends SummarViewContainer {
 									return "";
 								}
 							}
+
+							// if (data && data.length > 0) {
+							// 	SummarDebug.log(1, `No transcription segments received for file: ${fileName}`);
+							// 	return data.text;
+							// } else {
+							// 	SummarDebug.log(1, `No transcription text received for file: ${fileName}`);
+							// 	return "";
+							// }
+
 							SummarDebug.log(3, data);
 							// SRT 포맷 변환
 							const srtContent = data.segments
@@ -428,6 +437,11 @@ export class AudioHandler extends SummarViewContainer {
         // 엔드포인트 설정 (비어있으면 기본값)
         const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
         const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
+
+		// const sttModel = this.plugin.settings.sttModel;
+		// const summarai = new SummarAI(this.plugin, sttModel);
+		// if (!summarai.hasKey(true)) return '';
+
         const response = await requestUrl({
             url: url,
             method: "POST",
@@ -437,8 +451,13 @@ export class AudioHandler extends SummarViewContainer {
             },
             body: await requestbody.arrayBuffer(),
         });
-
         return response.json;
+
+
+		// await summarai.fetchWithBody(await requestbody.arrayBuffer(), contentType, url);
+
+		// const response = await summarai.response.text;
+		// return response;
     }
 
 	////////////////////////////
@@ -554,49 +573,75 @@ export class AudioHandler extends SummarViewContainer {
 	}
 	
 	async callGeminiTranscription(base64: string, mimeType: string): Promise<string | null> {
-		const apiKey = this.plugin.settings.googleApiKey;
-		if (!apiKey || apiKey.length === 0) {
-		  SummarDebug.Notice(1, "Google API key is missing. Please add your API key in the settings.");
-		  this.GoogleApiKeyAlert();
-		  return null;
-		}
-
 		const sttModel = this.plugin.settings.sttModel;
-		const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${sttModel}:generateContent`;
+		const summarai = new SummarAI(this.plugin, sttModel);
+		if (!summarai.hasKey(true)) return '';
+
+		// const apiKey = this.plugin.settings.googleApiKey;
+		// if (!apiKey || apiKey.length === 0) {
+		//   SummarDebug.Notice(1, "Google API key is missing. Please add your API key in the settings.");
+		//   this.GoogleApiKeyAlert();
+		//   return null;
+		// }
+
+		// const sttModel = this.plugin.settings.sttModel;
+		// const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${sttModel}:generateContent`;
 		let systemInstruction = `You are an expert in audio-to-text transcription.\n\n1. Accurately transcribe the provided audio content into text.\n2. You MUST output the transcription in SRT (SubRip Text) format only.\n3. Split each subtitle entry into segments of 2-3 seconds.\n4. Follow this strict SRT format for every output:\n   - ommit Sequential number\n   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)\n   - Text content\n   - Blank line (to separate from next entry)\n\n5. Include appropriate punctuation and paragraphing according to the language's grammar and context.\n6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.\n7. If multiple speakers are present, clearly indicate speaker changes (e.g., "Speaker 1: Hello").\n\nYour response must contain ONLY the SRT format transcript with no additional explanation or text.`;
 		if (this.plugin.settings.recordingLanguage) {
 			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settings.recordingLanguage)}.`;
 		}
 		try {
-			const response = await SummarRequestUrl(this.plugin, {
-				url: `${API_URL}?key=${this.plugin.settings.googleApiKey}`,
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					contents: [{
-						parts: [
-							{ text: systemInstruction },
-							{
-								inlineData: {
-									mimeType: mimeType,
-									data: base64
-								}
+			// const response = await SummarRequestUrl(this.plugin, {
+			// 	url: `${API_URL}?key=${this.plugin.settings.googleApiKey}`,
+			// 	method: 'POST',
+			// 	headers: {
+			// 		'Content-Type': 'application/json'
+			// 	},
+			// 	body: JSON.stringify({
+			// 		contents: [{
+			// 			parts: [
+			// 				{ text: systemInstruction },
+			// 				{
+			// 					inlineData: {
+			// 						mimeType: mimeType,
+			// 						data: base64
+			// 					}
+			// 				}
+			// 			]
+			// 		}],
+			// 	})
+			// });
+			const bodyContent = JSON.stringify({
+				contents: [{
+					parts: [
+						{ text: systemInstruction },
+						{
+							inlineData: {
+								mimeType: mimeType,
+								data: base64
 							}
-						]
-					}],
-				})
+						}
+					]
+				}],
 			});
-			if (response.status !== 200) {
-				throw new Error(`API 오류 (${response.status}): ${response.text}`);
+
+			await summarai.fetchWithBody(bodyContent);
+			const status = summarai.response.status;
+			const result = summarai.response.text;
+
+
+			// if (response.status !== 200) {
+			if (status !== 200) {
+				// throw new Error(`API 오류 (${response.status}): ${response.text}`);
+				throw new Error(`API 오류 (${status}): ${result}`);
 			}
-			const data = response.json;
-			if (data.candidates && data.candidates.length > 0 && 
-				data.candidates[0].content && 
-				data.candidates[0].content.parts && 
-				data.candidates[0].content.parts.length > 0) {
-				const result = data.candidates[0].content.parts[0].text;
+			// const data = response.json;
+			// if (data.candidates && data.candidates.length > 0 && 
+			// 	data.candidates[0].content && 
+			// 	data.candidates[0].content.parts && 
+			// 	data.candidates[0].content.parts.length > 0) {
+			if (result && result.length > 0) {
+				// const result = data.candidates[0].content.parts[0].text;
 				if (typeof result === 'string') {
 					return result;
 				} else {

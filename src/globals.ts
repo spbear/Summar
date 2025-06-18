@@ -56,20 +56,34 @@ export class SummarViewContainer {
   } 
 }
 
-export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bodyContent: string, throwFlag: boolean = true): Promise<any> {
+export async function fetchOpenai(
+  plugin: SummarPlugin, 
+  openaiApiKey: string, 
+  bodyContent: string | ArrayBuffer, 
+  throwFlag: boolean = true, 
+  contentType: string = 'application/json',
+  apiUrl?: string
+): Promise<any> {
   try {
     SummarDebug.log(1, `openaiApiKey: ${openaiApiKey}`);
     SummarDebug.log(2, `bodyContent: ${bodyContent}`);
+    SummarDebug.log(3, `contentType: ${contentType}`);
+    SummarDebug.log(4, `apiUrl: ${apiUrl}`);
 
     // 엔드포인트 설정 (비어있으면 기본값)
-    const endpoint = plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
-    const url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
+    let url = '';
+    if (apiUrl && apiUrl.trim().length > 0) {
+      url = apiUrl.trim();
+    } else {
+      const endpoint = plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+      url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
+    }
 
     const response = await SummarRequestUrl(plugin, {
       url: url,
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": contentType,
         "Authorization": `Bearer ${openaiApiKey}`
       },
       body: bodyContent,
@@ -82,7 +96,14 @@ export async function fetchOpenai(plugin: SummarPlugin, openaiApiKey: string, bo
   }
 }
 
-export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, geminiApiKey: string, bodyContent: string, throwFlag: boolean = true): Promise<any> {
+export async function fetchGemini(
+  plugin: SummarPlugin, 
+  geminiModel: string, 
+  geminiApiKey: string, 
+  bodyContent: string, 
+  throwFlag: boolean = true, 
+  contentType: string = 'application/json' 
+): Promise<any> {
   try {
     SummarDebug.log(1, `geminiApiKey: ${geminiApiKey}`);
     SummarDebug.log(2, `bodyContent: ${bodyContent}`);
@@ -93,7 +114,7 @@ export async function fetchGemini(plugin: SummarPlugin, geminiModel: string, gem
       url: API_URL,
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": contentType
       },
       body: bodyContent,
       throw: throwFlag,
@@ -126,7 +147,7 @@ export class SummarAI extends SummarViewContainer {
     const model = aiModel.toLowerCase().trim();
 
     if (model.includes('gpt') || model.includes('davinci') || model.includes('curie') ||
-      model.includes('babbage') || model.includes('ada')) {
+      model.includes('babbage') || model.includes('ada') || model.includes('whisper')) {
       this.aiProvider = 'openai';
       this.aiKey = plugin.settings.openaiApiKey;
     } else if (model.includes('gemini') || model.includes('bison') || model.includes('palm')) {
@@ -172,22 +193,44 @@ export class SummarAI extends SummarViewContainer {
     return false
   }
 
-  async fetch( messages: string[] ): Promise<boolean> {
+  async fetch( messages : string[] ): Promise<boolean> {
+    if (messages && messages.length > 0) {
+      if (this.aiProvider === 'openai') {
+        const openaiMessages = messages.map(message => ({
+          role: "user",
+          content: message
+        }));
+        const bodyContent = JSON.stringify({
+          model: this.aiModel,
+          messages: openaiMessages,
+        });
+        return await this.fetchWithBody(bodyContent);
+      } else if (this.aiProvider === 'gemini') {
+        const contents = messages.map(message => ({
+          role: "user",
+          parts: [
+            {
+              text: message
+            }
+          ]
+        }));
+        const bodyContent = JSON.stringify({
+          contents: contents,
+        });
+        return await this.fetchWithBody(bodyContent);
+      }
+    }
+    return false;
+  }
+
+  async fetchWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
     try {
-      if (messages && messages.length > 0) {
+      // if ( bodyContent && bodyContent.length > 0 ) {
+      if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
         if (this.aiProvider === 'openai') {
           SummarDebug.log(1, `SummarAI.fetch() - Using OpenAI API with model: ${this.aiModel}`);
           
-          const openaiMessages = messages.map(message => ({
-            role: "user",
-            content: message
-          }));
-          const bodyContent = JSON.stringify({
-            model: this.aiModel,
-            messages: openaiMessages,
-          });
-
-          const response = await fetchOpenai(this.plugin, this.aiKey, bodyContent, false);
+          const response = await fetchOpenai(this.plugin, this.aiKey, bodyContent, false, contentType, apiUrl);
           if (response.json &&
             response.json.choices &&
             response.json.choices.length > 0 &&
@@ -209,19 +252,8 @@ export class SummarAI extends SummarViewContainer {
         }
         else if (this.aiProvider === 'gemini') {
           SummarDebug.log(1, `SummarAI.fetch() - Using Gemini API with model: ${this.aiModel}`);
-          const contents = messages.map(message => ({
-            role: "user",
-            parts: [
-              {
-                text: message
-              }
-            ]
-          }));
 
-          const bodyContent = JSON.stringify({
-            contents: contents,
-          });
-          const response = await fetchGemini(this.plugin, this.aiModel, this.aiKey, bodyContent, false);
+          const response = await fetchGemini(this.plugin, this.aiModel, this.aiKey, bodyContent as string, false, contentType);
           if (response.json &&
             response.json.candidates &&
             response.json.candidates.length > 0 &&
@@ -281,12 +313,12 @@ export class SummarDebug {
   }
 }
 
-export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam | string): RequestUrlResponsePromise {
+export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam | string, throwFlag: boolean = true): RequestUrlResponsePromise {
   let requestParam: RequestUrlParam;
   
   if (typeof request === 'string') {
     // request가 문자열이면 객체로 변환
-    requestParam = { url: request, headers: {}, method: "GET", throw: true }; 
+    requestParam = { url: request, headers: {}, method: "GET", throw: throwFlag }; 
   } else {
     // request가 객체이면 그대로 사용
     requestParam = request;

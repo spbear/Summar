@@ -1,6 +1,6 @@
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, fetchOpenai } from "./globals";
+import { SummarViewContainer, SummarDebug, fetchOpenai, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { PdfToPng } from "./pdftopng";
 import { JsonBuilder } from "./jsonbuilder";
@@ -20,14 +20,17 @@ export class PdfHandler extends SummarViewContainer {
 	 * @param plugin 플러그인 인스턴스
 	 */
 	async convertPdfToMarkdown() {
-		const { openaiApiKey } = this.plugin.settings;
+		const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
+		if (!summarai.hasKey(true)) return '';
 
-		if (!openaiApiKey) {
-			SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
-			this.updateResultText( "Please configure OpenAI API key in the plugin settings.");
-			this.enableNewNote(false);
-			return;
-		}
+		// const { openaiApiKey } = this.plugin.settings;
+
+		// if (!openaiApiKey) {
+		// 	SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
+		// 	this.updateResultText( "Please configure OpenAI API key in the plugin settings.");
+		// 	this.enableNewNote(false);
+		// 	return;
+		// }
 
 		const pdftopng = new PdfToPng(this.plugin);
 		try {
@@ -41,7 +44,7 @@ export class PdfHandler extends SummarViewContainer {
 			const fileInput = document.createElement("input");
 			fileInput.type = "file";
 			fileInput.accept = ".pdf";
-			const openaiApiKey = this.plugin.settings.openaiApiKey;
+			// const openaiApiKey = this.plugin.settings.openaiApiKey;
 			const pdfPrompt = this.plugin.settings.pdfPrompt;
 
 			fileInput.onchange = async () => {
@@ -105,30 +108,39 @@ export class PdfHandler extends SummarViewContainer {
 					this.enableNewNote(false);
 
 					this.timer.start();
-					const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
+					// const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
+					await summarai.fetchWithBody(body_content);
+					const status = summarai.response.status;
+					const summary = summarai.response.text;
+
 					this.timer.stop();
 
-					if (aiResponse.status !== 200) {
-						const errorText = aiResponse.text;
-						SummarDebug.error(1, "OpenAI API Error:", errorText);
-						this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+					// if (aiResponse.status !== 200) {
+					if (status !== 200) {
+						// const errorText = aiResponse.text;
+						// SummarDebug.error(1, "OpenAI API Error:", errorText);
+						SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
+						// this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
+						this.updateResultText(`Error: ${status} - ${summary}`);
 						this.enableNewNote(false);
 						return;
 					}
 
-					const aiData = aiResponse.json;
-					if (aiData.choices && aiData.choices.length > 0) {
-						const summary = aiData.choices[0].message.content || "No summary generated.";
+					// const aiData = aiResponse.json;
+					// if (aiData.choices && aiData.choices.length > 0) {
+					if (summary && summary.length > 0) {
+						// const summary = aiData.choices[0].message.content || "No summary generated.";
 						const markdownContent = this.extractMarkdownContent(summary);
 						if (markdownContent) {
 							this.updateResultText(markdownContent);
 							this.enableNewNote(true);
 						} else {
-							this.updateResultText(JSON.stringify(aiData, null, 2));
-							this.enableNewNote(false);
+							// this.updateResultText(JSON.stringify(aiData, null, 2));
+							this.updateResultText(summary);
+							this.enableNewNote(true);
 						}
 					} else {
-						this.updateResultText("No valid response from OpenAI API.");
+						this.updateResultText("No valid response from AI API.");
 						this.enableNewNote(false);
 					}
 
