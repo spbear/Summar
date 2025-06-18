@@ -1,7 +1,7 @@
 {
   "model_list": {
     "webModel": {
-      "default": "gpt-4o",
+      "default": "gpt-4.1-mini",
       "models": {
         "gpt-4o": "gpt-4o",
         "gpt-4.1": "gpt-4.1",
@@ -29,7 +29,7 @@
       }
     },
     "transcriptSummaryModel": {
-      "default": "gpt-4o",
+      "default": "gpt-4.1-mini",
       "models": {
         "gpt-4o": "gpt-4o",
         "gpt-4.1": "gpt-4.1",
@@ -40,7 +40,7 @@
       }
     },
     "customModel": {
-      "default": "gpt-4o",
+      "default": "gpt-4.1-mini",
       "models": {
         "gpt-4o": "gpt-4o",
         "gpt-4.1": "gpt-4.1",
