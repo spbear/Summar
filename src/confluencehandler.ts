@@ -1,5 +1,4 @@
 import SummarPlugin from "./main";
-import { OpenAIResponse } from "./types";
 import { SummarViewContainer, SummarDebug, containsDomain, SummarRequestUrl, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { ConfluenceAPI } from "./confluenceapi";
@@ -20,13 +19,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 	 * @param plugin 플러그인 인스턴스
 	 */
 	async fetchAndSummarize(url: string) {
-		const { confluenceApiToken, confluenceDomain, useConfluenceAPI, openaiApiKey, webPrompt } = this.plugin.settings;
-		// if (!openaiApiKey) {
-		// 	SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
-		// 	this.updateResultText("Please configure OpenAI API key in the plugin settings.");
-		// 	this.enableNewNote(false);
-		// 	return;
-		// }
+		const { confluenceApiToken, confluenceDomain, useConfluenceAPI, webPrompt } = this.plugin.settings;
 
 		const summarai = new SummarAI(this.plugin, this.plugin.settings.webModel);
 		if (!summarai.hasKey(true)) return;

@@ -1,6 +1,5 @@
 import SummarPlugin from "./main";
-import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, SummarAI, chatOpenai } from "./globals";
+import { SummarViewContainer, SummarDebug, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { PdfToPng } from "./pdftopng";
 import { JsonBuilder } from "./jsonbuilder";
@@ -119,13 +118,11 @@ export class PdfHandler extends SummarViewContainer {
 			}
 
 			if (summary && summary.length > 0) {
-				// const summary = aiData.choices[0].message.content || "No summary generated.";
 				const markdownContent = this.extractMarkdownContent(summary);
 				if (markdownContent) {
 					this.updateResultText(markdownContent);
 					this.enableNewNote(true);
 				} else {
-					// this.updateResultText(JSON.stringify(aiData, null, 2));
 					this.updateResultText(summary);
 					this.enableNewNote(true);
 				}

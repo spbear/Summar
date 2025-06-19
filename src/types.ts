@@ -62,14 +62,6 @@ export interface PluginSettings {
   refiningPrompt: string; // before 1.0.0
 }
 
-export interface OpenAIResponse {
-  choices: {
-    message: {
-      content: string;
-    };
-  }[];
-}
-
 export interface ModelInfo {
     [key: string]: string;
 }

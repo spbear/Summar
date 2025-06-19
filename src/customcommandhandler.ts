@@ -1,5 +1,4 @@
 import SummarPlugin from "./main";
-import { OpenAIResponse } from "./types";
 import { SummarViewContainer, SummarDebug, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { MarkdownView } from "obsidian";
@@ -37,20 +36,6 @@ export class CustomCommandHandler extends SummarViewContainer {
 		const summarai = new SummarAI(this.plugin, cmdModel as string);
 
 		if (!summarai.hasKey(true)) return;
-
-		// if (aiProvider ==='openai' && (!aiKey || aiKey.length === 0)) {
-		// 	SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
-		// 	this.updateResultText("Please configure OpenAI API key in the plugin settings.");
-		// 	this.enableNewNote(false);
-		// 	return;
-		// }
-
-		// if (aiProvider ==='gemini' && (!aiKey || aiKey.length === 0)) {
-		// 	SummarDebug.Notice(0, "Please configure Gemini API key in the plugin settings.", 0);
-		// 	this.updateResultText("Please configure Gemini API key in the plugin settings.");
-		// 	this.enableNewNote(false);
-		// 	return;
-		// }
 
 		this.updateResultText(`Execute prompt with selected text using [${cmdModel}]...`);
 		this.enableNewNote(false);

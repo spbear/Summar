@@ -1,6 +1,5 @@
-import { normalizePath, Platform, Notice } from "obsidian";
+import { normalizePath, Platform } from "obsidian";
 import SummarPlugin from "./main";
-import { OpenAIResponse } from "./types";
 import { SummarDebug, SummarViewContainer, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath, SummarAI } from "./globals";
 import { NativeAudioRecorder } from "./audiorecorder";
 import { RecordingTimer } from "./recordingtimer";
@@ -46,7 +45,6 @@ export class AudioRecordingManager extends SummarViewContainer {
 		SummarDebug.log(1, `newFilePath: ${newFilePath}`);
 
 		const transcriptSummaryPrompt = this.plugin.settings.transcriptSummaryPrompt;
-		// const openaiApiKey = this.plugin.settings.openaiApiKey;
 
 		let summary = "";
 
@@ -128,7 +126,6 @@ export class AudioRecordingManager extends SummarViewContainer {
 		this.enableNewNote(false);
 
 		const refineSummaryPrompt = this.plugin.settings.refineSummaryPrompt;
-		// const openaiApiKey = this.plugin.settings.openaiApiKey;
 
 		try {
 			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
