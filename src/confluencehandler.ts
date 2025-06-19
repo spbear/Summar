@@ -1,5 +1,6 @@
 import SummarPlugin from "./main";
-import { SummarViewContainer, SummarDebug, containsDomain, SummarRequestUrl, SummarAI } from "./globals";
+import { SummarViewContainer, SummarDebug, containsDomain, SummarRequestUrl } from "./globals";
+import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
 import { ConfluenceAPI } from "./confluenceapi";
 

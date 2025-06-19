@@ -222,11 +222,6 @@ export class SummarView extends View {
 
       let newNoteName = this.plugin.newNoteName;
       
-      // if (this.plugin.newNoteName.includes(".md")) {
-      //   newNoteName = newNoteName.replace(".md", " summary.md");
-      // } else {
-      //   newNoteName = newNoteName + ".md";
-      // }
       if (!newNoteName || newNoteName === "") {
         const summarView = new SummarViewContainer(this.plugin);
         summarView.enableNewNote(true, newNoteName);
@@ -255,7 +250,6 @@ export class SummarView extends View {
           await this.plugin.app.vault.adapter.mkdir(folderPath);
         }
         SummarDebug.log(1, `resultContainer.value===\n${this.plugin.resultContainer.value}`);
-        // SummarDebug.log(1, this.plugin.resultContainer.value);
         await this.plugin.app.vault.create(filePath, this.plugin.resultContainer.value);
         await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
       }

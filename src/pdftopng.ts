@@ -81,7 +81,7 @@ export class PdfToPng extends SummarViewContainer {
 
     SummarDebug.log(1, this.pdfName);
 
-    this.timer.start();
+    // this.timer.start();
     await this.convertPdfToPng();//this.pdfName, options);
     if (removeflag) {
       await this.deleteIfExists(this.pdfName);
@@ -93,7 +93,7 @@ export class PdfToPng extends SummarViewContainer {
     if (removeflag) {
       await this.deleteIfExists(this.outputDir);
     }
-    this.timer.stop();
+    // this.timer.stop();
 
     return result;
   }

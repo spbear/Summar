@@ -11,6 +11,8 @@ import { AudioRecordingManager } from "./recordingmanager";
 import { CustomCommandHandler } from "./customcommandhandler";
 import { CalendarHandler } from "./calendarhandler";
 import { StatusBar } from "./statusbar";
+import { SummarStatsModal } from "./summarstatsmodal";
+import { IndexedDBManager } from "./summarailog";
 
 
 export default class SummarPlugin extends Plugin {
@@ -128,6 +130,7 @@ export default class SummarPlugin extends Plugin {
     refineSummaryPrompt: ""
   };
 
+  dbManager: IndexedDBManager;
 
   async onload() {
     this.OBSIDIAN_PLUGIN_DIR = normalizePath("/.obsidian/plugins");
@@ -179,6 +182,9 @@ export default class SummarPlugin extends Plugin {
     this.recordingStatus = new StatusBar(this);
     this.reservedStatus = new StatusBar(this,true);
     this.calendarHandler = new CalendarHandler(this);
+
+    this.dbManager = new IndexedDBManager();
+    await this.dbManager.init();
 
 
     if (Platform.isDesktopApp) {
@@ -431,6 +437,16 @@ export default class SummarPlugin extends Plugin {
         fileInput.click();
       },
     });
+
+    // Summar stats 대시보드 커맨드 추가
+    // this.addCommand({
+    //   id: "show-summar-stats",
+    //   name: "Show Summar stats",
+    //   callback: async () => {
+    //     const modal = new SummarStatsModal(this);
+    //     modal.open();
+    //   },
+    // });
 
     this.registerCustomCommandAndMenus();
 

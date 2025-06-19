@@ -1,6 +1,7 @@
 import { normalizePath, Platform } from "obsidian";
 import SummarPlugin from "./main";
-import { SummarDebug, SummarViewContainer, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath, SummarAI } from "./globals";
+import { SummarDebug, SummarViewContainer, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath } from "./globals";
+import { SummarAI } from "./summarai";
 import { NativeAudioRecorder } from "./audiorecorder";
 import { RecordingTimer } from "./recordingtimer";
 import { SummarTimer } from "./summartimer";

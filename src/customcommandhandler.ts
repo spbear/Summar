@@ -1,8 +1,10 @@
 import SummarPlugin from "./main";
-import { SummarViewContainer, SummarDebug, SummarAI } from "./globals";
+import { SummarViewContainer, SummarDebug } from "./globals";
+import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
 import { MarkdownView } from "obsidian";
 import { text } from "stream/consumers";
+
 
 export class CustomCommandHandler extends SummarViewContainer {
 	private timer: SummarTimer;

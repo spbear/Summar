@@ -1,5 +1,6 @@
 import SummarPlugin from "./main";
-import { SummarViewContainer, SummarDebug, SummarAI } from "./globals";
+import { SummarViewContainer, SummarDebug } from "./globals";
+import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
 import { PdfToPng } from "./pdftopng";
 import { JsonBuilder } from "./jsonbuilder";
@@ -47,12 +48,12 @@ export class PdfHandler extends SummarViewContainer {
 			const pdfPrompt = this.plugin.settings.pdfPrompt;
 			SummarDebug.Notice(1, file.name);
 
-			this.updateResultText(`Converting PDF to markdown using [${this.plugin.settings.pdfModel}]. This may take a while...`);
-			this.enableNewNote(false);
-
 			this.timer.start();
 
 			const base64Values = await pdftopng.convert(file, (SummarDebug.level() < 4));
+
+			this.updateResultText(`Converting PDF to markdown using [${this.plugin.settings.pdfModel}]. This may take a while...`);
+			this.enableNewNote(false);
 
 			// JsonBuilder 인스턴스 생성
 			const jsonBuilder = new JsonBuilder();

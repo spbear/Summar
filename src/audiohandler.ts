@@ -1,6 +1,7 @@
 import { TFile, TFolder, normalizePath, RequestUrlParam } from "obsidian";
 import SummarPlugin from "./main";
-import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath, SummarAI } from "./globals";
+import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath } from "./globals";
+import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
 
 export class AudioHandler extends SummarViewContainer {
