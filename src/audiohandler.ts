@@ -607,7 +607,7 @@ export class AudioHandler extends SummarViewContainer {
 				}],
 			});
 
-			await summarai.fetchWithBody(bodyContent);
+			await summarai.chatWithBody(bodyContent);
 			const status = summarai.response.status;
 			const result = summarai.response.text;
 

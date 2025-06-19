@@ -1,6 +1,6 @@
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, fetchOpenai, containsDomain, SummarRequestUrl, SummarAI } from "./globals";
+import { SummarViewContainer, SummarDebug, containsDomain, SummarRequestUrl, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { ConfluenceAPI } from "./confluenceapi";
 
@@ -88,45 +88,24 @@ export class ConfluenceHandler extends SummarViewContainer {
 
 			SummarDebug.log(2, "Fetched page content:", page_content);
 
-			// const summarai = new SummarAI(this.plugin, this.plugin.settings.webModel);
-			// if (!summarai.hasKey(true)) return;
 
-			// const body_content = JSON.stringify({
-			// 	model: this.plugin.settings.webModel,
-			// 	messages: [
-			// 		// { role: "system", content: systemPrompt },
-			// 		{ role: "user", content: `${webPrompt}\n\n${page_content}` },
-			// 	],
-			// 	// max_tokens: 16384,
-			// });
-
-			this.updateResultText( "Summarizing...");
+			this.updateResultText( `Generating summary using [${this.plugin.settings.webModel}]...` );
 			this.enableNewNote(false);
 
-			// const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
 			const message = `${webPrompt}\n\n${page_content}`;
-			await summarai.fetch([message]);
+			await summarai.chat([message]);
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
 
 			this.timer.stop();
 
-			// if (aiResponse.status !== 200) {
 			if (status !== 200) {
-				// const errorText = aiResponse.text;
-				// SummarDebug.error(1, "OpenAI API Error:", errorText);
-				// this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
-				// this.enableNewNote(false);
 				SummarDebug.error(1, "OpenAI API Error:", summary);
 				this.updateResultText(`Error: ${status} - ${summary}`);
 				this.enableNewNote(false);
 
 				return;
 			}
-
-			// const aiData = aiResponse.json;
-			// if (aiData.choices && aiData.choices.length > 0) {
-				// const summary = aiData.choices[0].message.content || "No summary generated.";
 
 			if (summary && summary.length > 0) {
 				this.updateResultText(summary);

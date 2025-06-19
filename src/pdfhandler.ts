@@ -1,6 +1,6 @@
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, fetchOpenai, SummarAI } from "./globals";
+import { SummarViewContainer, SummarDebug, SummarAI, chatOpenai } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { PdfToPng } from "./pdftopng";
 import { JsonBuilder } from "./jsonbuilder";
@@ -23,14 +23,14 @@ export class PdfHandler extends SummarViewContainer {
 		const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
 		if (!summarai.hasKey(true)) return '';
 
-		// const { openaiApiKey } = this.plugin.settings;
+		const { openaiApiKey } = this.plugin.settings;
 
-		// if (!openaiApiKey) {
-		// 	SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
-		// 	this.updateResultText( "Please configure OpenAI API key in the plugin settings.");
-		// 	this.enableNewNote(false);
-		// 	return;
-		// }
+		if (!openaiApiKey) {
+			SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
+			this.updateResultText( "Please configure OpenAI API key in the plugin settings.");
+			this.enableNewNote(false);
+			return;
+		}
 
 		const pdftopng = new PdfToPng(this.plugin);
 		try {
@@ -44,7 +44,7 @@ export class PdfHandler extends SummarViewContainer {
 			const fileInput = document.createElement("input");
 			fileInput.type = "file";
 			fileInput.accept = ".pdf";
-			// const openaiApiKey = this.plugin.settings.openaiApiKey;
+			const openaiApiKey = this.plugin.settings.openaiApiKey;
 			const pdfPrompt = this.plugin.settings.pdfPrompt;
 
 			fileInput.onchange = async () => {
@@ -104,32 +104,37 @@ export class PdfHandler extends SummarViewContainer {
 					const body_content = jsonBuilder.toString();
 					SummarDebug.log(2, body_content);
 
-					this.updateResultText("Converting PDF to markdown. This may take a while...");
+					this.updateResultText(`Converting PDF to markdown using [${this.plugin.settings.pdfModel}]. This may take a while...`);
 					this.enableNewNote(false);
 
 					this.timer.start();
-					// const aiResponse = await fetchOpenai(this.plugin, openaiApiKey, body_content);
-					await summarai.fetchWithBody(body_content);
-					const status = summarai.response.status;
-					const summary = summarai.response.text;
+					const aiResponse = await chatOpenai(this.plugin, openaiApiKey, body_content);
+
+					// await summarai.chatWithBody(body_content);
+					// const status = summarai.response.status;
+					// const summary = summarai.response.text;
 
 					this.timer.stop();
 
-					// if (aiResponse.status !== 200) {
-					if (status !== 200) {
-						// const errorText = aiResponse.text;
-						// SummarDebug.error(1, "OpenAI API Error:", errorText);
-						SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
-						// this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
-						this.updateResultText(`Error: ${status} - ${summary}`);
+					// if (status !== 200) {
+					// 	SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
+					// 	this.updateResultText(`Error: ${status} - ${summary}`);
+					// 	this.enableNewNote(false);
+					// 	return;
+					// }
+
+					if (aiResponse.status !== 200) {
+						const errorText = aiResponse.text || "Unknown error occurred.";
+						SummarDebug.error(1, "AI API Error:", errorText);
+						this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
 						this.enableNewNote(false);
 						return;
 					}
 
-					// const aiData = aiResponse.json;
-					// if (aiData.choices && aiData.choices.length > 0) {
-					if (summary && summary.length > 0) {
-						// const summary = aiData.choices[0].message.content || "No summary generated.";
+					const aiData = aiResponse.json;
+					if (aiData.choices && aiData.choices.length > 0) {
+					// if (summary && summary.length > 0) {
+						const summary = aiData.choices[0].message.content || "No summary generated.";
 						const markdownContent = this.extractMarkdownContent(summary);
 						if (markdownContent) {
 							this.updateResultText(markdownContent);

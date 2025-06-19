@@ -56,24 +56,33 @@ export class SummarViewContainer {
   } 
 }
 
-export async function fetchOpenai(
+export async function chatOpenai(
   plugin: SummarPlugin, 
   openaiApiKey: string, 
   bodyContent: string | ArrayBuffer, 
-  throwFlag: boolean = true
+  throwFlag: boolean = true, 
+  contentType: string = 'application/json',
+  apiUrl?: string
 ): Promise<any> {
   try {
     SummarDebug.log(1, `openaiApiKey: ${openaiApiKey}`);
     SummarDebug.log(2, `bodyContent: ${bodyContent}`);
+    SummarDebug.log(3, `contentType: ${contentType}`);
+    SummarDebug.log(4, `apiUrl: ${apiUrl}`);
 
-    const endpoint = plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
-    const url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
-
+    // 엔드포인트 설정 (비어있으면 기본값)
+    let url = '';
+    if (apiUrl && apiUrl.trim().length > 0) {
+      url = apiUrl.trim();
+    } else {
+      const endpoint = plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+      url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
+    }
     const response = await SummarRequestUrl(plugin, {
       url: url,
       method: "POST",
       headers: {
-        "Content-Type": 'application/json' ,
+        "Content-Type": contentType ,
         "Authorization": `Bearer ${openaiApiKey}`
       },
       body: bodyContent,
@@ -86,12 +95,13 @@ export async function fetchOpenai(
   }
 }
 
-export async function fetchGemini(
+export async function chatGemini(
   plugin: SummarPlugin, 
   geminiModel: string, 
   geminiApiKey: string, 
   bodyContent: string, 
-  throwFlag: boolean = true
+  throwFlag: boolean = true, 
+  contentType: string = 'application/json' 
 ): Promise<any> {
   try {
     SummarDebug.log(1, `geminiApiKey: ${geminiApiKey}`);
@@ -103,7 +113,7 @@ export async function fetchGemini(
       url: API_URL,
       method: "POST",
       headers: {
-        "Content-Type": 'application/json' 
+        "Content-Type": contentType 
       },
       body: bodyContent,
       throw: throwFlag,
@@ -182,7 +192,7 @@ export class SummarAI extends SummarViewContainer {
     return false
   }
 
-  async fetch( messages : string[] ): Promise<boolean> {
+  async chat( messages : string[] ): Promise<boolean> {
     if (messages && messages.length > 0) {
       if (this.aiProvider === 'openai') {
         const openaiMessages = messages.map(message => ({
@@ -193,7 +203,7 @@ export class SummarAI extends SummarViewContainer {
           model: this.aiModel,
           messages: openaiMessages,
         });
-        return await this.fetchWithBody(bodyContent);
+        return await this.chatWithBody(bodyContent);
       } else if (this.aiProvider === 'gemini') {
         const contents = messages.map(message => ({
           role: "user",
@@ -206,32 +216,33 @@ export class SummarAI extends SummarViewContainer {
         const bodyContent = JSON.stringify({
           contents: contents,
         });
-        return await this.fetchWithBody(bodyContent);
+        return await this.chatWithBody(bodyContent);
       }
     }
     return false;
   }
 
-  async fetchWithBody( bodyContent: string ): Promise<boolean> {
+  async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
     try {
-      if ( bodyContent && bodyContent.length > 0 ) {
+      // if ( bodyContent && bodyContent.length > 0 ) {
+      if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
         if (this.aiProvider === 'openai') {
-          SummarDebug.log(1, `SummarAI.fetch() - Using OpenAI API with model: ${this.aiModel}`);
+          SummarDebug.log(1, `SummarAI.chat() - Using OpenAI chat/completion with model: ${this.aiModel}`);
           
-          const response = await fetchOpenai(this.plugin, this.aiKey, bodyContent, false);
+          const response = await chatOpenai(this.plugin, this.aiKey, bodyContent, false, contentType, apiUrl);
           if (response.json &&
             response.json.choices &&
             response.json.choices.length > 0 &&
             response.json.choices[0].message &&
             response.json.choices[0].message.content
           ) {
-            SummarDebug.log(1, `OpenAI API response: \n${JSON.stringify(response.json)}`);
+            SummarDebug.log(1, `OpenAI chat/completion response: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.choices[0].message.content || '';
             return true;
           } else {
-            SummarDebug.log(1, `OpenAI API response without content: \n${JSON.stringify(response.json)}`);
+            SummarDebug.log(1, `OpenAI chat/completion response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
@@ -239,9 +250,9 @@ export class SummarAI extends SummarViewContainer {
           }
         }
         else if (this.aiProvider === 'gemini') {
-          SummarDebug.log(1, `SummarAI.fetch() - Using Gemini API with model: ${this.aiModel}`);
+          SummarDebug.log(1, `SummarAI.chat() - Using Gemini generateContent with model: ${this.aiModel}`);
 
-          const response = await fetchGemini(this.plugin, this.aiModel, this.aiKey, bodyContent as string, false);
+          const response = await chatGemini(this.plugin, this.aiModel, this.aiKey, bodyContent as string, false, contentType);
           if (response.json &&
             response.json.candidates &&
             response.json.candidates.length > 0 &&
@@ -250,13 +261,13 @@ export class SummarAI extends SummarViewContainer {
             response.json.candidates[0].content.parts.length > 0 &&
             response.json.candidates[0].content.parts[0].text
           ) {
-            SummarDebug.log(1, `Gemini API response: \n${JSON.stringify(response.json)}`);
+            SummarDebug.log(1, `Gemini generateContent response: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.candidates[0].content.parts[0].text || '';
             return true;
           } else {
-            SummarDebug.log(1, `Gemini API response without content: \n${JSON.stringify(response.json)}`);
+            SummarDebug.log(1, `Gemini generateContent response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';

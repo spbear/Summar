@@ -1,6 +1,6 @@
 import SummarPlugin from "./main";
 import { OpenAIResponse } from "./types";
-import { SummarViewContainer, SummarDebug, fetchOpenai, SummarAI } from "./globals";
+import { SummarViewContainer, SummarDebug, SummarAI } from "./globals";
 import { SummarTimer } from "./summartimer";
 import { MarkdownView } from "obsidian";
 import { text } from "stream/consumers";
@@ -52,7 +52,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 		// 	return;
 		// }
 
-		this.updateResultText("execute prompt with selected text...");
+		this.updateResultText(`Execute prompt with selected text using [${cmdModel}]...`);
 		this.enableNewNote(false);
 
 		try {
@@ -60,7 +60,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
 
-			await summarai.fetch([message]);
+			await summarai.chat([message]);
 			const responseStatus = summarai.response.status;
 			const responseText = summarai.response.text;
 			this.timer.stop();
