@@ -20,17 +20,21 @@ export class PdfHandler extends SummarViewContainer {
 	 * @param plugin 플러그인 인스턴스
 	 */
 	async convertPdfToMarkdown() {
-		const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
-		if (!summarai.hasKey(true)) return '';
+		const fileInput = document.createElement("input");
+		fileInput.type = "file";
+		fileInput.accept = ".pdf";
+		fileInput.onchange = async () => {
+			if (fileInput.files && fileInput.files.length > 0) {
+				const file = fileInput.files[0];
+				await this.convertToMarkdownFromPdf(file);
+			}
+		};
+		fileInput.click();
+	}
 
-		const { openaiApiKey } = this.plugin.settings;
-
-		if (!openaiApiKey) {
-			SummarDebug.Notice(0, "Please configure OpenAI API key in the plugin settings.", 0);
-			this.updateResultText( "Please configure OpenAI API key in the plugin settings.");
-			this.enableNewNote(false);
-			return;
-		}
+	async convertToMarkdownFromPdf(file: any): Promise<void> {
+		const summarai = new SummarAI(this.plugin, this.plugin.settings.pdfModel);
+		if (!summarai.hasKey(true)) return;
 
 		const pdftopng = new PdfToPng(this.plugin);
 		try {
@@ -41,118 +45,97 @@ export class PdfHandler extends SummarViewContainer {
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 			}
 
-			const fileInput = document.createElement("input");
-			fileInput.type = "file";
-			fileInput.accept = ".pdf";
-			const openaiApiKey = this.plugin.settings.openaiApiKey;
 			const pdfPrompt = this.plugin.settings.pdfPrompt;
+			SummarDebug.Notice(1, file.name);
 
-			fileInput.onchange = async () => {
-				if (fileInput.files && fileInput.files.length > 0) {
-					const file = fileInput.files[0];
-					SummarDebug.Notice(1, file.name);
+			this.updateResultText(`Converting PDF to markdown using [${this.plugin.settings.pdfModel}]. This may take a while...`);
+			this.enableNewNote(false);
 
-					const base64Values = await pdftopng.convert(file, (SummarDebug.level() < 4));
+			this.timer.start();
 
-					// JsonBuilder 인스턴스 생성
-					const jsonBuilder = new JsonBuilder();
+			const base64Values = await pdftopng.convert(file, (SummarDebug.level() < 4));
 
-					// 기본 데이터 추가
-					jsonBuilder.addData("model", this.plugin.settings.pdfModel);
+			// JsonBuilder 인스턴스 생성
+			const jsonBuilder = new JsonBuilder();
 
-					// 시스템 메시지 추가
-					jsonBuilder.addToArray("messages", {
-						role: "system",
-						content: [
-							{
-								type: "text",
-								text: pdfPrompt,
+			// 기본 데이터 추가
+			jsonBuilder.addData("model", this.plugin.settings.pdfModel);
+
+			// 시스템 메시지 추가
+			jsonBuilder.addToArray("messages", {
+				role: "system",
+				content: [
+					{
+						type: "text",
+						text: pdfPrompt,
+					},
+				],
+			});
+
+			base64Values.forEach((base64, index) => {
+				SummarDebug.log(2, `${index + 1}번 파일의 Base64: ${base64}`);
+				const page_prompt = `다음은 PDF의 페이지 ${index + 1}입니다.`;
+				jsonBuilder.addToArray("messages", {
+					role: "user",
+					content: [
+						{
+							type: "text",
+							text: page_prompt,
+						},
+						{
+							type: "image_url",
+							image_url: {
+								url: `data:image/png;base64,${base64}`,
 							},
-						],
-					});
+						},
+					],
+				});
+			});
 
-					base64Values.forEach((base64, index) => {
-						SummarDebug.log(2, `${index + 1}번 파일의 Base64: ${base64}`);
-						const page_prompt = `다음은 PDF의 페이지 ${index + 1}입니다.`;
-						jsonBuilder.addToArray("messages", {
-							role: "user",
-							content: [
-								{
-									type: "text",
-									text: page_prompt,
-								},
-								{
-									type: "image_url",
-									image_url: {
-										url: `data:image/png;base64,${base64}`,
-									},
-								},
-							],
-						});
-					});
+			jsonBuilder.addToArray("messages", {
+				role: "user",
+				content: [
+					{
+						type: "text",
+						text: "모든 페이지가 전송되었습니다. 이제 전체 PDF의 마크다운 결과를 출력하세요.",
+					},
+				],
+			});
 
-					jsonBuilder.addToArray("messages", {
-						role: "user",
-						content: [
-							{
-								type: "text",
-								text: "모든 페이지가 전송되었습니다. 이제 전체 PDF의 마크다운 결과를 출력하세요.",
-							},
-						],
-					});
+			const body_content = jsonBuilder.toString();
+			SummarDebug.log(2, body_content);
 
-					const body_content = jsonBuilder.toString();
-					SummarDebug.log(2, body_content);
+			await summarai.chatWithBody(body_content);
+			const status = summarai.response.status;
+			const summary = summarai.response.text;
 
-					this.updateResultText(`Converting PDF to markdown using [${this.plugin.settings.pdfModel}]. This may take a while...`);
-					this.enableNewNote(false);
+			this.timer.stop();
 
-					this.timer.start();
-					const aiResponse = await chatOpenai(this.plugin, openaiApiKey, body_content);
+			if (status !== 200) {
+				SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
+				this.updateResultText(`Error: ${status} - ${summary}`);
+				this.enableNewNote(false);
+				return;
+			}
 
-					// await summarai.chatWithBody(body_content);
-					// const status = summarai.response.status;
-					// const summary = summarai.response.text;
-
-					this.timer.stop();
-
-					// if (status !== 200) {
-					// 	SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
-					// 	this.updateResultText(`Error: ${status} - ${summary}`);
-					// 	this.enableNewNote(false);
-					// 	return;
-					// }
-
-					if (aiResponse.status !== 200) {
-						const errorText = aiResponse.text || "Unknown error occurred.";
-						SummarDebug.error(1, "AI API Error:", errorText);
-						this.updateResultText(`Error: ${aiResponse.status} - ${errorText}`);
-						this.enableNewNote(false);
-						return;
-					}
-
-					const aiData = aiResponse.json;
-					if (aiData.choices && aiData.choices.length > 0) {
-					// if (summary && summary.length > 0) {
-						const summary = aiData.choices[0].message.content || "No summary generated.";
-						const markdownContent = this.extractMarkdownContent(summary);
-						if (markdownContent) {
-							this.updateResultText(markdownContent);
-							this.enableNewNote(true);
-						} else {
-							// this.updateResultText(JSON.stringify(aiData, null, 2));
-							this.updateResultText(summary);
-							this.enableNewNote(true);
-						}
-					} else {
-						this.updateResultText("No valid response from AI API.");
-						this.enableNewNote(false);
-					}
-
-					SummarDebug.log(1, "PDF conversion to images complete.");
+			if (summary && summary.length > 0) {
+				// const summary = aiData.choices[0].message.content || "No summary generated.";
+				const markdownContent = this.extractMarkdownContent(summary);
+				if (markdownContent) {
+					this.updateResultText(markdownContent);
+					this.enableNewNote(true);
+				} else {
+					// this.updateResultText(JSON.stringify(aiData, null, 2));
+					this.updateResultText(summary);
+					this.enableNewNote(true);
 				}
-			};
-			fileInput.click();
+			} else {
+				this.updateResultText("No valid response from AI API.");
+				this.enableNewNote(false);
+			}
+
+			SummarDebug.log(1, "PDF conversion to images complete.");
+		
 		} catch (error) {
 			this.timer.stop();
 

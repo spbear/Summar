@@ -264,6 +264,19 @@ export default class SummarPlugin extends Plugin {
                   }
                 });
             });
+          } else if (file.name.toLowerCase().includes(".pdf")) {
+            menu.addItem((item) => {
+              item
+                .setTitle("Convert PDF to Markdown")
+                .setIcon("file")
+                .onClick(async () => {
+                  try {
+                    this.pdfHandler.convertToMarkdownFromPdf( await this.tfileToBrowserFile(file) );
+                  } catch (error) {
+                    SummarDebug.error(1, "Error handling file:", error);
+                  }
+                });
+            });
           }
         }
 
@@ -815,6 +828,14 @@ export default class SummarPlugin extends Plugin {
     }
     return files;
   }
+  async tfileToBrowserFile(tfile: TFile): Promise<File> {
+    // Read the file as ArrayBuffer from the vault
+    const arrayBuffer = await this.app.vault.adapter.readBinary(tfile.path);
+    // Guess the MIME type (optional, you can use a library or default to 'application/octet-stream')
+    const mimeType = "application/pdf"; // or use a function to detect based on extension
+    // Create a browser File object
+    return new File([arrayBuffer], tfile.name, { type: mimeType });
+  }  
 }
 
 
