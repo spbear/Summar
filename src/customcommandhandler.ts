@@ -35,7 +35,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 		const appendToNote = !!settings[`cmd_append_to_note_${cmdIndex}`];
 		const copyToClipboard = !!settings[`cmd_copy_to_clipboard_${cmdIndex}`];
 
-		const summarai = new SummarAI(this.plugin, cmdModel as string);
+		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 
 		if (!summarai.hasKey(true)) return;
 

@@ -12,12 +12,14 @@ export class SummarAI extends SummarViewContainer {
   aiModel: string = '';
   aiProvider: string = '';
   aiKey: string = '';
+  feature: string = '';
   response: SummarAIResponse = { status: 0, json: null, text: '' };
   
 
-  constructor(plugin: SummarPlugin, aiModel: string) {
+  constructor(plugin: SummarPlugin, aiModel: string, feature: string) {
     super(plugin);
     this.aiModel = aiModel;
+    this.feature = feature;
 
     const model = aiModel.toLowerCase().trim();
 
@@ -98,15 +100,18 @@ export class SummarAI extends SummarViewContainer {
     return false;
   }
 
-  async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
+//   async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
+  async chatWithBody( bodyContent: string ): Promise<boolean> {
     try {
-      
-      // if ( bodyContent && bodyContent.length > 0 ) {
-      if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
+      const trackapi = new TrackedAPIClient(this.plugin);
+
+      if ( bodyContent && bodyContent.length > 0 ) {
+    //   if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
         if (this.aiProvider === 'openai') {
           SummarDebug.log(1, `SummarAI.chat() - Using OpenAI chat/completion with model: ${this.aiModel}`);
           
-          const response = await this.chatOpenai(bodyContent, false, contentType, apiUrl);
+        //   const response = await this.chatOpenai(bodyContent, false, contentType, apiUrl);
+        const response = await this.chatOpenai(bodyContent, false);
           if (response.json &&
             response.json.choices &&
             response.json.choices.length > 0 &&
@@ -117,19 +122,22 @@ export class SummarAI extends SummarViewContainer {
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.choices[0].message.content || '';
+            trackapi.logAPICall('openai', this.aiModel, 'chat/completions', this.feature, bodyContent, response.json, true);
             return true;
           } else {
             SummarDebug.log(1, `OpenAI chat/completion response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
+            trackapi.logAPICall('openai', this.aiModel, 'chat/completions', this.feature, bodyContent, response.json, false, this.response.text);
             return false
           }
         }
         else if (this.aiProvider === 'gemini') {
           SummarDebug.log(1, `SummarAI.chat() - Using Gemini generateContent with model: ${this.aiModel}`);
 
-          const response = await this.chatGemini(bodyContent as string, false, contentType);
+        //   const response = await this.chatGemini(bodyContent as string, false, contentType);
+        const response = await this.chatGemini(bodyContent, false);
           if (response.json &&
             response.json.candidates &&
             response.json.candidates.length > 0 &&
@@ -142,12 +150,14 @@ export class SummarAI extends SummarViewContainer {
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.candidates[0].content.parts[0].text || '';
+            trackapi.logAPICall('gemini', this.aiModel, 'generateContent', this.feature, bodyContent, response.json, true);
             return true;
           } else {
             SummarDebug.log(1, `Gemini generateContent response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
+            trackapi.logAPICall('gemini', this.aiModel, 'generateContent', this.feature, bodyContent, response.json, false, this.response.text);
             return false
           }
           SummarDebug.log(1, `API responses error: \n${JSON.stringify(response.json)}`);

@@ -22,7 +22,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 	async fetchAndSummarize(url: string) {
 		const { confluenceApiToken, confluenceDomain, useConfluenceAPI, webPrompt } = this.plugin.settings;
 
-		const summarai = new SummarAI(this.plugin, this.plugin.settings.webModel);
+		const summarai = new SummarAI(this.plugin, this.plugin.settings.webModel, 'web');
 		if (!summarai.hasKey(true)) return;
 
 		if (!confluenceApiToken) {

@@ -33,7 +33,7 @@ export class PdfHandler extends SummarViewContainer {
 	}
 
 	async convertToMarkdownFromPdf(file: any): Promise<void> {
-		const summarai = new SummarAI(this.plugin, this.plugin.settings.pdfModel);
+		const summarai = new SummarAI(this.plugin, this.plugin.settings.pdfModel, 'pdf');
 		if (!summarai.hasKey(true)) return;
 
 		const pdftopng = new PdfToPng(this.plugin);

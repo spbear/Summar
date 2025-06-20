@@ -439,14 +439,14 @@ export default class SummarPlugin extends Plugin {
     });
 
     // Summar stats 대시보드 커맨드 추가
-    // this.addCommand({
-    //   id: "show-summar-stats",
-    //   name: "Show Summar stats",
-    //   callback: async () => {
-    //     const modal = new SummarStatsModal(this);
-    //     modal.open();
-    //   },
-    // });
+    this.addCommand({
+      id: "show-summar-stats",
+      name: "Show Summar stats",
+      callback: async () => {
+        const modal = new SummarStatsModal(this);
+        modal.open();
+      },
+    });
 
     this.registerCustomCommandAndMenus();
 

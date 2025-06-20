@@ -1,3 +1,5 @@
+import SummarPlugin from "./main";
+
 // API 로그 인터페이스
 export interface APICallLog {
     id: string;
@@ -25,7 +27,7 @@ export interface APICallLog {
 
 // IndexedDB 관리 클래스
 export class IndexedDBManager {
-    private dbName = 'ai-api-logs.db';
+    private dbName = 'summar-ai-api-logs-db';
     private dbVersion = 1;
     private db: IDBDatabase | null = null;
 
@@ -382,74 +384,83 @@ export class IndexedDBManager {
 export class TrackedAPIClient {
     private dbManager: IndexedDBManager;
     private sessionId: string;
+    private startTime: number;
 
-    constructor(dbManager: IndexedDBManager) {
-        this.dbManager = dbManager;
+    constructor(plugin: SummarPlugin) {
+        this.dbManager = plugin.dbManager;
         this.sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        this.startTime = Date.now();
     }
 
-    async callOpenAI(endpoint: string, payload: any, feature: string): Promise<any> {
-        const startTime = Date.now();
+    start() {
+        this.startTime = Date.now();
+    }
+    getLatency() : number {
+        return Date.now() - this.startTime;
+    }
+
+    // async callOpenAI(endpoint: string, payload: any, feature: string): Promise<any> {
+    //     // const startTime = Date.now();
         
-        try {
-            const response = await fetch(`https://api.openai.com/v1/${endpoint}`, {
-                method: 'POST',
-                headers: {
-                    // 'Authorization': `Bearer ${this.settings.openaiApiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
+    //     try {
+    //         const response = await fetch(`https://api.openai.com/v1/${endpoint}`, {
+    //             method: 'POST',
+    //             headers: {
+    //                 // 'Authorization': `Bearer ${this.settings.openaiApiKey}`,
+    //                 'Content-Type': 'application/json'
+    //             },
+    //             body: JSON.stringify(payload)
+    //         });
 
-            const responseData = await response.json();
-            const latency = Date.now() - startTime;
+    //         const responseData = await response.json();
+    //         const latency = this.getLatency
 
-            // IndexedDB에 로그 저장
-            await this.logAPICall('openai', payload.model || 'unknown', endpoint, feature, payload, responseData, latency, response.ok);
+    //         // IndexedDB에 로그 저장
+    //         // await this.logAPICall('openai', payload.model || 'unknown', endpoint, feature, payload, responseData, this.getLatency(), response.ok);
 
-            if (!response.ok) {
-                throw new Error(responseData.error?.message || 'OpenAI API Error');
-            }
+    //         if (!response.ok) {
+    //             throw new Error(responseData.error?.message || 'OpenAI API Error');
+    //         }
 
-            return responseData;
+    //         return responseData;
 
-        } catch (error) {
-            const latency = Date.now() - startTime;
-            await this.logAPICall('openai', payload.model || 'unknown', endpoint, feature, payload, null, latency, false, error.message);
-            throw error;
-        }
-    }
+    //     } catch (error) {
+    //         const latency = this.getLatency();
+    //         await this.logAPICall('openai', payload.model || 'unknown', endpoint, feature, payload, null, latency, false, error.message);
+    //         throw error;
+    //     }
+    // }
 
-    async callGemini(endpoint: string, payload: any, feature: string): Promise<any> {
-        const startTime = Date.now();
+    // async callGemini(endpoint: string, payload: any, feature: string): Promise<any> {
+    //     const startTime = Date.now();
         
-        try {
-            // const response = await fetch(
-            //     // `https://generativelanguage.googleapis.com/v1/${endpoint}?key=${this.settings.geminiApiKey}`,
-            //     {
-            //         method: 'POST',
-            //         headers: { 'Content-Type': 'application/json' },
-            //         body: JSON.stringify(payload)
-            //     }
-            // );
+    //     try {
+    //         // const response = await fetch(
+    //         //     // `https://generativelanguage.googleapis.com/v1/${endpoint}?key=${this.settings.geminiApiKey}`,
+    //         //     {
+    //         //         method: 'POST',
+    //         //         headers: { 'Content-Type': 'application/json' },
+    //         //         body: JSON.stringify(payload)
+    //         //     }
+    //         // );
 
-            // const responseData = await response.json();
-            // const latency = Date.now() - startTime;
+    //         // const responseData = await response.json();
+    //         // const latency = Date.now() - startTime;
 
-            // await this.logAPICall('gemini', this.extractGeminiModel(endpoint), endpoint, feature, payload, responseData, latency, response.ok);
+    //         // await this.logAPICall('gemini', this.extractGeminiModel(endpoint), endpoint, feature, payload, responseData, latency, response.ok);
 
-            // if (!response.ok) {
-            //     throw new Error(responseData.error?.message || 'Gemini API Error');
-            // }
+    //         // if (!response.ok) {
+    //         //     throw new Error(responseData.error?.message || 'Gemini API Error');
+    //         // }
 
-            // return responseData;
+    //         // return responseData;
 
-        } catch (error) {
-            const latency = Date.now() - startTime;
-            await this.logAPICall('gemini', this.extractGeminiModel(endpoint), endpoint, feature, payload, null, latency, false, error.message);
-            throw error;
-        }
-    }
+    //     } catch (error) {
+    //         const latency = Date.now() - startTime;
+    //         await this.logAPICall('gemini', this.extractGeminiModel(endpoint), endpoint, feature, payload, null, latency, false, error.message);
+    //         throw error;
+    //     }
+    // }
 
     async logAPICall(
         provider: string,
@@ -458,7 +469,9 @@ export class TrackedAPIClient {
         feature: string,
         requestData: any,
         responseData: any,
-        latency: number,
+        // requestSize: number,
+        // responseData: number,
+        // latency: number,
         success: boolean,
         error?: string
     ) {
@@ -466,6 +479,7 @@ export class TrackedAPIClient {
 
         const requestSize = new Blob([JSON.stringify(requestData)]).size;
         const responseSize = responseData ? new Blob([JSON.stringify(responseData)]).size : 0;
+        const latency = this.getLatency();
 
         const logEntry: APICallLog = {
             id: crypto.randomUUID(),

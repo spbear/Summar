@@ -50,7 +50,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 		let summary = "";
 
 		try {
-			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
+			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel, 'stt-summary');
 			if (!summarai.hasKey(true)) return '';
 
 			this.updateResultText( `Generating summary using [${this.plugin.settings.transcriptSummaryModel}]...` );
@@ -129,7 +129,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 		const refineSummaryPrompt = this.plugin.settings.refineSummaryPrompt;
 
 		try {
-			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel);
+			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel, 'stt-refine');
 			if (!summarai.hasKey(true)) return '';
 			const messages: string[] = [];
 			messages.push(refineSummaryPrompt);
