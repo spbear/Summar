@@ -671,7 +671,7 @@ export class TrackedAPIClient {
         const features = ['stt', 'web', 'custom', 'pdf', 'stt-summary', 'stt-refine'];
         const providers: ('openai' | 'gemini')[] = ['openai', 'gemini'];
         const now = Date.now();
-        const oneYear = 365 * 24 * 60 * 60 * 1000;
+        const oneYear = 330 * 24 * 60 * 60 * 1000;
         function randomStr(len: number) {
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let s = '';
@@ -730,11 +730,4 @@ export class TrackedAPIClient {
         }
     }
 
-    /**
-     * SummarStatsModal 등 외부에서 쉽게 호출할 수 있도록 static 버전 제공
-     */
-    // static async logAPICallTestStatic(plugin: SummarPlugin) {
-    //     const client = new TrackedAPIClient(plugin);
-    //     await client.logAPICallTest();
-    // }
 }

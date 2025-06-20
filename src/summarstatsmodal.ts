@@ -245,17 +245,21 @@ export class SummarStatsModal {
                     updated++;
                 }
             }
-            // DB에 반영 (전체 삭제 후 재삽입)
+            // DB에 반영 (api_logs와 daily_stats 모두 삭제 후 재삽입)
             if (updated > 0) {
-                // 기존 로그 삭제
                 const db = this.plugin.dbManager['db'];
                 if (db) {
                     await new Promise((resolve, reject) => {
-                        const tx = db.transaction(['api_logs'], 'readwrite');
-                        const store = tx.objectStore('api_logs');
-                        const clearReq = store.clear();
-                        clearReq.onsuccess = () => resolve(undefined);
-                        clearReq.onerror = () => reject(clearReq.error);
+                        const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
+                        const logsStore = tx.objectStore('api_logs');
+                        const statsStore = tx.objectStore('daily_stats');
+                        const clear1 = logsStore.clear();
+                        const clear2 = statsStore.clear();
+                        let done = 0;
+                        const check = () => { if (++done === 2) resolve(undefined); };
+                        clear1.onsuccess = check; clear2.onsuccess = check;
+                        clear1.onerror = () => reject(clear1.error);
+                        clear2.onerror = () => reject(clear2.error);
                     });
                 }
                 // 재삽입
@@ -504,9 +508,25 @@ export class SummarStatsModal {
         stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
       }
     }
-    // 평균값 계산
-    const stats: any[] = Object.values(dayMap);
-    stats.forEach(stat => {
+    // 7일간 누락된 날짜도 0으로 채움
+    const stats: any[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start.getTime());
+      d.setDate(start.getDate() + i);
+      const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+      const stat = dayMap[key] || {
+        period: key,
+        totalCalls: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        avgLatency: 0,
+        successRate: 0,
+        features: {},
+        featureTokens: {},
+        featureCosts: {},
+        featureLatencies: {},
+        featureSuccessRates: {},
+      };
       if (stat.totalCalls > 0) {
         stat.avgLatency = stat.avgLatency / stat.totalCalls;
         stat.successRate = (stat.successRate / stat.totalCalls) * 100;
@@ -518,9 +538,8 @@ export class SummarStatsModal {
           stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
         });
       }
-    });
-    // 날짜 오름차순 정렬
-    stats.sort((a, b) => a.period.localeCompare(b.period));
+      stats.push(stat);
+    }
     return stats;
   }
 
@@ -536,13 +555,12 @@ export class SummarStatsModal {
       startDate: start,
       endDate: end
     });
-    // 주별 집계 (월~일)
+    // 주별 집계 (ISO week)
     const weekMap: Record<string, any> = {};
     for (const log of logs) {
       const d = new Date(log.timestamp);
-      // ISO week: yyyy-Www
       const year = d.getFullYear();
-      const week = getWeekNumber(d);
+      const week = getWeekNumber(d)-1;
       const key = `${year}-W${week.toString().padStart(2, '0')}`;
       if (!weekMap[key]) {
         weekMap[key] = {
@@ -574,13 +592,30 @@ export class SummarStatsModal {
         stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
       }
     }
-    // 평균값 계산
-    const stats: any[] = Object.values(weekMap);
-    stats.forEach(stat => {
+    // 8주간 누락된 주도 0으로 채움
+    const stats: any[] = [];
+    let d = new Date(start.getTime());
+    for (let i = 0; i < 8; i++) {
+      // ISO week 계산
+      const year = d.getFullYear();
+      const week = getWeekNumber(d);
+      const key = `${year}-W${week.toString().padStart(2, '0')}`;
+      const stat = weekMap[key] || {
+        period: key,
+        totalCalls: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        avgLatency: 0,
+        successRate: 0,
+        features: {},
+        featureTokens: {},
+        featureCosts: {},
+        featureLatencies: {},
+        featureSuccessRates: {},
+      };
       if (stat.totalCalls > 0) {
         stat.avgLatency = stat.avgLatency / stat.totalCalls;
         stat.successRate = (stat.successRate / stat.totalCalls) * 100;
-        // feature별 평균
         Object.keys(stat.featureLatencies).forEach(f => {
           stat.featureLatencies[f] = stat.featureLatencies[f] / (stat.features[f] || 1);
         });
@@ -588,9 +623,9 @@ export class SummarStatsModal {
           stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
         });
       }
-    });
-    // 주차 오름차순 정렬
-    stats.sort((a, b) => a.period.localeCompare(b.period));
+      stats.push(stat);
+      d.setDate(d.getDate() + 7);
+    }
     return stats;
   }
 
@@ -641,13 +676,27 @@ export class SummarStatsModal {
         stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
       }
     }
-    // 평균값 계산
-    const stats: any[] = Object.values(monthMap);
-    stats.forEach(stat => {
+    // 12개월간 누락된 월도 0으로 채움
+    const stats: any[] = [];
+    let d = new Date(start.getFullYear(), start.getMonth(), 1);
+    for (let i = 0; i < 12; i++) {
+      const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+      const stat = monthMap[key] || {
+        period: key,
+        totalCalls: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        avgLatency: 0,
+        successRate: 0,
+        features: {},
+        featureTokens: {},
+        featureCosts: {},
+        featureLatencies: {},
+        featureSuccessRates: {},
+      };
       if (stat.totalCalls > 0) {
         stat.avgLatency = stat.avgLatency / stat.totalCalls;
         stat.successRate = (stat.successRate / stat.totalCalls) * 100;
-        // feature별 평균
         Object.keys(stat.featureLatencies).forEach(f => {
           stat.featureLatencies[f] = stat.featureLatencies[f] / (stat.features[f] || 1);
         });
@@ -655,9 +704,9 @@ export class SummarStatsModal {
           stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
         });
       }
-    });
-    // 월 오름차순 정렬
-    stats.sort((a, b) => a.period.localeCompare(b.period));
+      stats.push(stat);
+      d.setMonth(d.getMonth() + 1);
+    }
     return stats;
   }
 
@@ -683,8 +732,22 @@ export class SummarStatsModal {
 
   updateChart() {
     if (!this.chartArea) return;
-    const canvas = this.chartArea.querySelector('canvas') as HTMLCanvasElement;
-    if (!canvas) return;
+    // 차트 영역 비울 때도 height 고정
+    this.chartArea.style.height = '260px';
+    this.chartArea.style.background = 'var(--background-secondary)';
+    this.chartArea.style.borderRadius = '8px';
+    this.chartArea.style.marginBottom = '16px';
+    this.chartArea.style.display = 'flex';
+    this.chartArea.style.alignItems = 'center';
+    this.chartArea.style.justifyContent = 'center';
+    // 기존 차트/캔버스 제거 후 새로 생성
+    this.chartArea.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    canvas.id = 'ai-trend-chart';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    this.chartArea.appendChild(canvas);
+
     // 차트 데이터 준비
     let labels: string[] = [];
     let label = '';
@@ -722,27 +785,8 @@ export class SummarStatsModal {
           backgroundColor: palette[idx % palette.length],
           borderColor: palette[idx % palette.length],
           borderWidth: 1,
-          stack: 'features',
         };
       });
-      // hourly일 때는 첫 feature만 전체 합을 가지므로, label도 전체 합으로 표시
-      if (this.currentMetric === 'totalCost' && this.currentPeriod === 'hourly') {
-        datasets = [
-          {
-            label: '총 비용($)',
-            data: this.summaryStats.map(s => s.totalCost || 0),
-            backgroundColor: palette[0],
-            borderColor: palette[0],
-            borderWidth: 1,
-            stack: 'features',
-          }
-        ];
-      }
-      label =
-        (this.currentMetric === 'totalCalls' && '총 호출수') ||
-        (this.currentMetric === 'totalTokens' && '총 토큰수') ||
-        (this.currentMetric === 'totalCost' && '총 비용($)') ||
-        '';
     } else if (["avgLatency", "successRate"].includes(this.currentMetric)) {
       // 평균지연/성공률: feature별 dot scatter
       isScatter = true;
@@ -864,51 +908,51 @@ export class SummarStatsModal {
     }
   }
 
-  // 주간/월간 집계 함수 (일간 통계를 합산)
-  async aggregateWeeklyStats(weeks: number): Promise<any[]> {
-    // 최근 N주간의 일간 통계 fetch 후 주간별로 합산
-    const days = weeks * 7;
-    const daily = await this.plugin.dbManager.getDailyStats(days);
-    const weekStats: any[] = [];
-    for (let i = 0; i < weeks; i++) {
-      const week = daily.slice(i * 7, (i + 1) * 7);
-      if (week.length === 0) continue;
-      weekStats.push({
-        period: `${week[0].period}~${week[week.length - 1].period}`,
-        totalCalls: week.reduce((a, b) => a + (b.totalCalls || 0), 0),
-        totalTokens: week.reduce((a, b) => a + (b.totalTokens || 0), 0),
-        totalCost: week.reduce((a, b) => a + (b.totalCost || 0), 0),
-        avgLatency: week.reduce((a, b) => a + ((b.avgLatency || 0) * (b.totalCalls || 1)), 0) / (week.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
-        successRate: week.reduce((a, b) => a + ((b.successRate || 0) * (b.totalCalls || 1)), 0) / (week.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
-      });
-    }
-    return weekStats;
-  }
+//   // 주간/월간 집계 함수 (일간 통계를 합산)
+//   async aggregateWeeklyStats(weeks: number): Promise<any[]> {
+//     // 최근 N주간의 일간 통계 fetch 후 주간별로 합산
+//     const days = weeks * 7;
+//     const daily = await this.plugin.dbManager.getDailyStats(days);
+//     const weekStats: any[] = [];
+//     for (let i = 0; i < weeks; i++) {
+//       const week = daily.slice(i * 7, (i + 1) * 7);
+//       if (week.length === 0) continue;
+//       weekStats.push({
+//         period: `${week[0].period}~${week[week.length - 1].period}`,
+//         totalCalls: week.reduce((a, b) => a + (b.totalCalls || 0), 0),
+//         totalTokens: week.reduce((a, b) => a + (b.totalTokens || 0), 0),
+//         totalCost: week.reduce((a, b) => a + (b.totalCost || 0), 0),
+//         avgLatency: week.reduce((a, b) => a + ((b.avgLatency || 0) * (b.totalCalls || 1)), 0) / (week.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
+//         successRate: week.reduce((a, b) => a + ((b.successRate || 0) * (b.totalCalls || 1)), 0) / (week.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
+//       });
+//     }
+//     return weekStats;
+//   }
 
-  async aggregateMonthlyStats(months: number): Promise<any[]> {
-    // 최근 N개월의 일간 통계 fetch 후 월별로 합산
-    const days = months * 31;
-    const daily = await this.plugin.dbManager.getDailyStats(days);
-    const monthMap: Record<string, any[]> = {};
-    daily.forEach(d => {
-      const [m, d1] = (d.period || '').split('/');
-      if (!m) return;
-      if (!monthMap[m]) monthMap[m] = [];
-      monthMap[m].push(d);
-    });
-    const monthStats: any[] = [];
-    Object.entries(monthMap).slice(-months).forEach(([m, arr]) => {
-      monthStats.push({
-        period: `${m}월`,
-        totalCalls: arr.reduce((a, b) => a + (b.totalCalls || 0), 0),
-        totalTokens: arr.reduce((a, b) => a + (b.totalTokens || 0), 0),
-        totalCost: arr.reduce((a, b) => a + (b.totalCost || 0), 0),
-        avgLatency: arr.reduce((a, b) => a + ((b.avgLatency || 0) * (b.totalCalls || 1)), 0) / (arr.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
-        successRate: arr.reduce((a, b) => a + ((b.successRate || 0) * (b.totalCalls || 1)), 0) / (arr.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
-      });
-    });
-    return monthStats;
-  }
+//   async aggregateMonthlyStats(months: number): Promise<any[]> {
+//     // 최근 N개월의 일간 통계 fetch 후 월별로 합산
+//     const days = months * 31;
+//     const daily = await this.plugin.dbManager.getDailyStats(days);
+//     const monthMap: Record<string, any[]> = {};
+//     daily.forEach(d => {
+//       const [m, d1] = (d.period || '').split('/');
+//       if (!m) return;
+//       if (!monthMap[m]) monthMap[m] = [];
+//       monthMap[m].push(d);
+//     });
+//     const monthStats: any[] = [];
+//     Object.entries(monthMap).slice(-months).forEach(([m, arr]) => {
+//       monthStats.push({
+//         period: `${m}월`,
+//         totalCalls: arr.reduce((a, b) => a + (b.totalCalls || 0), 0),
+//         totalTokens: arr.reduce((a, b) => a + (b.totalTokens || 0), 0),
+//         totalCost: arr.reduce((a, b) => a + (b.totalCost || 0), 0),
+//         avgLatency: arr.reduce((a, b) => a + ((b.avgLatency || 0) * (b.totalCalls || 1)), 0) / (arr.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
+//         successRate: arr.reduce((a, b) => a + ((b.successRate || 0) * (b.totalCalls || 1)), 0) / (arr.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1),
+//       });
+//     });
+//     return monthStats;
+//   }
 
   close() {
     if (this.modalBg) {
@@ -933,9 +977,10 @@ export class SummarStatsModal {
 
 // ISO week number 계산 함수
 function getWeekNumber(d: Date): number {
-  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d as any) - (yearStart as any)) / 86400000 + 1) / 7);
+  // 로컬 타임존 기준으로 주차 계산
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dayNum = date.getDay() || 7;
+  date.setDate(date.getDate() + 4 - dayNum);
+  const yearStart = new Date(date.getFullYear(), 0, 1);
+  return Math.ceil((((date as any) - (yearStart as any)) / 86400000 + 1) / 7);
 }
