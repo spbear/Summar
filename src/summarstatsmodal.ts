@@ -17,7 +17,7 @@ export class SummarStatsModal {
   private plugin: SummarPlugin;
   private modalBg: HTMLDivElement | null = null;
   private chart: any = null;
-  private currentPeriod: 'daily' | 'weekly' | 'monthly' = 'daily';
+  private currentPeriod: 'hourly' | 'daily' | 'weekly' | 'monthly' = 'hourly';
   private currentMetric: 'totalCalls' | 'totalTokens' | 'totalCost' | 'avgLatency' | 'successRate' = 'totalCalls';
   private periodButtons: Record<string, HTMLButtonElement> = {};
   private metricDivs: Record<string, HTMLDivElement> = {};
@@ -90,9 +90,10 @@ export class SummarStatsModal {
     periodTabs.style.gap = '8px';
     periodTabs.style.marginBottom = '16px';
     const periods: [string, string, number][] = [
-      ['일별', 'daily', 7],
-      ['주간', 'weekly', 8],
-      ['월간', 'monthly', 6],
+      ['일간', 'hourly', 24],
+      ['주간', 'daily', 7],
+      ['월간', 'weekly', 8],
+      ['연간', 'monthly', 12],
     ];
     periods.forEach(([label, value]) => {
       const btn = document.createElement('button');
@@ -162,194 +163,195 @@ export class SummarStatsModal {
     modal.appendChild(this.chartArea);
 
     // 내보내기/비교/예측/알림 등 고급 기능 버튼(placeholder)
-    const actions = document.createElement('div');
-    actions.style.display = 'flex';
-    actions.style.gap = '12px';
-    actions.style.marginTop = '12px';
-    actions.innerHTML = `
-      <button id="ai-export-csv">CSV 내보내기</button>
-      <button id="ai-recalc-cost">비용 재계산</button>
-      <button id="ai-reset-db">초기화</button>
-      <button id="ai-create-test-data">테스트 데이터 생성</button>
-    `;
-    modal.appendChild(actions);
+    if (this.plugin.settings.debugLevel > 0) {
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '12px';
+        actions.style.marginTop = '12px';
+        actions.innerHTML = `
+        <button id="ai-export-csv">CSV 내보내기</button>
+        <button id="ai-recalc-cost">비용 재계산</button>
+        <button id="ai-reset-db">초기화</button>
+        <button id="ai-create-test-data">테스트 데이터 생성</button>
+        `;
+        modal.appendChild(actions);
 
-    // CSV 내보내기 버튼 이벤트
-    const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
-    exportCsvBtn.onclick = async () => {
-      // summar-ai-api-logs-db 전체 로그를 CSV로 변환
-      const logs = await this.plugin.dbManager.getLogs();
-      if (!logs || logs.length === 0) {
-        alert('내보낼 데이터가 없습니다.');
-        return;
-      }
-      // CSV 헤더
-      const headers = [
-        'id','timestamp','timestampISO','provider','model','endpoint','feature','requestSize','responseSize','requestTokens','responseTokens','totalTokens','cost','latency','success','errorMessage','sessionId','userAgent','version'
-      ];
-      const rows = logs.map(log => headers.map(h => {
-        let v = log[h as keyof typeof log];
-        if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
-        if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
-        return v ?? '';
-      }).join(','));
-      const csv = [headers.join(','), ...rows].join('\n');
-      // 파일 저장 dialog
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'summar-ai-api-logs.csv';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-    };
+        // CSV 내보내기 버튼 이벤트
+        const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
+        exportCsvBtn.onclick = async () => {
+            // summar-ai-api-logs-db 전체 로그를 CSV로 변환
+            const logs = await this.plugin.dbManager.getLogs();
+            if (!logs || logs.length === 0) {
+                alert('내보낼 데이터가 없습니다.');
+                return;
+            }
+            // CSV 헤더
+            const headers = [
+                'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
+            ];
+            const rows = logs.map(log => headers.map(h => {
+                let v = log[h as keyof typeof log];
+                if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
+                if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+                return v ?? '';
+            }).join(','));
+            const csv = [headers.join(','), ...rows].join('\n');
+            // 파일 저장 dialog
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'summar-ai-api-logs.csv';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        };
 
-    // 비용 재계산 버튼 이벤트
-    const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
-    recalcBtn.onclick = async () => {
-      if (!this.plugin.dbManager) return;
-      const logs = await this.plugin.dbManager.getLogs();
-      if (!logs || logs.length === 0) {
-        alert('재계산할 데이터가 없습니다.');
-        return;
-      }
-      // summarailog의 비용 계산 함수 사용
-      const trackapi = new TrackedAPIClient(this.plugin);
-      let updated = 0;
-      for (const log of logs) {
-        let newCost = 0;
-        if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
-          const usage = {
-            prompt_tokens: log.requestTokens ?? 0,
-            completion_tokens: log.responseTokens ?? 0,
-            total_tokens: log.totalTokens ?? 0
-          };
-          newCost = trackapi.calculateOpenAICost(log.model, usage) ?? log.cost ?? 0;
-        } else if (log.provider === 'gemini' && log.totalTokens !== undefined) {
-          const usage = {
-            promptTokenCount: log.requestTokens ?? 0,
-            candidatesTokenCount: log.responseTokens ?? 0,
-          };
-          newCost = trackapi.calculateGeminiCost(log.model, usage) ?? log.cost ?? 0;
-        } else {
-          newCost = log.cost ?? 0;
-        }
-        if (log.cost !== newCost) {
-          log.cost = newCost;
-          updated++;
-        }
-      }
-      // DB에 반영 (전체 삭제 후 재삽입)
-      if (updated > 0) {
-        // 기존 로그 삭제
-        const db = this.plugin.dbManager['db'];
-        if (db) {
-          await new Promise((resolve, reject) => {
-            const tx = db.transaction(['api_logs'], 'readwrite');
-            const store = tx.objectStore('api_logs');
-            const clearReq = store.clear();
-            clearReq.onsuccess = () => resolve(undefined);
-            clearReq.onerror = () => reject(clearReq.error);
-          });
-        }
-        // 재삽입
-        for (const log of logs) {
-          await this.plugin.dbManager.addLog(log);
-        }
-      }
-      alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
-      await this.updateStatsAndChart();
-    };
+        // 비용 재계산 버튼 이벤트
+        const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
+        recalcBtn.onclick = async () => {
+            if (!this.plugin.dbManager) return;
+            const logs = await this.plugin.dbManager.getLogs();
+            if (!logs || logs.length === 0) {
+                alert('재계산할 데이터가 없습니다.');
+                return;
+            }
+            // summarailog의 비용 계산 함수 사용
+            const trackapi = new TrackedAPIClient(this.plugin);
+            let updated = 0;
+            for (const log of logs) {
+                let newCost = 0;
+                if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
+                    const usage = {
+                        prompt_tokens: log.requestTokens ?? 0,
+                        completion_tokens: log.responseTokens ?? 0,
+                        total_tokens: log.totalTokens ?? 0
+                    };
+                    newCost = trackapi.calculateOpenAICost(log.model, usage) ?? log.cost ?? 0;
+                } else if (log.provider === 'gemini' && log.totalTokens !== undefined) {
+                    const usage = {
+                        promptTokenCount: log.requestTokens ?? 0,
+                        candidatesTokenCount: log.responseTokens ?? 0,
+                    };
+                    newCost = trackapi.calculateGeminiCost(log.model, usage) ?? log.cost ?? 0;
+                } else {
+                    newCost = log.cost ?? 0;
+                }
+                if (log.cost !== newCost) {
+                    log.cost = newCost;
+                    updated++;
+                }
+            }
+            // DB에 반영 (전체 삭제 후 재삽입)
+            if (updated > 0) {
+                // 기존 로그 삭제
+                const db = this.plugin.dbManager['db'];
+                if (db) {
+                    await new Promise((resolve, reject) => {
+                        const tx = db.transaction(['api_logs'], 'readwrite');
+                        const store = tx.objectStore('api_logs');
+                        const clearReq = store.clear();
+                        clearReq.onsuccess = () => resolve(undefined);
+                        clearReq.onerror = () => reject(clearReq.error);
+                    });
+                }
+                // 재삽입
+                for (const log of logs) {
+                    await this.plugin.dbManager.addLog(log);
+                }
+            }
+            alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
+            await this.updateStatsAndChart();
+        };
 
-    // 초기화 버튼 이벤트
-    const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
-    resetBtn.onclick = async () => {
-      // 커스텀 경고 모달 생성
-      const confirmBg = document.createElement('div');
-      confirmBg.style.position = 'fixed';
-      confirmBg.style.top = '0';
-      confirmBg.style.left = '0';
-      confirmBg.style.width = '100vw';
-      confirmBg.style.height = '100vh';
-      confirmBg.style.background = 'rgba(0,0,0,0.3)';
-      confirmBg.style.zIndex = '10000';
-      const confirmBox = document.createElement('div');
-      confirmBox.style.position = 'absolute';
-      confirmBox.style.top = '50%';
-      confirmBox.style.left = '50%';
-      confirmBox.style.transform = 'translate(-50%, -50%)';
-      confirmBox.style.background = 'var(--background-primary)';
-      confirmBox.style.borderRadius = '12px';
-      confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
-      confirmBox.style.padding = '32px 24px';
-      confirmBox.style.minWidth = '320px';
-      confirmBox.style.textAlign = 'center';
-      confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
-      const yesBtn = document.createElement('button');
-      yesBtn.textContent = 'Yes';
-      yesBtn.style.margin = '0 12px';
-      yesBtn.style.padding = '8px 24px';
-      yesBtn.style.background = 'var(--background-secondary)';
-      yesBtn.style.color = 'var(--text-normal)';
-      yesBtn.style.border = '1px solid var(--background-modifier-border)';
-      yesBtn.style.borderRadius = '6px';
-      yesBtn.style.cursor = 'pointer';
-      const noBtn = document.createElement('button');
-      noBtn.textContent = 'No';
-      noBtn.style.margin = '0 12px';
-      noBtn.style.padding = '8px 24px';
-      noBtn.style.background = 'var(--color-accent)';
-      noBtn.style.color = 'white';
-      noBtn.style.border = 'none';
-      noBtn.style.borderRadius = '6px';
-      noBtn.style.cursor = 'pointer';
-      confirmBox.appendChild(yesBtn);
-      confirmBox.appendChild(noBtn);
-      confirmBg.appendChild(confirmBox);
-      document.body.appendChild(confirmBg);
-      noBtn.onclick = () => { document.body.removeChild(confirmBg); };
-      yesBtn.onclick = async () => {
-        document.body.removeChild(confirmBg);
-        if (!this.plugin.dbManager) return;
-        const db = this.plugin.dbManager['db'];
-        if (db) {
-          await new Promise((resolve, reject) => {
-            const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
-            const logsStore = tx.objectStore('api_logs');
-            const statsStore = tx.objectStore('daily_stats');
-            const clear1 = logsStore.clear();
-            const clear2 = statsStore.clear();
-            let done = 0;
-            const check = () => { if (++done === 2) resolve(undefined); };
-            clear1.onsuccess = check; clear2.onsuccess = check;
-            clear1.onerror = () => reject(clear1.error);
-            clear2.onerror = () => reject(clear2.error);
-          });
-        }
-        alert('DB가 초기화되었습니다.');
-        await this.updateStatsAndChart();
-      };
-    };
+        // 초기화 버튼 이벤트
+        const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
+        resetBtn.onclick = async () => {
+            // 커스텀 경고 모달 생성
+            const confirmBg = document.createElement('div');
+            confirmBg.style.position = 'fixed';
+            confirmBg.style.top = '0';
+            confirmBg.style.left = '0';
+            confirmBg.style.width = '100vw';
+            confirmBg.style.height = '100vh';
+            confirmBg.style.background = 'rgba(0,0,0,0.3)';
+            confirmBg.style.zIndex = '10000';
+            const confirmBox = document.createElement('div');
+            confirmBox.style.position = 'absolute';
+            confirmBox.style.top = '50%';
+            confirmBox.style.left = '50%';
+            confirmBox.style.transform = 'translate(-50%, -50%)';
+            confirmBox.style.background = 'var(--background-primary)';
+            confirmBox.style.borderRadius = '12px';
+            confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+            confirmBox.style.padding = '32px 24px';
+            confirmBox.style.minWidth = '320px';
+            confirmBox.style.textAlign = 'center';
+            confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
+            const yesBtn = document.createElement('button');
+            yesBtn.textContent = 'Yes';
+            yesBtn.style.margin = '0 12px';
+            yesBtn.style.padding = '8px 24px';
+            yesBtn.style.background = 'var(--background-secondary)';
+            yesBtn.style.color = 'var(--text-normal)';
+            yesBtn.style.border = '1px solid var(--background-modifier-border)';
+            yesBtn.style.borderRadius = '6px';
+            yesBtn.style.cursor = 'pointer';
+            const noBtn = document.createElement('button');
+            noBtn.textContent = 'No';
+            noBtn.style.margin = '0 12px';
+            noBtn.style.padding = '8px 24px';
+            noBtn.style.background = 'var(--color-accent)';
+            noBtn.style.color = 'white';
+            noBtn.style.border = 'none';
+            noBtn.style.borderRadius = '6px';
+            noBtn.style.cursor = 'pointer';
+            confirmBox.appendChild(yesBtn);
+            confirmBox.appendChild(noBtn);
+            confirmBg.appendChild(confirmBox);
+            document.body.appendChild(confirmBg);
+            noBtn.onclick = () => { document.body.removeChild(confirmBg); };
+            yesBtn.onclick = async () => {
+                document.body.removeChild(confirmBg);
+                if (!this.plugin.dbManager) return;
+                const db = this.plugin.dbManager['db'];
+                if (db) {
+                    await new Promise((resolve, reject) => {
+                        const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
+                        const logsStore = tx.objectStore('api_logs');
+                        const statsStore = tx.objectStore('daily_stats');
+                        const clear1 = logsStore.clear();
+                        const clear2 = statsStore.clear();
+                        let done = 0;
+                        const check = () => { if (++done === 2) resolve(undefined); };
+                        clear1.onsuccess = check; clear2.onsuccess = check;
+                        clear1.onerror = () => reject(clear1.error);
+                        clear2.onerror = () => reject(clear2.error);
+                    });
+                }
+                alert('DB가 초기화되었습니다.');
+                await this.updateStatsAndChart();
+            };
+        };
 
-    // 테스트 데이터 생성 버튼 이벤트
-    const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
-    testDataBtn.onclick = async () => {
-      await TrackedAPIClient.logAPICallTestStatic(this.plugin);
-      alert('테스트 데이터가 추가되었습니다');
-      await this.updateStatsAndChart();
-    };
-
+        // 테스트 데이터 생성 버튼 이벤트
+        const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
+        testDataBtn.onclick = async () => {
+            this.logAPICallTest();
+            alert('테스트 데이터가 추가되었습니다');
+            await this.updateStatsAndChart();
+        };
+    }
     document.body.appendChild(this.modalBg);
 
-    // 디폴트: 일별, 총호출수
-    this.setPeriod('daily');
+    // 디폴트: 시간별, 총호출수
+    this.setPeriod('hourly');
   }
 
-  async setPeriod(period: 'daily' | 'weekly' | 'monthly') {
+  async setPeriod(period: 'hourly' | 'daily' | 'weekly' | 'monthly') {
     this.currentPeriod = period;
     // 버튼 스타일 업데이트
     Object.entries(this.periodButtons).forEach(([key, btn]) => {
@@ -375,12 +377,14 @@ export class SummarStatsModal {
     // 기간별 데이터 fetch
     let stats: any[] = [];
     if (this.plugin.dbManager) {
-      if (this.currentPeriod === 'daily') {
-        stats = await this.plugin.dbManager.getDailyStats(7);
+      if (this.currentPeriod === 'hourly') {
+        stats = await this.getHourlyStats();
+      } else if (this.currentPeriod === 'daily') {
+        stats = await this.getDailyStats();
       } else if (this.currentPeriod === 'weekly') {
-        stats = await this.aggregateWeeklyStats(8);
+        stats = await this.getWeeklyStats();
       } else if (this.currentPeriod === 'monthly') {
-        stats = await this.aggregateMonthlyStats(6);
+        stats = await this.getMonthlyStats();
       }
     }
     this.summaryStats = stats;
@@ -388,6 +392,273 @@ export class SummarStatsModal {
     this.updateSummaryCards(stats);
     // 차트 업데이트
     this.setMetric(this.currentMetric); // metric 스타일 및 차트 갱신
+  }
+
+  /**
+   * 오늘 날짜의 0~23시까지의 로그를 시간별로 집계
+   */
+  async getHourlyStats(): Promise<any[]> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const date = now.getDate();
+    const start = new Date(year, month, date, 0, 0, 0, 0);
+    const end = new Date(year, month, date, 23, 59, 59, 999);
+    const logs = await this.plugin.dbManager.getLogs({
+      startDate: start,
+      endDate: end
+    });
+    // 0~23시별로 집계
+    const hourlyStats: any[] = Array.from({ length: 24 }, (_, h) => ({
+      period: `${h}시`,
+      totalCalls: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      avgLatency: 0,
+      successRate: 0,
+      features: {},
+      featureTokens: {},
+      featureCosts: {},
+      featureLatencies: {},
+      featureSuccessRates: {},
+    }));
+    for (const log of logs) {
+      const d = new Date(log.timestamp);
+      const hour = d.getHours();
+      const stat = hourlyStats[hour];
+      stat.totalCalls++;
+      stat.totalTokens += log.totalTokens || 0;
+      stat.totalCost += log.cost || 0;
+      stat.avgLatency += log.latency || 0;
+      stat.successRate += log.success ? 1 : 0;
+      // feature별
+      if (log.feature) {
+        stat.features[log.feature] = (stat.features[log.feature] || 0) + 1;
+        stat.featureTokens[log.feature] = (stat.featureTokens[log.feature] || 0) + (log.totalTokens || 0);
+        stat.featureCosts[log.feature] = (stat.featureCosts[log.feature] || 0) + (log.cost || 0);
+        stat.featureLatencies[log.feature] = (stat.featureLatencies[log.feature] || 0) + (log.latency || 0);
+        stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
+      }
+    }
+    // 평균값 계산
+    hourlyStats.forEach(stat => {
+      if (stat.totalCalls > 0) {
+        stat.avgLatency = stat.avgLatency / stat.totalCalls;
+        stat.successRate = (stat.successRate / stat.totalCalls) * 100;
+        // feature별 평균
+        Object.keys(stat.featureLatencies).forEach(f => {
+          stat.featureLatencies[f] = stat.featureLatencies[f] / (stat.features[f] || 1);
+        });
+        Object.keys(stat.featureSuccessRates).forEach(f => {
+          stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
+        });
+      }
+    });
+    return hourlyStats;
+  }
+
+  /**
+   * 최근 7일간의 로그을 일별로 집계
+   */
+  async getDailyStats(): Promise<any[]> {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6); // 7일간
+    const logs = await this.plugin.dbManager.getLogs({
+      startDate: start,
+      endDate: end
+    });
+    // 날짜별 집계
+    const dayMap: Record<string, any> = {};
+    for (const log of logs) {
+      const d = new Date(log.timestamp);
+      const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+      if (!dayMap[key]) {
+        dayMap[key] = {
+          period: key,
+          totalCalls: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          avgLatency: 0,
+          successRate: 0,
+          features: {},
+          featureTokens: {},
+          featureCosts: {},
+          featureLatencies: {},
+          featureSuccessRates: {},
+        };
+      }
+      const stat = dayMap[key];
+      stat.totalCalls++;
+      stat.totalTokens += log.totalTokens || 0;
+      stat.totalCost += log.cost || 0;
+      stat.avgLatency += log.latency || 0;
+      stat.successRate += log.success ? 1 : 0;
+      // feature별
+      if (log.feature) {
+        stat.features[log.feature] = (stat.features[log.feature] || 0) + 1;
+        stat.featureTokens[log.feature] = (stat.featureTokens[log.feature] || 0) + (log.totalTokens || 0);
+        stat.featureCosts[log.feature] = (stat.featureCosts[log.feature] || 0) + (log.cost || 0);
+        stat.featureLatencies[log.feature] = (stat.featureLatencies[log.feature] || 0) + (log.latency || 0);
+        stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
+      }
+    }
+    // 평균값 계산
+    const stats: any[] = Object.values(dayMap);
+    stats.forEach(stat => {
+      if (stat.totalCalls > 0) {
+        stat.avgLatency = stat.avgLatency / stat.totalCalls;
+        stat.successRate = (stat.successRate / stat.totalCalls) * 100;
+        // feature별 평균
+        Object.keys(stat.featureLatencies).forEach(f => {
+          stat.featureLatencies[f] = stat.featureLatencies[f] / (stat.features[f] || 1);
+        });
+        Object.keys(stat.featureSuccessRates).forEach(f => {
+          stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
+        });
+      }
+    });
+    // 날짜 오름차순 정렬
+    stats.sort((a, b) => a.period.localeCompare(b.period));
+    return stats;
+  }
+
+  /**
+   * 최근 8주간의 로그를 주별로 집계
+   */
+  async getWeeklyStats(): Promise<any[]> {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 7 * 8 + 1); // 8주간
+    const logs = await this.plugin.dbManager.getLogs({
+      startDate: start,
+      endDate: end
+    });
+    // 주별 집계 (월~일)
+    const weekMap: Record<string, any> = {};
+    for (const log of logs) {
+      const d = new Date(log.timestamp);
+      // ISO week: yyyy-Www
+      const year = d.getFullYear();
+      const week = getWeekNumber(d);
+      const key = `${year}-W${week.toString().padStart(2, '0')}`;
+      if (!weekMap[key]) {
+        weekMap[key] = {
+          period: key,
+          totalCalls: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          avgLatency: 0,
+          successRate: 0,
+          features: {},
+          featureTokens: {},
+          featureCosts: {},
+          featureLatencies: {},
+          featureSuccessRates: {},
+        };
+      }
+      const stat = weekMap[key];
+      stat.totalCalls++;
+      stat.totalTokens += log.totalTokens || 0;
+      stat.totalCost += log.cost || 0;
+      stat.avgLatency += log.latency || 0;
+      stat.successRate += log.success ? 1 : 0;
+      // feature별
+      if (log.feature) {
+        stat.features[log.feature] = (stat.features[log.feature] || 0) + 1;
+        stat.featureTokens[log.feature] = (stat.featureTokens[log.feature] || 0) + (log.totalTokens || 0);
+        stat.featureCosts[log.feature] = (stat.featureCosts[log.feature] || 0) + (log.cost || 0);
+        stat.featureLatencies[log.feature] = (stat.featureLatencies[log.feature] || 0) + (log.latency || 0);
+        stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
+      }
+    }
+    // 평균값 계산
+    const stats: any[] = Object.values(weekMap);
+    stats.forEach(stat => {
+      if (stat.totalCalls > 0) {
+        stat.avgLatency = stat.avgLatency / stat.totalCalls;
+        stat.successRate = (stat.successRate / stat.totalCalls) * 100;
+        // feature별 평균
+        Object.keys(stat.featureLatencies).forEach(f => {
+          stat.featureLatencies[f] = stat.featureLatencies[f] / (stat.features[f] || 1);
+        });
+        Object.keys(stat.featureSuccessRates).forEach(f => {
+          stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
+        });
+      }
+    });
+    // 주차 오름차순 정렬
+    stats.sort((a, b) => a.period.localeCompare(b.period));
+    return stats;
+  }
+
+  /**
+   * 최근 12개월간의 로그를 월별로 집계
+   */
+  async getMonthlyStats(): Promise<any[]> {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const start = new Date(end);
+    start.setMonth(end.getMonth() - 11); // 12개월간
+    const logs = await this.plugin.dbManager.getLogs({
+      startDate: start,
+      endDate: end
+    });
+    // 월별 집계
+    const monthMap: Record<string, any> = {};
+    for (const log of logs) {
+      const d = new Date(log.timestamp);
+      const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+      if (!monthMap[key]) {
+        monthMap[key] = {
+          period: key,
+          totalCalls: 0,
+          totalTokens: 0,
+          totalCost: 0,
+          avgLatency: 0,
+          successRate: 0,
+          features: {},
+          featureTokens: {},
+          featureCosts: {},
+          featureLatencies: {},
+          featureSuccessRates: {},
+        };
+      }
+      const stat = monthMap[key];
+      stat.totalCalls++;
+      stat.totalTokens += log.totalTokens || 0;
+      stat.totalCost += log.cost || 0;
+      stat.avgLatency += log.latency || 0;
+      stat.successRate += log.success ? 1 : 0;
+      // feature별
+      if (log.feature) {
+        stat.features[log.feature] = (stat.features[log.feature] || 0) + 1;
+        stat.featureTokens[log.feature] = (stat.featureTokens[log.feature] || 0) + (log.totalTokens || 0);
+        stat.featureCosts[log.feature] = (stat.featureCosts[log.feature] || 0) + (log.cost || 0);
+        stat.featureLatencies[log.feature] = (stat.featureLatencies[log.feature] || 0) + (log.latency || 0);
+        stat.featureSuccessRates[log.feature] = (stat.featureSuccessRates[log.feature] || 0) + (log.success ? 1 : 0);
+      }
+    }
+    // 평균값 계산
+    const stats: any[] = Object.values(monthMap);
+    stats.forEach(stat => {
+      if (stat.totalCalls > 0) {
+        stat.avgLatency = stat.avgLatency / stat.totalCalls;
+        stat.successRate = (stat.successRate / stat.totalCalls) * 100;
+        // feature별 평균
+        Object.keys(stat.featureLatencies).forEach(f => {
+          stat.featureLatencies[f] = stat.featureLatencies[f] / (stat.features[f] || 1);
+        });
+        Object.keys(stat.featureSuccessRates).forEach(f => {
+          stat.featureSuccessRates[f] = (stat.featureSuccessRates[f] / (stat.features[f] || 1)) * 100;
+        });
+      }
+    });
+    // 월 오름차순 정렬
+    stats.sort((a, b) => a.period.localeCompare(b.period));
+    return stats;
   }
 
   updateSummaryCards(stats: any[]) {
@@ -435,13 +706,11 @@ export class SummarStatsModal {
     // 총 호출수/토큰수/비용: feature별 합이 아닌 전체 합으로 y축
     if (["totalCalls", "totalTokens", "totalCost"].includes(this.currentMetric)) {
       isStackedBar = true;
-      // feature별 데이터
       const palette = [
         '#667eea', '#764ba2', '#4facfe', '#00f2fe', '#fa709a', '#f6d365', '#fda085', '#43e97b', '#38f9d7', '#f7971e', '#ffd200', '#f953c6', '#b91d73', '#43cea2', '#185a9d', '#f857a6', '#ff5858', '#ff9a9e', '#a18cd1', '#fbc2eb'
       ];
       datasets = features.map((f, idx) => {
-        // feature별 값
-        let data: number[] = this.summaryStats.map(s => {
+        let data: number[] = this.summaryStats.map((s, i) => {
           if (this.currentMetric === 'totalCalls') return s.features?.[f] || 0;
           if (this.currentMetric === 'totalTokens') return s.featureTokens?.[f] || 0;
           if (this.currentMetric === 'totalCost') return s.featureCosts?.[f] || 0;
@@ -456,6 +725,19 @@ export class SummarStatsModal {
           stack: 'features',
         };
       });
+      // hourly일 때는 첫 feature만 전체 합을 가지므로, label도 전체 합으로 표시
+      if (this.currentMetric === 'totalCost' && this.currentPeriod === 'hourly') {
+        datasets = [
+          {
+            label: '총 비용($)',
+            data: this.summaryStats.map(s => s.totalCost || 0),
+            backgroundColor: palette[0],
+            borderColor: palette[0],
+            borderWidth: 1,
+            stack: 'features',
+          }
+        ];
+      }
       label =
         (this.currentMetric === 'totalCalls' && '총 호출수') ||
         (this.currentMetric === 'totalTokens' && '총 토큰수') ||
@@ -468,12 +750,13 @@ export class SummarStatsModal {
         '#667eea', '#764ba2', '#4facfe', '#00f2fe', '#fa709a', '#f6d365', '#fda085', '#43e97b', '#38f9d7', '#f7971e', '#ffd200', '#f953c6', '#b91d73', '#43cea2', '#185a9d', '#f857a6', '#ff5858', '#ff9a9e', '#a18cd1', '#fbc2eb'
       ];
       datasets = features.map((f, idx) => {
-        // 각 기간별 feature의 평균값
         let data = this.summaryStats.map((s, i) => {
           let y = 0;
           if (this.currentMetric === 'avgLatency') y = s.featureLatencies?.[f] ?? null;
           if (this.currentMetric === 'successRate') y = s.featureSuccessRates?.[f] ?? null;
-          return y != null ? { x: i, y } : null;
+          // x축을 s.period(문자열, 예: '0시', '1시' 등)로 통일
+          let x = s.period;
+          return y != null ? { x, y } : null;
         }).filter(v => v !== null);
         return {
           label: `${idx + 1}. ${f}`,
@@ -581,9 +864,9 @@ export class SummarStatsModal {
     }
   }
 
-  // 주간/월간 집계 함수 (일별 통계를 합산)
+  // 주간/월간 집계 함수 (일간 통계를 합산)
   async aggregateWeeklyStats(weeks: number): Promise<any[]> {
-    // 최근 N주간의 일별 통계 fetch 후 주간별로 합산
+    // 최근 N주간의 일간 통계 fetch 후 주간별로 합산
     const days = weeks * 7;
     const daily = await this.plugin.dbManager.getDailyStats(days);
     const weekStats: any[] = [];
@@ -603,7 +886,7 @@ export class SummarStatsModal {
   }
 
   async aggregateMonthlyStats(months: number): Promise<any[]> {
-    // 최근 N개월의 일별 통계 fetch 후 월별로 합산
+    // 최근 N개월의 일간 통계 fetch 후 월별로 합산
     const days = months * 31;
     const daily = await this.plugin.dbManager.getDailyStats(days);
     const monthMap: Record<string, any[]> = {};
@@ -642,6 +925,17 @@ export class SummarStatsModal {
    * SummarStatsModal에서 직접 호출할 수 있는 테스트 데이터 생성 함수
    */
   async logAPICallTest() {
-    await TrackedAPIClient.logAPICallTestStatic(this.plugin);
+    const client = new TrackedAPIClient(this.plugin);
+    await client.logAPICallTest();
+    // await TrackedAPIClient.logAPICallTestStatic(this.plugin);
   }
+}
+
+// ISO week number 계산 함수
+function getWeekNumber(d: Date): number {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d as any) - (yearStart as any)) / 86400000 + 1) / 7);
 }

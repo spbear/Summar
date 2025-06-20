@@ -671,16 +671,16 @@ export class TrackedAPIClient {
         const features = ['stt', 'web', 'custom', 'pdf', 'stt-summary', 'stt-refine'];
         const providers: ('openai' | 'gemini')[] = ['openai', 'gemini'];
         const now = Date.now();
-        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        const oneYear = 365 * 24 * 60 * 60 * 1000;
         function randomStr(len: number) {
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let s = '';
             for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
             return s;
         }
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 1000; i++) {
             // 날짜 랜덤
-            const timestamp = now - Math.floor(Math.random() * oneWeek);
+            const timestamp = now - Math.floor(Math.random() * oneYear);
             const timestampISO = new Date(timestamp).toISOString();
             // provider/model 짝 랜덤
             const provider: 'openai' | 'gemini' = providers[Math.floor(Math.random() * providers.length)] as 'openai' | 'gemini';
@@ -697,7 +697,7 @@ export class TrackedAPIClient {
             const responseSize = 100 + Math.floor(Math.random() * 101);
             const latency = 1000 + Math.floor(Math.random() * 3001);
             const success = Math.random() < 0.8; // 성공 80% 확률
-            const errorMessage = success ? undefined : '임의 에러: ' + randomStr(8);
+            const errorMessage = success ? undefined : 'Error occurred: ' + randomStr(8);
             const sessionId = randomStr(10 + Math.floor(Math.random() * 11));
             const userAgent = `Obsidian-Summar/${this.plugin.manifest?.version ?? '1.0.0'}`;
             const version = '1.0.0';
@@ -711,7 +711,7 @@ export class TrackedAPIClient {
                 timestampISO,
                 provider,
                 model,
-                endpoint: '/test',
+                endpoint: 'test',
                 feature,
                 requestSize,
                 responseSize,
@@ -733,8 +733,8 @@ export class TrackedAPIClient {
     /**
      * SummarStatsModal 등 외부에서 쉽게 호출할 수 있도록 static 버전 제공
      */
-    static async logAPICallTestStatic(plugin: SummarPlugin) {
-        const client = new TrackedAPIClient(plugin);
-        await client.logAPICallTest();
-    }
+    // static async logAPICallTestStatic(plugin: SummarPlugin) {
+    //     const client = new TrackedAPIClient(plugin);
+    //     await client.logAPICallTest();
+    // }
 }
