@@ -170,7 +170,7 @@ export class SummarStatsModal {
       <button id="ai-export-csv">CSV 내보내기</button>
       <button id="ai-recalc-cost">비용 재계산</button>
       <button id="ai-reset-db">초기화</button>
-      <button id="ai-predict">예측분석</button>
+      <button id="ai-create-test-data">테스트 데이터 생성</button>
     `;
     modal.appendChild(actions);
 
@@ -185,7 +185,7 @@ export class SummarStatsModal {
       }
       // CSV 헤더
       const headers = [
-        'id','timestamp','provider','model','endpoint','feature','requestSize','responseSize','requestTokens','responseTokens','totalTokens','cost','latency','success','errorMessage','sessionId','userAgent','version'
+        'id','timestamp','timestampISO','provider','model','endpoint','feature','requestSize','responseSize','requestTokens','responseTokens','totalTokens','cost','latency','success','errorMessage','sessionId','userAgent','version'
       ];
       const rows = logs.map(log => headers.map(h => {
         let v = log[h as keyof typeof log];
@@ -268,23 +268,78 @@ export class SummarStatsModal {
     // 초기화 버튼 이벤트
     const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
     resetBtn.onclick = async () => {
-      if (!this.plugin.dbManager) return;
-      const db = this.plugin.dbManager['db'];
-      if (db) {
-        await new Promise((resolve, reject) => {
-          const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
-          const logsStore = tx.objectStore('api_logs');
-          const statsStore = tx.objectStore('daily_stats');
-          const clear1 = logsStore.clear();
-          const clear2 = statsStore.clear();
-          let done = 0;
-          const check = () => { if (++done === 2) resolve(undefined); };
-          clear1.onsuccess = check; clear2.onsuccess = check;
-          clear1.onerror = () => reject(clear1.error);
-          clear2.onerror = () => reject(clear2.error);
-        });
-      }
-      alert('DB가 초기화되었습니다.');
+      // 커스텀 경고 모달 생성
+      const confirmBg = document.createElement('div');
+      confirmBg.style.position = 'fixed';
+      confirmBg.style.top = '0';
+      confirmBg.style.left = '0';
+      confirmBg.style.width = '100vw';
+      confirmBg.style.height = '100vh';
+      confirmBg.style.background = 'rgba(0,0,0,0.3)';
+      confirmBg.style.zIndex = '10000';
+      const confirmBox = document.createElement('div');
+      confirmBox.style.position = 'absolute';
+      confirmBox.style.top = '50%';
+      confirmBox.style.left = '50%';
+      confirmBox.style.transform = 'translate(-50%, -50%)';
+      confirmBox.style.background = 'var(--background-primary)';
+      confirmBox.style.borderRadius = '12px';
+      confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+      confirmBox.style.padding = '32px 24px';
+      confirmBox.style.minWidth = '320px';
+      confirmBox.style.textAlign = 'center';
+      confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
+      const yesBtn = document.createElement('button');
+      yesBtn.textContent = 'Yes';
+      yesBtn.style.margin = '0 12px';
+      yesBtn.style.padding = '8px 24px';
+      yesBtn.style.background = 'var(--background-secondary)';
+      yesBtn.style.color = 'var(--text-normal)';
+      yesBtn.style.border = '1px solid var(--background-modifier-border)';
+      yesBtn.style.borderRadius = '6px';
+      yesBtn.style.cursor = 'pointer';
+      const noBtn = document.createElement('button');
+      noBtn.textContent = 'No';
+      noBtn.style.margin = '0 12px';
+      noBtn.style.padding = '8px 24px';
+      noBtn.style.background = 'var(--color-accent)';
+      noBtn.style.color = 'white';
+      noBtn.style.border = 'none';
+      noBtn.style.borderRadius = '6px';
+      noBtn.style.cursor = 'pointer';
+      confirmBox.appendChild(yesBtn);
+      confirmBox.appendChild(noBtn);
+      confirmBg.appendChild(confirmBox);
+      document.body.appendChild(confirmBg);
+      noBtn.onclick = () => { document.body.removeChild(confirmBg); };
+      yesBtn.onclick = async () => {
+        document.body.removeChild(confirmBg);
+        if (!this.plugin.dbManager) return;
+        const db = this.plugin.dbManager['db'];
+        if (db) {
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
+            const logsStore = tx.objectStore('api_logs');
+            const statsStore = tx.objectStore('daily_stats');
+            const clear1 = logsStore.clear();
+            const clear2 = statsStore.clear();
+            let done = 0;
+            const check = () => { if (++done === 2) resolve(undefined); };
+            clear1.onsuccess = check; clear2.onsuccess = check;
+            clear1.onerror = () => reject(clear1.error);
+            clear2.onerror = () => reject(clear2.error);
+          });
+        }
+        alert('DB가 초기화되었습니다.');
+        await this.updateStatsAndChart();
+      };
+    };
+
+    // 테스트 데이터 생성 버튼 이벤트
+    const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
+    testDataBtn.onclick = async () => {
+      await TrackedAPIClient.logAPICallTestStatic(this.plugin);
+      alert('테스트 데이터가 추가되었습니다');
       await this.updateStatsAndChart();
     };
 
@@ -581,5 +636,12 @@ export class SummarStatsModal {
       this.chart.destroy();
       this.chart = null;
     }
+  }
+
+  /**
+   * SummarStatsModal에서 직접 호출할 수 있는 테스트 데이터 생성 함수
+   */
+  async logAPICallTest() {
+    await TrackedAPIClient.logAPICallTestStatic(this.plugin);
   }
 }

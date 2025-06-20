@@ -104,6 +104,7 @@ export default class SummarPlugin extends Plugin {
   PLUGIN_SETTINGS: string = "";  // 플러그인 디렉토리의 data.json
   PLUGIN_MODELS: string = "";  // 플러그인 디렉토리의 models.json
   PLUGIN_PROMPTS: string = "";  // 플러그인 디렉토리의 prompts.json
+  PLUGIN_MODELPRICING: any = {} // 플러그인 디렉토리의 model-pricing.json
   PLUGIN_SETTINGS_SCHEMA_VERSION = "1.0.0"; // 플러그인 설정 스키마 버전
   
   modelsByCategory: Record<ModelCategory, ModelInfo> = {
@@ -131,6 +132,7 @@ export default class SummarPlugin extends Plugin {
   };
 
   dbManager: IndexedDBManager;
+  modelPricing: any = {};
 
   async onload() {
     this.OBSIDIAN_PLUGIN_DIR = normalizePath("/.obsidian/plugins");
@@ -143,9 +145,15 @@ export default class SummarPlugin extends Plugin {
 
     this.PLUGIN_PROMPTS = normalizePath(this.PLUGIN_DIR + "/prompts.json");
     await this.loadPromptsFromFile();
-    
+
+    this.PLUGIN_MODELPRICING = normalizePath(this.PLUGIN_DIR + "/model-pricing.json");
+    await this.loadModelPricingFromFile();
+
+
     this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
     this.settings = await this.loadSettingsFromFile();
+
+
     SummarDebug.initialize(this.settings.debugLevel);
 
     SummarDebug.log(1, `OBSIDIAN_PLUGIN_DIR: ${this.OBSIDIAN_PLUGIN_DIR}`);
@@ -804,7 +812,25 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
+  async loadModelPricingFromFile(): Promise<void> {
+    if (await this.app.vault.adapter.exists(this.PLUGIN_MODELPRICING)) {
+      SummarDebug.log(1, "Settings file exists:", this.PLUGIN_MODELPRICING);
+    } else {
+      SummarDebug.log(1, "Settings file does not exist:", this.PLUGIN_MODELPRICING);
+    }
 
+    if (await this.app.vault.adapter.exists(this.PLUGIN_MODELPRICING)) {
+      SummarDebug.log(1, "Reading settings from model-pricing.json");
+      try {
+        const modelPricingJson = await this.app.vault.adapter.read(this.PLUGIN_MODELPRICING);
+        this.modelPricing = JSON.parse(modelPricingJson);
+        SummarDebug.log(1, "Prompts loaded successfully");
+      } catch (error) {
+        SummarDebug.log(1, "Error reading model pricing:", error);
+        this.modelPricing = {};
+      }
+    }
+  }
 
 
   // 커맨드에서 사용할 링크 설정

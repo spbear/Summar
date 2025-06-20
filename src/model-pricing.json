@@ -1,0 +1,26 @@
+{
+  "openai": {
+    "gpt-4o":        { "inputPerK": 0.005,   "outputPerK": 0.015 },
+    "gpt-4.1":       { "inputPerK": 0.01,    "outputPerK": 0.03 },
+    "gpt-4.1-mini":  { "inputPerK": 0.003,   "outputPerK": 0.009 },
+    "gpt-4":         { "inputPerK": 0.03,    "outputPerK": 0.06 },
+    "gpt-4-turbo":   { "inputPerK": 0.01,    "outputPerK": 0.03 },
+    "gpt-3.5-turbo": { "inputPerK": 0.001,   "outputPerK": 0.002 },
+    "o1-mini":       { "inputPerK": 0.0011,  "outputPerK": 0.0044 },
+    "o3-mini":       { "inputPerK": 0.0011,  "outputPerK": 0.0044 },
+    "whisper-1":     { "inputPerK": 0,       "outputPerK": 0 },     
+    "gpt-4o-transcribe": { "inputPerK": 0,   "outputPerK": 0 },
+    "gpt-4o-mini-transcribe": { "inputPerK": 0, "outputPerK": 0 }
+  },
+  "gemini": {
+    "gemini-2.5-pro": {
+      "under200k":   { "inputPerK": 0.00125, "outputPerK": 0.01 },
+      "over200k":    { "inputPerK": 0.0025,  "outputPerK": 0.015 }
+    },
+    "gemini-2.5-flash":       { "inputPerK": 0.0003,  "outputPerK": 0.0025 },
+    "gemini-2.0-flash":       { "inputPerK": 0.0001,  "outputPerK": 0.0004 },
+    "gemini-2.0-latest-lite": { "inputPerK": 0.00005, "outputPerK": 0.0002 },
+    "gemini-1.5-lite":        { "inputPerK": 0.00005, "outputPerK": 0.0002 },
+    "gemini-1.0-lite":        { "inputPerK": 0.00002, "outputPerK": 0.0001 }
+  }
+}

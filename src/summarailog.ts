@@ -4,6 +4,7 @@ import SummarPlugin from "./main";
 export interface APICallLog {
     id: string;
     timestamp: number;
+    timestampISO: string;
     provider: 'openai' | 'gemini' | 'claude';
     model: string;
     endpoint: string;
@@ -482,10 +483,12 @@ export class TrackedAPIClient {
         const requestSize = new Blob([JSON.stringify(requestData)]).size;
         const responseSize = responseData ? new Blob([JSON.stringify(responseData)]).size : 0;
         const latency = this.getLatency();
+        const now = Date.now();
 
         const logEntry: APICallLog = {
             id: crypto.randomUUID(),
-            timestamp: Date.now(),
+            timestamp: now,
+            timestampISO: new Date(now).toISOString(),
             provider: provider as any,
             model,
             endpoint,
@@ -540,36 +543,41 @@ export class TrackedAPIClient {
         // 모델명 정규화
         const m = model.toLowerCase();
         // 2024년 6월 기준 OpenAI 공식 가격 (USD, 1K tokens)
-        const pricing: Record<string, { input: number; output: number }> = {
-            'gpt-4o': { input: 0.005, output: 0.015 },
-            'gpt-4.1': { input: 0.01, output: 0.03 },
-            'gpt-4.1-mini': { input: 0.003, output: 0.009 },
-            'gpt-4': { input: 0.03, output: 0.06 },
-            'gpt-4-turbo': { input: 0.01, output: 0.03 },
-            'gpt-3.5-turbo': { input: 0.001, output: 0.002 },
-            'whisper-1': { input: 0.006, output: 0 }, // 1분당 0.006, 토큰 단위 환산 불가
-            'gpt-4o-mini-transcribe': { input: 0.006, output: 0 }, // whisper-1과 동일 처리
-            'gpt-4o-transcribe': { input: 0.006, output: 0 }, // whisper-1과 동일 처리
-            'o1-mini': { input: 0.0011, output: 0.0044 }, // 공식 가격 없음
-            'o3-mini': { input: 0.0011, output: 0.0044 }, // 공식 가격 없음
-        };
+        // const pricing: Record<string, { input: number; output: number }> = {
+        //     'gpt-4o': { input: 0.005, output: 0.015 },
+        //     'gpt-4.1': { input: 0.01, output: 0.03 },
+        //     'gpt-4.1-mini': { input: 0.003, output: 0.009 },
+        //     'gpt-4': { input: 0.03, output: 0.06 },
+        //     'gpt-4-turbo': { input: 0.01, output: 0.03 },
+        //     'gpt-3.5-turbo': { input: 0.001, output: 0.002 },
+        //     'whisper-1': { input: 0.006, output: 0 }, // 1분당 0.006, 토큰 단위 환산 불가
+        //     'gpt-4o-mini-transcribe': { input: 0.006, output: 0 }, // whisper-1과 동일 처리
+        //     'gpt-4o-transcribe': { input: 0.006, output: 0 }, // whisper-1과 동일 처리
+        //     'o1-mini': { input: 0.0011, output: 0.0044 }, // 공식 가격 없음
+        //     'o3-mini': { input: 0.0011, output: 0.0044 }, // 공식 가격 없음
+        // };
         // 모델명 매핑
-        let price = pricing[m];
-        if (!price) {
-            // 접두사 매칭 (gpt-4o, gpt-4.1 등)
-            if (m.startsWith('gpt-4o')) price = pricing['gpt-4o'];
-            else if (m.startsWith('gpt-4.1-mini')) price = pricing['gpt-4.1-mini'];
-            else if (m.startsWith('gpt-4.1')) price = pricing['gpt-4.1'];
-            else if (m.startsWith('gpt-4')) price = pricing['gpt-4'];
-            else if (m.startsWith('gpt-3.5')) price = pricing['gpt-3.5-turbo'];
-            else if (m.startsWith('whisper-1')) price = pricing['whisper-1'];
-            else if (m.startsWith('o1-mini')) price = pricing['o1-mini'];
-            else if (m.startsWith('o3-mini')) price = pricing['o3-mini'];
-            else price = { input: 0, output: 0 };
-        }
+        // let price = pricing[m];
+        // if (!price) {
+        //     // 접두사 매칭 (gpt-4o, gpt-4.1 등)
+        //     if (m.startsWith('gpt-4o')) price = pricing['gpt-4o'];
+        //     else if (m.startsWith('gpt-4.1-mini')) price = pricing['gpt-4.1-mini'];
+        //     else if (m.startsWith('gpt-4.1')) price = pricing['gpt-4.1'];
+        //     else if (m.startsWith('gpt-4')) price = pricing['gpt-4'];
+        //     else if (m.startsWith('gpt-3.5')) price = pricing['gpt-3.5-turbo'];
+        //     else if (m.startsWith('whisper-1')) price = pricing['whisper-1'];
+        //     else if (m.startsWith('o1-mini')) price = pricing['o1-mini'];
+        //     else if (m.startsWith('o3-mini')) price = pricing['o3-mini'];
+        //     else price = { input: 0, output: 0 };
+        // }
         // whisper류는 토큰 단위가 아니므로 cost는 0 또는 별도 처리
+
+        const pricing = this.plugin.modelPricing?.openai ?? {};
+        const matchedKey = Object.keys(pricing).find(key => m.includes(key.toLowerCase())) ?? '';
+        const price = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0 };
+
         if (m.includes('whisper') || m.includes('transcribe')) return 0;
-        return (usage.prompt_tokens * price.input / 1000) + (usage.completion_tokens * price.output / 1000);
+        return (usage.prompt_tokens * price.inputPerK / 1000) + (usage.completion_tokens * price.outputPerK / 1000);
     }
 
     calculateGeminiCost(
@@ -583,40 +591,150 @@ export class TrackedAPIClient {
         const promptTokens = usage.promptTokenCount || 0;
         const completionTokens = usage.candidatesTokenCount || 0;
 
-        let inputPerK = 0;
-        let outputPerK = 0;
+        // let inputPerK = 0;
+        // let outputPerK = 0;
+
+        // if (model.includes('2.5-pro')) {
+        //     if (promptTokens > 200_000) {
+        //         inputPerK = 0.0025;
+        //         outputPerK = 0.015;
+        //     } else {
+        //         inputPerK = 0.00125;
+        //         outputPerK = 0.01;
+        //     }
+        // } else if (model.includes('2.5-flash')) {
+        //     inputPerK = 0.0003;
+        //     outputPerK = 0.0025;
+        // } else if (model.includes('2.0-flash')) {
+        //     inputPerK = 0.0001;
+        //     outputPerK = 0.0004;
+        // } else if (model.includes('2.0-latest-lite')) {
+        //     inputPerK = 0.00005;
+        //     outputPerK = 0.0002;
+        // } else if (model.includes('1.5-lite')) {
+        //     inputPerK = 0.00005;
+        //     outputPerK = 0.0002;
+        // } else if (model.includes('1.0-lite')) {
+        //     inputPerK = 0.00002;
+        //     outputPerK = 0.0001;
+        // }
+        
+        // const inputCost = (promptTokens * inputPerK) / 1000;
+        // const outputCost = (completionTokens * outputPerK) / 1000;
+        // return inputCost + outputCost;
+
+        const pricing = this.plugin.modelPricing?.gemini ?? {};
+        let inputPerK = 0, outputPerK = 0;
 
         if (model.includes('2.5-pro')) {
-            if (promptTokens > 200_000) {
-                inputPerK = 0.0025;
-                outputPerK = 0.015;
-            } else {
-                inputPerK = 0.00125;
-                outputPerK = 0.01;
-            }
-        } else if (model.includes('2.5-flash')) {
-            inputPerK = 0.0003;
-            outputPerK = 0.0025;
-        } else if (model.includes('2.0-flash')) {
-            inputPerK = 0.0001;
-            outputPerK = 0.0004;
-        } else if (model.includes('2.0-latest-lite')) {
-            inputPerK = 0.00005;
-            outputPerK = 0.0002;
-        } else if (model.includes('1.5-lite')) {
-            inputPerK = 0.00005;
-            outputPerK = 0.0002;
-        } else if (model.includes('1.0-lite')) {
-            inputPerK = 0.00002;
-            outputPerK = 0.0001;
+        const tier = promptTokens > 200_000
+            ? pricing["gemini-2.5-pro"]?.over200k
+            : pricing["gemini-2.5-pro"]?.under200k;
+        inputPerK = tier?.inputPerK ?? 0;
+        outputPerK = tier?.outputPerK ?? 0;
+        } else {
+        const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
+        const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0 };
+        inputPerK = tier.inputPerK;
+        outputPerK = tier.outputPerK;
         }
 
-        const inputCost = (promptTokens * inputPerK) / 1000;
-        const outputCost = (completionTokens * outputPerK) / 1000;
-        return inputCost + outputCost;
+        return (promptTokens * inputPerK) / 1000 + (completionTokens * outputPerK) / 1000;
+
     }
     private extractGeminiModel(endpoint: string): string {
         const match = endpoint.match(/models\/([^:\/]+)/);
         return match ? match[1] : 'unknown';
+    }
+
+    /**
+     * 테스트용 API 로그 100개를 DB에 랜덤 생성하여 추가합니다.
+     * - timestamp: 오늘~일주일 전 랜덤
+     * - provider/model: model-pricing.json 기반 랜덤 (openai/gemini 짝 맞춤)
+     * - feature: 'stt', 'web', 'custom', 'pdf', 'stt-summary', 'stt-refine' 중 랜덤
+     * - requestSize/responseSize: 100~200 랜덤
+     * - latency: 1000~4000 랜덤
+     * - success: true/false 랜덤, errorMessage는 false일 때만 임의값
+     * - sessionId: 10~20자 랜덤 문자열
+     * - userAgent/version: logAPICall 참고
+     * - requestTokens/responseTokens/totalTokens: 임의값
+     * - cost: 0~0.003 랜덤
+     */
+    async logAPICallTest() {
+        // 모델/프로바이더 목록 준비
+        const openaiModels = [
+            'gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1-mini', 'o3-mini', 'whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe'
+        ];
+        const geminiModels = [
+            'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-latest-lite', 'gemini-1.5-lite', 'gemini-1.0-lite'
+        ];
+        const features = ['stt', 'web', 'custom', 'pdf', 'stt-summary', 'stt-refine'];
+        const providers: ('openai' | 'gemini')[] = ['openai', 'gemini'];
+        const now = Date.now();
+        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        function randomStr(len: number) {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let s = '';
+            for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+            return s;
+        }
+        for (let i = 0; i < 100; i++) {
+            // 날짜 랜덤
+            const timestamp = now - Math.floor(Math.random() * oneWeek);
+            const timestampISO = new Date(timestamp).toISOString();
+            // provider/model 짝 랜덤
+            const provider: 'openai' | 'gemini' = providers[Math.floor(Math.random() * providers.length)] as 'openai' | 'gemini';
+            let model = '';
+            if (provider === 'openai') {
+                model = openaiModels[Math.floor(Math.random() * openaiModels.length)];
+            } else {
+                model = geminiModels[Math.floor(Math.random() * geminiModels.length)];
+            }
+            // feature 랜덤
+            const feature = features[Math.floor(Math.random() * features.length)];
+            // 기타 값 랜덤
+            const requestSize = 100 + Math.floor(Math.random() * 101);
+            const responseSize = 100 + Math.floor(Math.random() * 101);
+            const latency = 1000 + Math.floor(Math.random() * 3001);
+            const success = Math.random() < 0.8; // 성공 80% 확률
+            const errorMessage = success ? undefined : '임의 에러: ' + randomStr(8);
+            const sessionId = randomStr(10 + Math.floor(Math.random() * 11));
+            const userAgent = `Obsidian-Summar/${this.plugin.manifest?.version ?? '1.0.0'}`;
+            const version = '1.0.0';
+            const requestTokens = 100 + Math.floor(Math.random() * 100);
+            const responseTokens = 100 + Math.floor(Math.random() * 100);
+            const totalTokens = requestTokens + responseTokens;
+            const cost = Math.random() * 0.003;
+            const log = {
+                id: crypto.randomUUID(),
+                timestamp,
+                timestampISO,
+                provider,
+                model,
+                endpoint: '/test',
+                feature,
+                requestSize,
+                responseSize,
+                requestTokens,
+                responseTokens,
+                totalTokens,
+                cost: Number(cost.toFixed(6)),
+                latency,
+                success,
+                errorMessage,
+                sessionId,
+                userAgent,
+                version
+            };
+            await this.dbManager.addLog(log);
+        }
+    }
+
+    /**
+     * SummarStatsModal 등 외부에서 쉽게 호출할 수 있도록 static 버전 제공
+     */
+    static async logAPICallTestStatic(plugin: SummarPlugin) {
+        const client = new TrackedAPIClient(plugin);
+        await client.logAPICallTest();
     }
 }
