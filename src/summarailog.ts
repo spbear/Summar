@@ -385,8 +385,10 @@ export class TrackedAPIClient {
     private dbManager: IndexedDBManager;
     private sessionId: string;
     private startTime: number;
+    private plugin: SummarPlugin;
 
     constructor(plugin: SummarPlugin) {
+        this.plugin = plugin;
         this.dbManager = plugin.dbManager;
         this.sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         this.startTime = Date.now();
@@ -497,7 +499,7 @@ export class TrackedAPIClient {
             errorMessage: error,
             
             sessionId: this.sessionId,
-            userAgent: 'Obsidian-Plugin',
+            userAgent: `Obsidian-Summar/${this.plugin.manifest.version}`,
             version: '1.0.0',
             
             ...this.parseUsageData(provider, responseData)
@@ -527,31 +529,92 @@ export class TrackedAPIClient {
                 requestTokens: responseData.usageMetadata.promptTokenCount,
                 responseTokens: responseData.usageMetadata.candidatesTokenCount,
                 totalTokens: responseData.usageMetadata.totalTokenCount,
-                cost: this.calculateGeminiCost(responseData.usageMetadata)
+                cost: this.calculateGeminiCost(responseData.modelVersion, responseData.usageMetadata)
             };
         }
 
         return {};
     }
 
-    private calculateOpenAICost(model: string, usage: any): number {
+    calculateOpenAICost(model: string, usage: any): number {
+        // 모델명 정규화
+        const m = model.toLowerCase();
+        // 2024년 6월 기준 OpenAI 공식 가격 (USD, 1K tokens)
         const pricing: Record<string, { input: number; output: number }> = {
+            'gpt-4o': { input: 0.005, output: 0.015 },
+            'gpt-4.1': { input: 0.01, output: 0.03 },
+            'gpt-4.1-mini': { input: 0.003, output: 0.009 },
             'gpt-4': { input: 0.03, output: 0.06 },
             'gpt-4-turbo': { input: 0.01, output: 0.03 },
             'gpt-3.5-turbo': { input: 0.001, output: 0.002 },
-            'whisper-1': { input: 0.006, output: 0 }
+            'whisper-1': { input: 0.006, output: 0 }, // 1분당 0.006, 토큰 단위 환산 불가
+            'gpt-4o-mini-transcribe': { input: 0.006, output: 0 }, // whisper-1과 동일 처리
+            'gpt-4o-transcribe': { input: 0.006, output: 0 }, // whisper-1과 동일 처리
+            'o1-mini': { input: 0.0011, output: 0.0044 }, // 공식 가격 없음
+            'o3-mini': { input: 0.0011, output: 0.0044 }, // 공식 가격 없음
         };
-        
-        const price = pricing[model] || { input: 0, output: 0 };
-        return (usage.prompt_tokens * price.input / 1000) + 
-               (usage.completion_tokens * price.output / 1000);
+        // 모델명 매핑
+        let price = pricing[m];
+        if (!price) {
+            // 접두사 매칭 (gpt-4o, gpt-4.1 등)
+            if (m.startsWith('gpt-4o')) price = pricing['gpt-4o'];
+            else if (m.startsWith('gpt-4.1-mini')) price = pricing['gpt-4.1-mini'];
+            else if (m.startsWith('gpt-4.1')) price = pricing['gpt-4.1'];
+            else if (m.startsWith('gpt-4')) price = pricing['gpt-4'];
+            else if (m.startsWith('gpt-3.5')) price = pricing['gpt-3.5-turbo'];
+            else if (m.startsWith('whisper-1')) price = pricing['whisper-1'];
+            else if (m.startsWith('o1-mini')) price = pricing['o1-mini'];
+            else if (m.startsWith('o3-mini')) price = pricing['o3-mini'];
+            else price = { input: 0, output: 0 };
+        }
+        // whisper류는 토큰 단위가 아니므로 cost는 0 또는 별도 처리
+        if (m.includes('whisper') || m.includes('transcribe')) return 0;
+        return (usage.prompt_tokens * price.input / 1000) + (usage.completion_tokens * price.output / 1000);
     }
 
-    private calculateGeminiCost(usage: any): number {
-        const pricePerToken = 0.0005 / 1000;
-        return usage.totalTokenCount * pricePerToken;
-    }
+    calculateGeminiCost(
+        modelVersion: string,
+        usage: {
+            promptTokenCount?: number;
+            candidatesTokenCount?: number;
+        }
+    ): number {
+        const model = (modelVersion || '').toLowerCase();
+        const promptTokens = usage.promptTokenCount || 0;
+        const completionTokens = usage.candidatesTokenCount || 0;
 
+        let inputPerK = 0;
+        let outputPerK = 0;
+
+        if (model.includes('2.5-pro')) {
+            if (promptTokens > 200_000) {
+                inputPerK = 0.0025;
+                outputPerK = 0.015;
+            } else {
+                inputPerK = 0.00125;
+                outputPerK = 0.01;
+            }
+        } else if (model.includes('2.5-flash')) {
+            inputPerK = 0.0003;
+            outputPerK = 0.0025;
+        } else if (model.includes('2.0-flash')) {
+            inputPerK = 0.0001;
+            outputPerK = 0.0004;
+        } else if (model.includes('2.0-latest-lite')) {
+            inputPerK = 0.00005;
+            outputPerK = 0.0002;
+        } else if (model.includes('1.5-lite')) {
+            inputPerK = 0.00005;
+            outputPerK = 0.0002;
+        } else if (model.includes('1.0-lite')) {
+            inputPerK = 0.00002;
+            outputPerK = 0.0001;
+        }
+
+        const inputCost = (promptTokens * inputPerK) / 1000;
+        const outputCost = (completionTokens * outputPerK) / 1000;
+        return inputCost + outputCost;
+    }
     private extractGeminiModel(endpoint: string): string {
         const match = endpoint.match(/models\/([^:\/]+)/);
         return match ? match[1] : 'unknown';

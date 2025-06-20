@@ -1,6 +1,6 @@
 import { Plugin } from "obsidian";
 import SummarPlugin from "./main";
-import { IndexedDBManager } from "./summarailog";
+import { IndexedDBManager, TrackedAPIClient} from "./summarailog";
 
 // Chart.js를 CDN에서 동적으로 로드
 function loadChartJs(): Promise<void> {
@@ -168,11 +168,125 @@ export class SummarStatsModal {
     actions.style.marginTop = '12px';
     actions.innerHTML = `
       <button id="ai-export-csv">CSV 내보내기</button>
-      <button id="ai-export-json">JSON 내보내기</button>
-      <button id="ai-compare-period">기간 비교</button>
+      <button id="ai-recalc-cost">비용 재계산</button>
+      <button id="ai-reset-db">초기화</button>
       <button id="ai-predict">예측분석</button>
     `;
     modal.appendChild(actions);
+
+    // CSV 내보내기 버튼 이벤트
+    const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
+    exportCsvBtn.onclick = async () => {
+      // summar-ai-api-logs-db 전체 로그를 CSV로 변환
+      const logs = await this.plugin.dbManager.getLogs();
+      if (!logs || logs.length === 0) {
+        alert('내보낼 데이터가 없습니다.');
+        return;
+      }
+      // CSV 헤더
+      const headers = [
+        'id','timestamp','provider','model','endpoint','feature','requestSize','responseSize','requestTokens','responseTokens','totalTokens','cost','latency','success','errorMessage','sessionId','userAgent','version'
+      ];
+      const rows = logs.map(log => headers.map(h => {
+        let v = log[h as keyof typeof log];
+        if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
+        if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+        return v ?? '';
+      }).join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      // 파일 저장 dialog
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'summar-ai-api-logs.csv';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    };
+
+    // 비용 재계산 버튼 이벤트
+    const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
+    recalcBtn.onclick = async () => {
+      if (!this.plugin.dbManager) return;
+      const logs = await this.plugin.dbManager.getLogs();
+      if (!logs || logs.length === 0) {
+        alert('재계산할 데이터가 없습니다.');
+        return;
+      }
+      // summarailog의 비용 계산 함수 사용
+      const trackapi = new TrackedAPIClient(this.plugin);
+      let updated = 0;
+      for (const log of logs) {
+        let newCost = 0;
+        if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
+          const usage = {
+            prompt_tokens: log.requestTokens ?? 0,
+            completion_tokens: log.responseTokens ?? 0,
+            total_tokens: log.totalTokens ?? 0
+          };
+          newCost = trackapi.calculateOpenAICost(log.model, usage) ?? log.cost ?? 0;
+        } else if (log.provider === 'gemini' && log.totalTokens !== undefined) {
+          const usage = {
+            promptTokenCount: log.requestTokens ?? 0,
+            candidatesTokenCount: log.responseTokens ?? 0,
+          };
+          newCost = trackapi.calculateGeminiCost(log.model, usage) ?? log.cost ?? 0;
+        } else {
+          newCost = log.cost ?? 0;
+        }
+        if (log.cost !== newCost) {
+          log.cost = newCost;
+          updated++;
+        }
+      }
+      // DB에 반영 (전체 삭제 후 재삽입)
+      if (updated > 0) {
+        // 기존 로그 삭제
+        const db = this.plugin.dbManager['db'];
+        if (db) {
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction(['api_logs'], 'readwrite');
+            const store = tx.objectStore('api_logs');
+            const clearReq = store.clear();
+            clearReq.onsuccess = () => resolve(undefined);
+            clearReq.onerror = () => reject(clearReq.error);
+          });
+        }
+        // 재삽입
+        for (const log of logs) {
+          await this.plugin.dbManager.addLog(log);
+        }
+      }
+      alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
+      await this.updateStatsAndChart();
+    };
+
+    // 초기화 버튼 이벤트
+    const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
+    resetBtn.onclick = async () => {
+      if (!this.plugin.dbManager) return;
+      const db = this.plugin.dbManager['db'];
+      if (db) {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
+          const logsStore = tx.objectStore('api_logs');
+          const statsStore = tx.objectStore('daily_stats');
+          const clear1 = logsStore.clear();
+          const clear2 = statsStore.clear();
+          let done = 0;
+          const check = () => { if (++done === 2) resolve(undefined); };
+          clear1.onsuccess = check; clear2.onsuccess = check;
+          clear1.onerror = () => reject(clear1.error);
+          clear2.onerror = () => reject(clear2.error);
+        });
+      }
+      alert('DB가 초기화되었습니다.');
+      await this.updateStatsAndChart();
+    };
 
     document.body.appendChild(this.modalBg);
 
@@ -247,72 +361,108 @@ export class SummarStatsModal {
     if (!canvas) return;
     // 차트 데이터 준비
     let labels: string[] = [];
-    let data: number[] = [];
     let label = '';
-    let featureGroups: Record<string, number[]> = {};
     let features: string[] = [];
-    let isFeatureChart = false;
-    // feature별 데이터가 있는 경우(예: 기능별 호출수 등)
-    if (this.currentMetric === 'totalCalls' && this.summaryStats.length > 0 && this.summaryStats[0].features) {
-      isFeatureChart = true;
-      // feature 목록 추출
+    let isStackedBar = false;
+    let isScatter = false;
+    let datasets: any[] = [];
+
+    // feature 목록 추출
+    if (this.summaryStats.length > 0 && this.summaryStats[0].features) {
       const allFeatures = new Set<string>();
       this.summaryStats.forEach(s => {
         Object.keys(s.features || {}).forEach(f => allFeatures.add(f));
       });
       features = Array.from(allFeatures);
-      // feature별로 데이터 배열 생성
-      featureGroups = {};
-      features.forEach(f => {
-        featureGroups[f] = this.summaryStats.map(s => (s.features && s.features[f]) ? s.features[f] : 0);
-      });
-      labels = this.summaryStats.map(s => s.period || '');
-      label = '기능별 호출수';
-    } else {
-      // 기존 단일 metric
-      if (this.summaryStats.length > 0) {
-        labels = this.summaryStats.map(s => s.period || '');
-        data = this.summaryStats.map(s => {
-          if (this.currentMetric === 'totalCalls') return s.totalCalls || 0;
-          if (this.currentMetric === 'totalTokens') return s.totalTokens || 0;
-          if (this.currentMetric === 'totalCost') return s.totalCost || 0;
-          if (this.currentMetric === 'avgLatency') return s.avgLatency || 0;
-          if (this.currentMetric === 'successRate') return s.successRate || 0;
+    }
+    labels = this.summaryStats.map(s => s.period || '');
+
+    // 총 호출수/토큰수/비용: feature별 합이 아닌 전체 합으로 y축
+    if (["totalCalls", "totalTokens", "totalCost"].includes(this.currentMetric)) {
+      isStackedBar = true;
+      // feature별 데이터
+      const palette = [
+        '#667eea', '#764ba2', '#4facfe', '#00f2fe', '#fa709a', '#f6d365', '#fda085', '#43e97b', '#38f9d7', '#f7971e', '#ffd200', '#f953c6', '#b91d73', '#43cea2', '#185a9d', '#f857a6', '#ff5858', '#ff9a9e', '#a18cd1', '#fbc2eb'
+      ];
+      datasets = features.map((f, idx) => {
+        // feature별 값
+        let data: number[] = this.summaryStats.map(s => {
+          if (this.currentMetric === 'totalCalls') return s.features?.[f] || 0;
+          if (this.currentMetric === 'totalTokens') return s.featureTokens?.[f] || 0;
+          if (this.currentMetric === 'totalCost') return s.featureCosts?.[f] || 0;
           return 0;
         });
-        label = {
-          totalCalls: '총 호출수',
-          totalTokens: '총 토큰수',
-          totalCost: '총 비용($)',
-          avgLatency: '평균 지연(ms)',
-          successRate: '성공률(%)',
-        }[this.currentMetric];
-      }
-    }
-    // 기존 차트 제거
-    if (this.chart) {
-      this.chart.destroy();
-      this.chart = null;
-    }
-    if ((window as any).Chart && canvas) {
-      if (isFeatureChart && features.length > 0) {
-        // feature별 색상 팔레트
-        const palette = [
-          '#667eea', '#764ba2', '#4facfe', '#00f2fe', '#fa709a', '#f6d365', '#fda085', '#43e97b', '#38f9d7', '#f7971e', '#ffd200', '#f953c6', '#b91d73', '#43cea2', '#185a9d', '#f857a6', '#ff5858', '#ff9a9e', '#a18cd1', '#fbc2eb'
-        ];
-        const datasets = features.map((f, idx) => ({
+        return {
           label: `${idx + 1}. ${f}`,
-          data: featureGroups[f],
+          data,
           backgroundColor: palette[idx % palette.length],
           borderColor: palette[idx % palette.length],
           borderWidth: 1,
-        }));
+          stack: 'features',
+        };
+      });
+      label =
+        (this.currentMetric === 'totalCalls' && '총 호출수') ||
+        (this.currentMetric === 'totalTokens' && '총 토큰수') ||
+        (this.currentMetric === 'totalCost' && '총 비용($)') ||
+        '';
+    } else if (["avgLatency", "successRate"].includes(this.currentMetric)) {
+      // 평균지연/성공률: feature별 dot scatter
+      isScatter = true;
+      const palette = [
+        '#667eea', '#764ba2', '#4facfe', '#00f2fe', '#fa709a', '#f6d365', '#fda085', '#43e97b', '#38f9d7', '#f7971e', '#ffd200', '#f953c6', '#b91d73', '#43cea2', '#185a9d', '#f857a6', '#ff5858', '#ff9a9e', '#a18cd1', '#fbc2eb'
+      ];
+      datasets = features.map((f, idx) => {
+        // 각 기간별 feature의 평균값
+        let data = this.summaryStats.map((s, i) => {
+          let y = 0;
+          if (this.currentMetric === 'avgLatency') y = s.featureLatencies?.[f] ?? null;
+          if (this.currentMetric === 'successRate') y = s.featureSuccessRates?.[f] ?? null;
+          return y != null ? { x: i, y } : null;
+        }).filter(v => v !== null);
+        return {
+          label: `${idx + 1}. ${f}`,
+          data,
+          showLine: false,
+          pointBackgroundColor: palette[idx % palette.length],
+          pointBorderColor: palette[idx % palette.length],
+          pointRadius: 6,
+          type: 'scatter',
+        };
+      });
+      label = this.currentMetric === 'avgLatency' ? '평균 지연(ms)' : '성공률(%)';
+    } else if (this.currentMetric === 'totalTokens') {
+      // 총 토큰수: y축을 각 기간별 모든 feature의 토큰 합의 최대값으로 고정
+      isStackedBar = true;
+      const palette = [
+        '#667eea', '#764ba2', '#4facfe', '#00f2fe', '#fa709a', '#f6d365', '#fda085', '#43e97b', '#38f9d7', '#f7971e', '#ffd200', '#f953c6', '#b91d73', '#43cea2', '#185a9d', '#f857a6', '#ff5858', '#ff9a9e', '#a18cd1', '#fbc2eb'
+      ];
+      // feature별 데이터
+      datasets = features.map((f, idx) => {
+        let data: number[] = this.summaryStats.map(s => s.featureTokens?.[f] || 0);
+        return {
+          label: `${idx + 1}. ${f}`,
+          data,
+          backgroundColor: palette[idx % palette.length],
+          borderColor: palette[idx % palette.length],
+          borderWidth: 1,
+          stack: 'features',
+        };
+      });
+      label = '총 토큰수';
+      // y축 최대값 계산 (각 기간별 feature 토큰 합의 최대값)
+      const maxY = Math.max(...this.summaryStats.map(s => {
+        return features.reduce((sum, f) => sum + (s.featureTokens?.[f] || 0), 0);
+      }), 10);
+      // 기존 차트 제거
+      if (this.chart) {
+        this.chart.destroy();
+        this.chart = null;
+      }
+      if ((window as any).Chart && canvas) {
         this.chart = new (window as any).Chart(canvas.getContext('2d'), {
           type: 'bar',
-          data: {
-            labels,
-            datasets,
-          },
+          data: { labels, datasets },
           options: {
             responsive: true,
             plugins: {
@@ -320,33 +470,54 @@ export class SummarStatsModal {
               title: { display: false },
             },
             scales: {
-              x: { title: { display: true, text: '기간' } },
-              y: { beginAtZero: true, title: { display: true, text: label } },
+              x: { title: { display: true, text: '기간' }, stacked: true },
+              y: { beginAtZero: true, title: { display: true, text: label }, stacked: true, max: maxY },
             },
           },
         });
-      } else {
-        // 단일 metric 차트
+      }
+      return;
+    }
+
+    // 기존 차트 제거
+    if (this.chart) {
+      this.chart.destroy();
+      this.chart = null;
+    }
+    if ((window as any).Chart && canvas) {
+      if (isStackedBar) {
         this.chart = new (window as any).Chart(canvas.getContext('2d'), {
           type: 'bar',
-          data: {
-            labels,
-            datasets: [{
-              label,
-              data,
-              backgroundColor: 'rgba(102, 126, 234, 0.7)',
-              borderColor: '#667eea',
-              borderWidth: 1,
-            }],
-          },
+          data: { labels, datasets },
           options: {
             responsive: true,
             plugins: {
-              legend: { display: false },
+              legend: { display: true, position: 'bottom' },
               title: { display: false },
             },
             scales: {
-              x: { title: { display: true, text: '기간' } },
+              x: { title: { display: true, text: '기간' }, stacked: true },
+              y: { beginAtZero: true, title: { display: true, text: label }, stacked: true },
+            },
+          },
+        });
+      } else if (isScatter) {
+        this.chart = new (window as any).Chart(canvas.getContext('2d'), {
+          type: 'scatter',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: true, position: 'bottom' },
+              title: { display: false },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: '기간' },
+                type: 'category',
+                labels,
+                ticks: { callback: (v: any, i: number) => labels[i] },
+              },
               y: { beginAtZero: true, title: { display: true, text: label } },
             },
           },
