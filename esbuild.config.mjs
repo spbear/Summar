@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { cpSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 
 const banner =
 `/*
@@ -35,6 +37,7 @@ const context = await esbuild.context({
 		"@lezer/common",
 		"@lezer/highlight",
 		"@lezer/lr",
+		"webm-duration-fix",
 		...builtins],
 	format: "cjs",
 	target: "node14", // Node.js 환경을 명시적으로 타겟
@@ -48,6 +51,16 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
+	// // ✅ webm-duration-fix 디렉토리 복사
+	// const src = "node_modules/webm-duration-fix";
+	// const dest = "dist/node_modules/webm-duration-fix";
+
+	// if (!existsSync("dist/node_modules")) {
+	// 	mkdirSync("dist/node_modules", { recursive: true });
+	// }
+
+	// cpSync(src, dest, { recursive: true });
+	// console.log("✅ webm-duration-fix copied to dist/node_modules");	
 	process.exit(0);
 } else {
 	await context.watch();

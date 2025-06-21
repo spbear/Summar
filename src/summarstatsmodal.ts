@@ -173,6 +173,7 @@ export class SummarStatsModal {
         <button id="ai-recalc-cost">비용 재계산</button>
         <button id="ai-reset-db">초기화</button>
         <button id="ai-create-test-data">테스트 데이터 생성</button>
+        <button id="ai-delete-test-data">테스트 데이터 삭제</button>
         `;
         modal.appendChild(actions);
 
@@ -187,7 +188,7 @@ export class SummarStatsModal {
             }
             // CSV 헤더
             const headers = [
-                'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
+                'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
             ];
             const rows = logs.map(log => headers.map(h => {
                 let v = log[h as keyof typeof log];
@@ -201,7 +202,7 @@ export class SummarStatsModal {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'summar-ai-api-logs.csv';
+            a.download = `${this.plugin.dbManager.dbName}.csv`;
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {
@@ -224,7 +225,9 @@ export class SummarStatsModal {
             let updated = 0;
             for (const log of logs) {
                 let newCost = 0;
-                if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
+                if (log.provider ==='openai' && log.feature === 'stt') {
+                    newCost = trackapi.calculateOpenAIAudioTranscriptionCost(log.model, log.duration ?? 0) ?? log.cost ?? 0;
+                } else if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
                     const usage = {
                         prompt_tokens: log.requestTokens ?? 0,
                         completion_tokens: log.responseTokens ?? 0,
@@ -344,10 +347,21 @@ export class SummarStatsModal {
         // 테스트 데이터 생성 버튼 이벤트
         const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
         testDataBtn.onclick = async () => {
-            this.logAPICallTest();
+            const client = new TrackedAPIClient(this.plugin);
+            await client.logAPICallTest(300, 1000);
             alert('테스트 데이터가 추가되었습니다');
             await this.updateStatsAndChart();
         };
+
+        // 테스트 데이터 삭제 버튼 이벤트
+        const deleteTestDataBtn = actions.querySelector('#ai-delete-test-data') as HTMLButtonElement;
+        deleteTestDataBtn.onclick = async () => {
+            const client = new TrackedAPIClient(this.plugin);
+            const number = await client.deleteTestLog();
+            alert(`테스트 데이터 ${number}건 삭제`);
+            await this.updateStatsAndChart();
+        };
+
     }
     document.body.appendChild(this.modalBg);
 
@@ -965,14 +979,6 @@ export class SummarStatsModal {
     }
   }
 
-  /**
-   * SummarStatsModal에서 직접 호출할 수 있는 테스트 데이터 생성 함수
-   */
-  async logAPICallTest() {
-    const client = new TrackedAPIClient(this.plugin);
-    await client.logAPICallTest();
-    // await TrackedAPIClient.logAPICallTestStatic(this.plugin);
-  }
 }
 
 // ISO week number 계산 함수

@@ -6,7 +6,13 @@
 	"type": "module",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "mkdir -p dist && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && cp src/manifest.json dist/manifest.json && cp src/styles.css dist/styles.css && cp src/models.json dist/models.json && cp src/prompts.json dist/prompts.json && cp src/model-pricing.json dist/model-pricing.json && cp src/fetch_calendar.swift dist/fetch_calendar.swift && zip -j dist/summar.zip dist/manifest.json dist/styles.css dist/main.js dist/models.json dist/prompts.json dist/model-pricing.json dist/fetch_calendar.swift",
+		"build": "npm run prebuild && npm run compile && npm run copy:pluginfiles && npm run copy:jsonfiles && npm run copy:swiftfile && npm run zip",
+		"prebuild": "mkdir -p dist && tsc -noEmit -skipLibCheck ",
+		"compile": "node esbuild.config.mjs production",
+		"copy:pluginfiles": "cp src/manifest.json dist/manifest.json && cp src/styles.css dist/styles.css",
+		"copy:jsonfiles": "cp src/models.json dist/models.json && cp src/prompts.json dist/prompts.json && cp src/model-pricing.json dist/model-pricing.json",
+		"copy:swiftfile": "cp src/fetch_calendar.swift dist/fetch_calendar.swift",
+		"zip": "cd dist && zip -r summar.zip manifest.json styles.css main.js models.json prompts.json model-pricing.json fetch_calendar.swift",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],

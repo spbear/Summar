@@ -104,8 +104,9 @@ export default class SummarPlugin extends Plugin {
   PLUGIN_SETTINGS: string = "";  // 플러그인 디렉토리의 data.json
   PLUGIN_MODELS: string = "";  // 플러그인 디렉토리의 models.json
   PLUGIN_PROMPTS: string = "";  // 플러그인 디렉토리의 prompts.json
-  PLUGIN_MODELPRICING: any = {} // 플러그인 디렉토리의 model-pricing.json
+  PLUGIN_MODELPRICING: any = {}; // 플러그인 디렉토리의 model-pricing.json
   PLUGIN_SETTINGS_SCHEMA_VERSION = "1.0.0"; // 플러그인 설정 스키마 버전
+  modelsJson: any = {}; // models.json
   
   modelsByCategory: Record<ModelCategory, ModelInfo> = {
         webModel: {},
@@ -192,7 +193,7 @@ export default class SummarPlugin extends Plugin {
     this.calendarHandler = new CalendarHandler(this);
 
     this.dbManager = new IndexedDBManager();
-    await this.dbManager.init();
+    await this.dbManager.init(this);
 
 
     if (Platform.isDesktopApp) {
@@ -723,6 +724,7 @@ export default class SummarPlugin extends Plugin {
       SummarDebug.log(1, "Reading settings from data.json");
       try {
         const modelDataJson = await this.app.vault.adapter.read(this.PLUGIN_MODELS);
+        this.modelsJson = modelDataJson;
         const modelData = JSON.parse(modelDataJson) as ModelData;
 
         if (modelData.model_list) {

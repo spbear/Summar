@@ -3,6 +3,7 @@ import SummarPlugin from "./main";
 import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath } from "./globals";
 import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
+import { get } from "http";
 
 export class AudioHandler extends SummarViewContainer {
 	private timer: SummarTimer;
@@ -164,9 +165,12 @@ export class AudioHandler extends SummarViewContainer {
 						} else {
 							const blob = file.slice(0, file.size, file.type);
 							const { body: finalBody, contentType } = await this.buildMultipartFormData(blob, fileName, file.type);
+							const duration = await getAudioDurationFromBlob(blob, fileName);
 
-							const data = await this.callWhisperTranscription(finalBody, contentType);
-							SummarDebug.log(1, `sendAudioData() - 1st response data: ${JSON.stringify(data)}`);							
+							SummarDebug.log(1, `==========\nsendAudioData() - file: ${fileName}, duration: ${duration} seconds`);
+
+							const data = await this.callWhisperTranscription(finalBody, contentType, duration);
+							// SummarDebug.log(1, `sendAudioData() - 1st response data: ${JSON.stringify(data)}`);							
 
 							// 응답 확인
 							if (!data.segments || data.segments.length === 0) {
@@ -425,22 +429,29 @@ export class AudioHandler extends SummarViewContainer {
 		};
 	}
 
-	async callWhisperTranscription(requestbody: Blob, contentType: string): Promise<any> {
-        // 엔드포인트 설정 (비어있으면 기본값)
-        const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
-        const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
+	async callWhisperTranscription(requestbody: Blob, contentType: string, duration: number): Promise<any> {
+		const sttModel = this.plugin.settings.sttModel;
+		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
+		if (!summarai.hasKey(true)) return '';
+		
+		const json = await summarai.audioTranscription((await requestbody.arrayBuffer() as ArrayBuffer), contentType, duration);
+		return json;
 
-		const response = await SummarRequestUrl(this.plugin, {
-			url: url,
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${this.plugin.settings.openaiApiKey}`,
-				"Content-Type": contentType,
-			},
-            body: await requestbody.arrayBuffer(),
-			throw: false
-		});
-		return response.json;
+        // 엔드포인트 설정 (비어있으면 기본값)
+        // const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+        // const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
+
+		// const response = await SummarRequestUrl(this.plugin, {
+		// 	url: url,
+		// 	method: "POST",
+		// 	headers: {
+		// 		Authorization: `Bearer ${this.plugin.settings.openaiApiKey}`,
+		// 		"Content-Type": contentType,
+		// 	},
+        //     body: await requestbody.arrayBuffer(),
+		// 	throw: false
+		// });
+		// return response.json;
     }
 
 	////////////////////////////
@@ -684,4 +695,28 @@ function isAudioFile(file: { name: string, type?: string }): boolean {
     if (file.type && file.type.startsWith("audio/")) return true;
     const ext = file.name.split('.').pop()?.toLowerCase();
     return ext ? audioExtensions.includes(ext) : false;
+}
+
+async function getAudioDurationFromBlob(blob: Blob, fileName: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const audio = new Audio();
+    audio.preload = "metadata";
+
+    audio.onloadedmetadata = () => {
+		if (audio.duration === Infinity || isNaN(audio.duration)) {
+			const match = fileName.match(/summar_audio_[^_]+_(\d+)ms\./);
+			if (match && match[1]) {
+				resolve(parseInt(match[1], 10)/1000); // milliseconds to seconds
+			} else {
+				resolve(0); // fallback to 0 if duration cannot be determined
+			}
+			return;
+		}
+		else {
+			resolve(audio.duration); // duration in seconds
+		}
+    };
+    audio.onerror = (e) => reject("Failed to load audio metadata");
+    audio.src = URL.createObjectURL(blob);
+  });
 }

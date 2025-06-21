@@ -240,7 +240,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 				// Stop the current recording and save the file
 				const blob = await this.stopRecordingInternal();
 				const extension = this.recorder.getMimeType()?.split("/")[1];
-				const fileName = normalizePath(this.recordingPath + `/summar_audio_${this.timeStamp}_${this.elapsedTime}s.${extension}`);
+
+				this.elapsedTime = Math.floor((new Date().getTime() - this.startTime.getTime()));
+				const fileName = normalizePath(this.recordingPath + `/summar_audio_${this.timeStamp}_${this.elapsedTime}ms.${extension}`);
+				this.startTime = new Date();
 
 				await this.saveFile(blob, fileName);
 
@@ -251,11 +254,11 @@ export class AudioRecordingManager extends SummarViewContainer {
 					await this.recorder.waitForInactive();
 					
 					if (this.isRecording) {
-						if (this.startTime) {
-							this.elapsedTime = Math.floor((new Date().getTime() - this.startTime.getTime()) / 1000);
-						} else {
-							this.elapsedTime = 0;
-						}
+						// if (this.startTime) {
+						// 	this.elapsedTime = Math.floor((new Date().getTime() - this.startTime.getTime()) / 1000);
+						// } else {
+						// 	this.elapsedTime = 0;
+						// }
 						this.timeStamp = this.getTimestamp();
 						this.recordingCounter++;
 
@@ -309,7 +312,11 @@ export class AudioRecordingManager extends SummarViewContainer {
 				}
 				const blob = await this.stopRecordingInternal();
 				const extension = this.recorder.getMimeType()?.split("/")[1];
-				const fileName = normalizePath(this.recordingPath + `/summar_audio_${this.timeStamp}_${this.elapsedTime}s.${extension}`);
+
+				this.elapsedTime = Math.floor((new Date().getTime() - this.startTime.getTime()));
+				const fileName = normalizePath(this.recordingPath + `/summar_audio_${this.timeStamp}_${this.elapsedTime}ms.${extension}`);
+				this.startTime = new Date();
+
 				await this.saveFile(blob, fileName);
 
 				if (blob.size === 0) {

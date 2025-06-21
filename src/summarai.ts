@@ -137,7 +137,7 @@ export class SummarAI extends SummarViewContainer {
           SummarDebug.log(1, `SummarAI.chat() - Using Gemini generateContent with model: ${this.aiModel}`);
 
         //   const response = await this.chatGemini(bodyContent as string, false, contentType);
-        const response = await this.chatGemini(bodyContent, false);
+          const response = await this.chatGemini(bodyContent, false);
           if (response.json &&
             response.json.candidates &&
             response.json.candidates.length > 0 &&
@@ -171,6 +171,83 @@ export class SummarAI extends SummarViewContainer {
     return false;
   }
 
+//   async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
+  async audioTranscription( bodyContent: ArrayBuffer, contentType: string, duration: number ): Promise<any> {
+    try {
+      const trackapi = new TrackedAPIClient(this.plugin);
+
+      if (bodyContent && bodyContent.byteLength > 0) {
+        if (this.aiProvider === 'openai') {
+          SummarDebug.log(1, `SummarAI.audioTranscription() - Using OpenAI audio/transcription with model: ${this.aiModel}`);
+
+          const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+          const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
+
+          const response = await SummarRequestUrl(this.plugin, {
+            url: url,
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${this.aiKey}`,
+              "Content-Type": contentType,
+            },
+            body: bodyContent,
+            throw: false
+          });
+          SummarDebug.log(1, `OpenAI audio/transcription response: \n${JSON.stringify(response.json)}`);
+          // SummarDebug.log(1, `OpenAI model: ${this.aiModel}, feature: ${this.feature}, duration: ${duration}`);
+
+          if (response && response.json) {
+            this.response.status = response.status;
+            this.response.json = response.json;
+            if (response.json.text) {
+              this.response.text = response.json.text.trim();
+              if (response.json.duration) {
+                duration = response.json.duration;
+              }
+              trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true, "", duration);
+            }
+            else {
+              this.response.text = response.json.error ? response.json.error.message : 'No content available';
+              trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, false, this.response.text, duration);
+            }
+          }
+//          trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true);
+
+          return response.json;
+
+        //   const response = await this.chatOpenai(bodyContent, false, contentType, apiUrl);
+        // const response = await this.chatOpenai(bodyContent, false);
+        //   if (response.json &&
+        //     response.json.choices &&
+        //     response.json.choices.length > 0 &&
+        //     response.json.choices[0].message &&
+        //     response.json.choices[0].message.content
+        //   ) {
+        //     SummarDebug.log(1, `OpenAI audio/transcription response: \n${JSON.stringify(response.json)}`);
+        //     this.response.status = response.status;
+        //     this.response.json = response.json;
+        //     this.response.text = response.json.choices[0].message.content || '';
+        //     trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true);
+        //     return true;
+        //   } else {
+        //     SummarDebug.log(1, `OpenAI audio/transcription response without content: \n${JSON.stringify(response.json)}`);
+        //     this.response.status = response.status;
+        //     this.response.json = response.json;
+        //     this.response.text = response.json.error ? response.json.error.message : 'No content available';
+        //     trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, false, this.response.text);
+        //     return false
+        //   }
+        }
+      }
+      throw new Error(`Unsupported provider: ${this.aiProvider}`);
+    } catch (error) {
+      SummarDebug.error(1, `Error calling ${this.aiProvider} API:`, error);
+      throw error;
+    }
+    return false;
+  }
+
+  
   private async chatOpenai(
     bodyContent: string | ArrayBuffer, 
     throwFlag: boolean = true, 
