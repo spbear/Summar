@@ -31,6 +31,7 @@ export interface APICallLog {
 // IndexedDB 관리 클래스
 export class IndexedDBManager {
     dbName = `summar-ai-api-logs-db`;
+    version = '1.0.1';
     private dbVersion = 2;
     private db: IDBDatabase | null = null;
 
@@ -470,6 +471,10 @@ export class TrackedAPIClient {
             duration?: number;
         }
     ) {
+if (this.plugin.settings.debugLevel < 1) {
+    return;
+}
+
         let requestSize: number;
         if (requestData instanceof ArrayBuffer) {
             requestSize = requestData.byteLength;
@@ -502,7 +507,7 @@ export class TrackedAPIClient {
             
             sessionId: this.sessionId,
             userAgent: `Obsidian-Summar/${this.plugin.manifest.version}`,
-            version: '1.0.0',
+            version: this.dbManager.version,//'1.0.0',
             
             ...this.parseUsageData(provider, responseData, model, duration)
         };
@@ -657,8 +662,8 @@ export class TrackedAPIClient {
             const success = Math.random() < 0.8;
             const errorMessage = success ? undefined : 'Error occurred: ' + randomStr(8);
             const sessionId = randomStr(10 + Math.floor(Math.random() * 11));
-            const userAgent = `Obsidian-Summar/${this.plugin.manifest?.version ?? '1.0.0'}`;
-            const version = '1.0.0';
+            const userAgent = `Obsidian-Summar-LogTest/${this.plugin.manifest?.version ?? '1.0.0'}`;
+            const version = this.dbManager.version; //'1.0.0';
             const requestTokens = 100 + Math.floor(Math.random() * 100);
             const responseTokens = 100 + Math.floor(Math.random() * 100);
             const totalTokens = requestTokens + responseTokens;
@@ -757,6 +762,8 @@ export class TrackedAPIClient {
     }
 
     async deleteTestLog(): Promise<number> {
-        return this.dbManager.deleteIf(log => log.endpoint === 'test');
+        return this.dbManager.deleteIf(
+            log => (log.endpoint === 'test' || (!!log.userAgent && log.userAgent.includes('Obsidian-Summar-LogTest')))
+        );    
     }
 }
