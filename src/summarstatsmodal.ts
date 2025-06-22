@@ -24,6 +24,8 @@ export class SummarStatsModal {
   private chartArea: HTMLDivElement | null = null;
   private summaryStats: any[] = [];
 
+  private currentProvider: string = 'all';
+
   constructor(plugin: SummarPlugin) {
     this.plugin = plugin;
   }
@@ -93,11 +95,18 @@ export class SummarStatsModal {
     header.appendChild(closeBtn);
     modal.appendChild(header);
 
+    // 기간/필터 행 생성
+    const filterRow = document.createElement('div');
+    filterRow.style.display = 'flex';
+    // filterRow.style.gap = '8px';
+    filterRow.style.justifyContent = 'space-between';
+    filterRow.style.alignItems = 'center';
+    filterRow.style.marginBottom = '16px';
+
     // 기간 선택 탭
     const periodTabs = document.createElement('div');
     periodTabs.style.display = 'flex';
     periodTabs.style.gap = '8px';
-    periodTabs.style.marginBottom = '16px';
     const periods: [string, string, number][] = [
       ['일간', 'hourly', 24],
       ['주간', 'daily', 7],
@@ -118,7 +127,43 @@ export class SummarStatsModal {
       this.periodButtons[value] = btn;
       periodTabs.appendChild(btn);
     });
-    modal.appendChild(periodTabs);
+    // modal.appendChild(periodTabs);
+
+    const providerBox = document.createElement('div');
+    providerBox.style.display = 'flex';
+    providerBox.style.alignItems = 'center';
+    providerBox.style.gap = '4px';
+
+    // const providerLabel = document.createElement('span');
+    // providerLabel.textContent = 'provider:';
+    // // providerLabel.style.fontWeight = 'bold';
+    // providerLabel.style.fontSize = '1em';
+    // providerLabel.style.color = 'var(--text-normal)';
+    // providerBox.appendChild(providerLabel);
+
+    // provider select
+    const providerSelect = document.createElement('select');
+    providerSelect.style.marginLeft = '16px';
+    providerSelect.style.padding = '6px 12px';
+    providerSelect.style.borderRadius = '6px';
+    providerSelect.style.border = '1px solid var(--background-modifier-border)';
+    providerSelect.style.background = 'var(--background-secondary)';
+    providerSelect.style.cursor = 'pointer';
+    ['all', 'openai', 'gemini'].forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p === 'all' ? '전체' : p;
+      providerSelect.appendChild(opt);
+    });
+    providerSelect.value = this.currentProvider;
+    providerSelect.onchange = () => this.setProvider(providerSelect.value);
+    providerBox.appendChild(providerSelect);
+
+    // filterRow에 좌/우측 요소 추가
+    filterRow.appendChild(periodTabs);
+    filterRow.appendChild(providerBox);
+
+    modal.appendChild(filterRow);
 
     // 요약 카드 영역
     const summaryCards = document.createElement('div');
@@ -388,6 +433,11 @@ export class SummarStatsModal {
     }
   };
 
+  async setProvider(provider: string) {
+    this.currentProvider = provider;
+    await this.updateStatsAndChart();
+  }
+
   async setPeriod(period: 'hourly' | 'daily' | 'weekly' | 'monthly') {
     this.currentPeriod = period;
     // 버튼 스타일 업데이트
@@ -413,15 +463,16 @@ export class SummarStatsModal {
   async updateStatsAndChart() {
     // 기간별 데이터 fetch
     let stats: any[] = [];
+    const providerOpt = this.currentProvider === 'all' ? undefined : this.currentProvider;
     if (this.plugin.dbManager) {
       if (this.currentPeriod === 'hourly') {
-        stats = await this.getHourlyStats();
+        stats = await this.getHourlyStats(providerOpt);
       } else if (this.currentPeriod === 'daily') {
-        stats = await this.getDailyStats();
+        stats = await this.getDailyStats(providerOpt);
       } else if (this.currentPeriod === 'weekly') {
-        stats = await this.getWeeklyStats();
+        stats = await this.getWeeklyStats(providerOpt);
       } else if (this.currentPeriod === 'monthly') {
-        stats = await this.getMonthlyStats();
+        stats = await this.getMonthlyStats(providerOpt);
       }
     }
     this.summaryStats = stats;
@@ -434,7 +485,7 @@ export class SummarStatsModal {
   /**
    * 오늘 날짜의 0~23시까지의 로그를 시간별로 집계
    */
-  async getHourlyStats(): Promise<any[]> {
+  async getHourlyStats(provider?: string): Promise<any[]> {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -443,7 +494,8 @@ export class SummarStatsModal {
     const end = new Date(year, month, date, 23, 59, 59, 999);
     const logs = await this.plugin.dbManager.getLogs({
       startDate: start,
-      endDate: end
+      endDate: end,
+      provider: provider
     });
     // 0~23시별로 집계
     const hourlyStats: any[] = Array.from({ length: 24 }, (_, h) => ({
@@ -497,14 +549,15 @@ export class SummarStatsModal {
   /**
    * 최근 7일간의 로그을 일별로 집계
    */
-  async getDailyStats(): Promise<any[]> {
+  async getDailyStats(provider?: string): Promise<any[]> {
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const start = new Date(end);
     start.setDate(end.getDate() - 6); // 7일간
     const logs = await this.plugin.dbManager.getLogs({
       startDate: start,
-      endDate: end
+      endDate: end,
+      provider: provider
     });
     // 날짜별 집계
     const dayMap: Record<string, any> = {};
@@ -579,14 +632,15 @@ export class SummarStatsModal {
   /**
    * 최근 8주간의 로그를 주별로 집계
    */
-  async getWeeklyStats(): Promise<any[]> {
+  async getWeeklyStats(provider?: string): Promise<any[]> {
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const start = new Date(end);
     start.setDate(end.getDate() - 7 * 8 + 1); // 8주간
     const logs = await this.plugin.dbManager.getLogs({
       startDate: start,
-      endDate: end
+      endDate: end,
+      provider: provider
     });
     // 주별 집계 (ISO week)
     const weekMap: Record<string, any> = {};
@@ -665,14 +719,15 @@ export class SummarStatsModal {
   /**
    * 최근 12개월간의 로그를 월별로 집계
    */
-  async getMonthlyStats(): Promise<any[]> {
+  async getMonthlyStats(provider?: string): Promise<any[]> {
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const start = new Date(end);
     start.setMonth(end.getMonth() - 11); // 12개월간
     const logs = await this.plugin.dbManager.getLogs({
       startDate: start,
-      endDate: end
+      endDate: end,
+      provider: provider
     });
     // 월별 집계
     const monthMap: Record<string, any> = {};

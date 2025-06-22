@@ -605,19 +605,6 @@ export class TrackedAPIClient {
         return match ? match[1] : 'unknown';
     }
 
-    /**
-     * 테스트용 API 로그를 count수 만큼 DB에 랜덤 생성하여 추가합니다.
-     * - timestamp: 오늘~일주일 전 랜덤
-     * - provider/model: model-pricing.json 기반 랜덤 (openai/gemini 짝 맞춤)
-     * - feature: 'stt', 'web', 'custom', 'pdf', 'stt-summary', 'stt-refine' 중 랜덤
-     * - requestSize/responseSize: 100~200 랜덤
-     * - latency: 1000~4000 랜덤
-     * - success: true/false 랜덤, errorMessage는 false일 때만 임의값
-     * - sessionId: 10~20자 랜덤 문자열
-     * - userAgent/version: logAPICall 참고
-     * - requestTokens/responseTokens/totalTokens: 임의값
-     * - cost: 0~0.003 랜덤
-     */
     async logAPICallTest(days: number, count: number) {
         // feature-model 매핑
         const modelFeatureMap = {
