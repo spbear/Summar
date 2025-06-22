@@ -151,7 +151,10 @@ export class AudioHandler extends SummarViewContainer {
 					try {
 						if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
 							const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
-							const transcript = await this.callGeminiTranscription(base64, mimeType) || "";
+							const blob = file.slice(0, file.size, file.type);
+							const duration = await getAudioDurationFromBlob(blob, fileName);
+							SummarDebug.log(1, `==========\nsendAudioData() - file: ${fileName}, duration: ${duration} seconds`);
+							const transcript = await this.callGeminiTranscription(base64, mimeType, duration) || "";
 							SummarDebug.log(3, transcript);
 							SummarDebug.log(1, 'seconds: ', seconds);
 							const strContent = this.adjustSrtTimestamps(transcript, seconds);
@@ -566,7 +569,7 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	}
 	
-	async callGeminiTranscription(base64: string, mimeType: string): Promise<string | null> {
+	async callGeminiTranscription(base64: string, mimeType: string, duration: number): Promise<string | null> {
 		const sttModel = this.plugin.settings.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
 		if (!summarai.hasKey(true)) return '';
@@ -590,7 +593,7 @@ export class AudioHandler extends SummarViewContainer {
 				}],
 			});
 
-			await summarai.chatWithBody(bodyContent);
+			await summarai.chatWithBody(bodyContent, duration);
 			const status = summarai.response.status;
 			const result = summarai.response.text;
 

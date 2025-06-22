@@ -141,6 +141,10 @@ export default class SummarPlugin extends Plugin {
     this.PLUGIN_DIR = normalizePath(this.OBSIDIAN_PLUGIN_DIR + "/" + this.PLUGIN_ID);
     this.PLUGIN_MANIFEST = normalizePath(this.PLUGIN_DIR + "/manifest.json");
 
+    this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
+    this.settings = await this.loadSettingsFromFile();
+    SummarDebug.initialize(this.settings.debugLevel);
+
     this.PLUGIN_MODELS = normalizePath(this.PLUGIN_DIR + "/models.json");    
     await this.loadModelsFromFile();
 
@@ -151,11 +155,8 @@ export default class SummarPlugin extends Plugin {
     await this.loadModelPricingFromFile();
 
 
-    this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
-    this.settings = await this.loadSettingsFromFile();
 
 
-    SummarDebug.initialize(this.settings.debugLevel);
 
     SummarDebug.log(1, `OBSIDIAN_PLUGIN_DIR: ${this.OBSIDIAN_PLUGIN_DIR}`);
     SummarDebug.log(1, `PLUGIN_ID: ${this.PLUGIN_ID}`);
@@ -725,7 +726,8 @@ export default class SummarPlugin extends Plugin {
       try {
         const modelDataJson = await this.app.vault.adapter.read(this.PLUGIN_MODELS);
         this.modelsJson = modelDataJson;
-        const modelData = JSON.parse(modelDataJson) as ModelData;
+        const modelData = this.modelsJson= JSON.parse(modelDataJson) as ModelData;
+        SummarDebug.log(3, `loadModelsFromFile()\n${JSON.stringify(this.modelsJson)}`);
 
         if (modelData.model_list) {
           const categories: ModelCategory[] = ['webModel', 'pdfModel', 'sttModel', 'transcriptSummaryModel', 'customModel'];

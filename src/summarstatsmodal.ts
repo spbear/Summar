@@ -172,11 +172,12 @@ export class SummarStatsModal {
     modal.appendChild(this.chartArea);
 
     // 내보내기/비교/예측/알림 등 고급 기능 버튼(placeholder)
+    // if (this.plugin.settings.debugLevel > 0) {
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.gap = '12px';
+    actions.style.marginTop = '12px';
     if (this.plugin.settings.debugLevel > 0) {
-        const actions = document.createElement('div');
-        actions.style.display = 'flex';
-        actions.style.gap = '12px';
-        actions.style.marginTop = '12px';
         actions.innerHTML = `
         <button id="ai-export-csv">CSV 내보내기</button>
         <button id="ai-recalc-cost">비용 재계산</button>
@@ -184,241 +185,191 @@ export class SummarStatsModal {
         <button id="ai-create-test-data">테스트 데이터 생성</button>
         <button id="ai-delete-test-data">테스트 데이터 삭제</button>
         `;
-        modal.appendChild(actions);
-
-        // CSV 내보내기 버튼 이벤트
-        const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
-        exportCsvBtn.onclick = async () => {
-            // summar-ai-api-logs-db 전체 로그를 CSV로 변환
-            const logs = await this.plugin.dbManager.getLogs();
-            if (!logs || logs.length === 0) {
-                alert('내보낼 데이터가 없습니다.');
-                return;
-            }
-            // CSV 헤더
-            const headers = [
-                'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
-            ];
-            const rows = logs.map(log => headers.map(h => {
-                let v = log[h as keyof typeof log];
-                if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
-                if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
-                return v ?? '';
-            }).join(','));
-            const csv = [headers.join(','), ...rows].join('\n');
-            // 파일 저장 dialog
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${this.plugin.dbManager.dbName}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 100);
-        };
-
-        // 비용 재계산 버튼 이벤트
-        const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
-        recalcBtn.onclick = async () => {
-            if (!this.plugin.dbManager) return;
-            const logs = await this.plugin.dbManager.getLogs();
-            if (!logs || logs.length === 0) {
-                alert('재계산할 데이터가 없습니다.');
-                return;
-            }
-            // summarailog의 비용 계산 함수 사용
-            const trackapi = new TrackedAPIClient(this.plugin);
-            let updated = 0;
-            for (const log of logs) {
-                let newCost = 0;
-                if (log.provider ==='openai' && log.feature === 'stt') {
-                    newCost = trackapi.calculateOpenAIAudioTranscriptionCost(log.model, log.duration ?? 0) ?? log.cost ?? 0;
-                } else if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
-                    const usage = {
-                        prompt_tokens: log.requestTokens ?? 0,
-                        completion_tokens: log.responseTokens ?? 0,
-                        total_tokens: log.totalTokens ?? 0
-                    };
-                    newCost = trackapi.calculateOpenAICost(log.model, usage) ?? log.cost ?? 0;
-                } else if (log.provider === 'gemini' && log.totalTokens !== undefined) {
-                    const usage = {
-                        promptTokenCount: log.requestTokens ?? 0,
-                        candidatesTokenCount: log.responseTokens ?? 0,
-                    };
-                    newCost = trackapi.calculateGeminiCost(log.model, usage) ?? log.cost ?? 0;
-                } else {
-                    newCost = log.cost ?? 0;
-                }
-                if (log.cost !== newCost) {
-                    log.cost = newCost;
-                    updated++;
-                }
-            }
-            // DB에 반영 (api_logs와 daily_stats 모두 삭제 후 재삽입)
-            if (updated > 0) {
-                const db = this.plugin.dbManager['db'];
-                if (db) {
-                    await new Promise((resolve, reject) => {
-                        const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
-                        const logsStore = tx.objectStore('api_logs');
-                        const statsStore = tx.objectStore('daily_stats');
-                        const clear1 = logsStore.clear();
-                        const clear2 = statsStore.clear();
-                        let done = 0;
-                        const check = () => { if (++done === 2) resolve(undefined); };
-                        clear1.onsuccess = check; clear2.onsuccess = check;
-                        clear1.onerror = () => reject(clear1.error);
-                        clear2.onerror = () => reject(clear2.error);
-                    });
-                }
-                // 재삽입
-                for (const log of logs) {
-                    await this.plugin.dbManager.addLog(log);
-                }
-            }
-            alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
-            await this.updateStatsAndChart();
-        };
-
-        // 초기화 버튼 이벤트
-        const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
-        resetBtn.onclick = async () => {
-          // 커스텀 경고 모달 생성
-          const confirmBg = document.createElement('div');
-          confirmBg.style.position = 'fixed';
-          confirmBg.style.top = '0';
-          confirmBg.style.left = '0';
-          confirmBg.style.width = '100vw';
-          confirmBg.style.height = '100vh';
-          confirmBg.style.background = 'rgba(0,0,0,0.3)';
-          confirmBg.style.zIndex = '10000';
-          const confirmBox = document.createElement('div');
-          confirmBox.style.position = 'absolute';
-          confirmBox.style.top = '50%';
-          confirmBox.style.left = '50%';
-          confirmBox.style.transform = 'translate(-50%, -50%)';
-          confirmBox.style.background = 'var(--background-primary)';
-          confirmBox.style.borderRadius = '12px';
-          confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
-          confirmBox.style.padding = '32px 24px';
-          confirmBox.style.minWidth = '320px';
-          confirmBox.style.textAlign = 'center';
-          confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
-          const yesBtn = document.createElement('button');
-          yesBtn.textContent = 'Yes';
-          yesBtn.style.margin = '0 12px';
-          yesBtn.style.padding = '8px 24px';
-          yesBtn.style.background = 'var(--background-secondary)';
-          yesBtn.style.color = 'var(--text-normal)';
-          yesBtn.style.border = '1px solid var(--background-modifier-border)';
-          yesBtn.style.borderRadius = '6px';
-          yesBtn.style.cursor = 'pointer';
-          const noBtn = document.createElement('button');
-          noBtn.textContent = 'No';
-          noBtn.style.margin = '0 12px';
-          noBtn.style.padding = '8px 24px';
-          noBtn.style.background = 'var(--color-accent)';
-          noBtn.style.color = 'white';
-          noBtn.style.border = 'none';
-          noBtn.style.borderRadius = '6px';
-          noBtn.style.cursor = 'pointer';
-          confirmBox.appendChild(yesBtn);
-          confirmBox.appendChild(noBtn);
-          confirmBg.appendChild(confirmBox);
-          document.body.appendChild(confirmBg);
-          noBtn.onclick = () => { document.body.removeChild(confirmBg); };
-          yesBtn.onclick = async () => {
-              document.body.removeChild(confirmBg);
-              if (!this.plugin.dbManager) return;
-              const db = this.plugin.dbManager['db'];
-              if (db) {
-                  await new Promise((resolve, reject) => {
-                      const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
-                      const logsStore = tx.objectStore('api_logs');
-                      const statsStore = tx.objectStore('daily_stats');
-                      const clear1 = logsStore.clear();
-                      const clear2 = statsStore.clear();
-                      let done = 0;
-                      const check = () => { if (++done === 2) resolve(undefined); };
-                      clear1.onsuccess = check; clear2.onsuccess = check;
-                      clear1.onerror = () => reject(clear1.error);
-                      clear2.onerror = () => reject(clear2.error);
-                  });
-              }
-              alert('DB가 초기화되었습니다.');
-              await this.updateStatsAndChart();
-          };
-        };
-
-        // 테스트 데이터 생성 버튼 이벤트
-        const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
-        testDataBtn.onclick = async () => {
-            const client = new TrackedAPIClient(this.plugin);
-            await client.logAPICallTest(300, 1000);
-            alert('테스트 데이터가 추가되었습니다');
-            await this.updateStatsAndChart();
-        };
-
-        // 테스트 데이터 삭제 버튼 이벤트
-        const deleteTestDataBtn = actions.querySelector('#ai-delete-test-data') as HTMLButtonElement;
-        deleteTestDataBtn.onclick = async () => {
-          // 커스텀 경고 모달 생성
-          const confirmBg = document.createElement('div');
-          confirmBg.style.position = 'fixed';
-          confirmBg.style.top = '0';
-          confirmBg.style.left = '0';
-          confirmBg.style.width = '100vw';
-          confirmBg.style.height = '100vh';
-          confirmBg.style.background = 'rgba(0,0,0,0.3)';
-          confirmBg.style.zIndex = '10000';
-          const confirmBox = document.createElement('div');
-          confirmBox.style.position = 'absolute';
-          confirmBox.style.top = '50%';
-          confirmBox.style.left = '50%';
-          confirmBox.style.transform = 'translate(-50%, -50%)';
-          confirmBox.style.background = 'var(--background-primary)';
-          confirmBox.style.borderRadius = '12px';
-          confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
-          confirmBox.style.padding = '32px 24px';
-          confirmBox.style.minWidth = '320px';
-          confirmBox.style.textAlign = 'center';
-          confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">테스트 데이터를 정말 삭제하시겠습니까?</div>`;
-          const yesBtn = document.createElement('button');
-          yesBtn.textContent = 'Yes';
-          yesBtn.style.margin = '0 12px';
-          yesBtn.style.padding = '8px 24px';
-          yesBtn.style.background = 'var(--background-secondary)';
-          yesBtn.style.color = 'var(--text-normal)';
-          yesBtn.style.border = '1px solid var(--background-modifier-border)';
-          yesBtn.style.borderRadius = '6px';
-          yesBtn.style.cursor = 'pointer';
-          const noBtn = document.createElement('button');
-          noBtn.textContent = 'No';
-          noBtn.style.margin = '0 12px';
-          noBtn.style.padding = '8px 24px';
-          noBtn.style.background = 'var(--color-accent)';
-          noBtn.style.color = 'white';
-          noBtn.style.border = 'none';
-          noBtn.style.borderRadius = '6px';
-          noBtn.style.cursor = 'pointer';
-          confirmBox.appendChild(yesBtn);
-          confirmBox.appendChild(noBtn);
-          confirmBg.appendChild(confirmBox);
-          document.body.appendChild(confirmBg);
-          noBtn.onclick = () => { document.body.removeChild(confirmBg); };
-          yesBtn.onclick = async () => {
-            document.body.removeChild(confirmBg);
-            const client = new TrackedAPIClient(this.plugin);
-            const number = await client.deleteTestLog();
-            alert(`테스트 데이터 ${number}건 삭제`);
-            await this.updateStatsAndChart();
-          }
-        };
-
+    } else {
+        actions.innerHTML = `
+        <button id="ai-export-csv">CSV 내보내기</button>
+        `;
     }
+    modal.appendChild(actions);
+
+    // CSV 내보내기 버튼 이벤트
+    const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
+    exportCsvBtn.onclick = async () => {
+        // summar-ai-api-logs-db 전체 로그를 CSV로 변환
+        const logs = await this.plugin.dbManager.getLogs();
+        if (!logs || logs.length === 0) {
+            alert('내보낼 데이터가 없습니다.');
+            return;
+        }
+        // CSV 헤더
+        const headers = [
+            'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
+        ];
+        const rows = logs.map(log => headers.map(h => {
+            let v = log[h as keyof typeof log];
+            if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
+            if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+            return v ?? '';
+        }).join(','));
+        const csv = [headers.join(','), ...rows].join('\n');
+        // 파일 저장 dialog
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.plugin.dbManager.dbName}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+    };
+
+    // 비용 재계산 버튼 이벤트
+    const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
+    recalcBtn.onclick = async () => {
+      const trackapi = new TrackedAPIClient(this.plugin);
+      const updated = await trackapi.recalcCost();
+        alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
+        await this.updateStatsAndChart();
+    };
+
+    // 초기화 버튼 이벤트
+    const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
+    resetBtn.onclick = async () => {
+      // 커스텀 경고 모달 생성
+      const confirmBg = document.createElement('div');
+      confirmBg.style.position = 'fixed';
+      confirmBg.style.top = '0';
+      confirmBg.style.left = '0';
+      confirmBg.style.width = '100vw';
+      confirmBg.style.height = '100vh';
+      confirmBg.style.background = 'rgba(0,0,0,0.3)';
+      confirmBg.style.zIndex = '10000';
+      const confirmBox = document.createElement('div');
+      confirmBox.style.position = 'absolute';
+      confirmBox.style.top = '50%';
+      confirmBox.style.left = '50%';
+      confirmBox.style.transform = 'translate(-50%, -50%)';
+      confirmBox.style.background = 'var(--background-primary)';
+      confirmBox.style.borderRadius = '12px';
+      confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+      confirmBox.style.padding = '32px 24px';
+      confirmBox.style.minWidth = '320px';
+      confirmBox.style.textAlign = 'center';
+      confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
+      const yesBtn = document.createElement('button');
+      yesBtn.textContent = 'Yes';
+      yesBtn.style.margin = '0 12px';
+      yesBtn.style.padding = '8px 24px';
+      yesBtn.style.background = 'var(--background-secondary)';
+      yesBtn.style.color = 'var(--text-normal)';
+      yesBtn.style.border = '1px solid var(--background-modifier-border)';
+      yesBtn.style.borderRadius = '6px';
+      yesBtn.style.cursor = 'pointer';
+      const noBtn = document.createElement('button');
+      noBtn.textContent = 'No';
+      noBtn.style.margin = '0 12px';
+      noBtn.style.padding = '8px 24px';
+      noBtn.style.background = 'var(--color-accent)';
+      noBtn.style.color = 'white';
+      noBtn.style.border = 'none';
+      noBtn.style.borderRadius = '6px';
+      noBtn.style.cursor = 'pointer';
+      confirmBox.appendChild(yesBtn);
+      confirmBox.appendChild(noBtn);
+      confirmBg.appendChild(confirmBox);
+      document.body.appendChild(confirmBg);
+      noBtn.onclick = () => { document.body.removeChild(confirmBg); };
+      yesBtn.onclick = async () => {
+          document.body.removeChild(confirmBg);
+          if (!this.plugin.dbManager) return;
+          const db = this.plugin.dbManager['db'];
+          if (db) {
+              await new Promise((resolve, reject) => {
+                  const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
+                  const logsStore = tx.objectStore('api_logs');
+                  const statsStore = tx.objectStore('daily_stats');
+                  const clear1 = logsStore.clear();
+                  const clear2 = statsStore.clear();
+                  let done = 0;
+                  const check = () => { if (++done === 2) resolve(undefined); };
+                  clear1.onsuccess = check; clear2.onsuccess = check;
+                  clear1.onerror = () => reject(clear1.error);
+                  clear2.onerror = () => reject(clear2.error);
+              });
+          }
+          alert('DB가 초기화되었습니다.');
+          await this.updateStatsAndChart();
+      };
+    };
+
+    // 테스트 데이터 생성 버튼 이벤트
+    const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
+    testDataBtn.onclick = async () => {
+        const client = new TrackedAPIClient(this.plugin);
+        await client.logAPICallTest(300, 1000);
+        alert('테스트 데이터가 추가되었습니다');
+        await this.updateStatsAndChart();
+    };
+
+    // 테스트 데이터 삭제 버튼 이벤트
+    const deleteTestDataBtn = actions.querySelector('#ai-delete-test-data') as HTMLButtonElement;
+    deleteTestDataBtn.onclick = async () => {
+      // 커스텀 경고 모달 생성
+      const confirmBg = document.createElement('div');
+      confirmBg.style.position = 'fixed';
+      confirmBg.style.top = '0';
+      confirmBg.style.left = '0';
+      confirmBg.style.width = '100vw';
+      confirmBg.style.height = '100vh';
+      confirmBg.style.background = 'rgba(0,0,0,0.3)';
+      confirmBg.style.zIndex = '10000';
+      const confirmBox = document.createElement('div');
+      confirmBox.style.position = 'absolute';
+      confirmBox.style.top = '50%';
+      confirmBox.style.left = '50%';
+      confirmBox.style.transform = 'translate(-50%, -50%)';
+      confirmBox.style.background = 'var(--background-primary)';
+      confirmBox.style.borderRadius = '12px';
+      confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+      confirmBox.style.padding = '32px 24px';
+      confirmBox.style.minWidth = '320px';
+      confirmBox.style.textAlign = 'center';
+      confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">테스트 데이터를 정말 삭제하시겠습니까?</div>`;
+      const yesBtn = document.createElement('button');
+      yesBtn.textContent = 'Yes';
+      yesBtn.style.margin = '0 12px';
+      yesBtn.style.padding = '8px 24px';
+      yesBtn.style.background = 'var(--background-secondary)';
+      yesBtn.style.color = 'var(--text-normal)';
+      yesBtn.style.border = '1px solid var(--background-modifier-border)';
+      yesBtn.style.borderRadius = '6px';
+      yesBtn.style.cursor = 'pointer';
+      const noBtn = document.createElement('button');
+      noBtn.textContent = 'No';
+      noBtn.style.margin = '0 12px';
+      noBtn.style.padding = '8px 24px';
+      noBtn.style.background = 'var(--color-accent)';
+      noBtn.style.color = 'white';
+      noBtn.style.border = 'none';
+      noBtn.style.borderRadius = '6px';
+      noBtn.style.cursor = 'pointer';
+      confirmBox.appendChild(yesBtn);
+      confirmBox.appendChild(noBtn);
+      confirmBg.appendChild(confirmBox);
+      document.body.appendChild(confirmBg);
+      noBtn.onclick = () => { document.body.removeChild(confirmBg); };
+      yesBtn.onclick = async () => {
+        document.body.removeChild(confirmBg);
+        const client = new TrackedAPIClient(this.plugin);
+        const number = await client.deleteTestLog();
+        alert(`테스트 데이터 ${number}건 삭제`);
+        await this.updateStatsAndChart();
+      }
+    };
+
     document.body.appendChild(this.modalBg);
 
     // 디폴트: 시간별, 총호출수

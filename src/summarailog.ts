@@ -74,14 +74,14 @@ export class IndexedDBManager {
         });
     }
 
-    async addLog(log: APICallLog): Promise<void> {
+    async addLog(log: APICallLog, update: boolean = false): Promise<void> {
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction(['api_logs', 'daily_stats'], 'readwrite');
             const logsStore = transaction.objectStore('api_logs');
             const statsStore = transaction.objectStore('daily_stats');
             
             // 로그 추가
-            const addRequest = logsStore.add(log);
+            const addRequest = update ? logsStore.put(log) : logsStore.add(log);
             
             addRequest.onsuccess = async () => {
                 // 일별 통계 업데이트
@@ -444,17 +444,31 @@ export class TrackedAPIClient {
     getLatency() : number {
         return Date.now() - this.startTime;
     }
-
+    /**
+     * loadAPICall()
+     * - provider: string;
+     * - model: string;
+     * - endpoint: string;
+     * - feature: string;
+     * - requestData: any;
+     * - responseData: any;
+     * - success?: boolean;
+     * - errorMessage?: string;
+     * - duration?: number;
+     */
     async logAPICall(
-        provider: string,
-        model: string,
-        endpoint: string,
-        feature: string,
-        requestData: any,
-        responseData: any,
-        success: boolean,
-        error?: string,
-        duration: number = -1,
+        { provider, model, endpoint, feature, requestData, responseData, success=true, errorMessage = '', duration = -1}:
+        { 
+            provider: string;
+            model: string;
+            endpoint: string;
+            feature: string;
+            requestData: any;
+            responseData: any;
+            success?: boolean;
+            errorMessage?: string;
+            duration?: number;
+        }
     ) {
         let requestSize: number;
         if (requestData instanceof ArrayBuffer) {
@@ -484,7 +498,7 @@ export class TrackedAPIClient {
             
             latency,
             success,
-            errorMessage: error,
+            errorMessage: errorMessage,
             
             sessionId: this.sessionId,
             userAgent: `Obsidian-Summar/${this.plugin.manifest.version}`,
@@ -570,16 +584,16 @@ export class TrackedAPIClient {
         let inputPerK = 0, outputPerK = 0;
 
         if (model.includes('2.5-pro')) {
-        const tier = promptTokens > 200_000
-            ? pricing["gemini-2.5-pro"]?.over200k
-            : pricing["gemini-2.5-pro"]?.under200k;
-        inputPerK = tier?.inputPerK ?? 0;
-        outputPerK = tier?.outputPerK ?? 0;
+            const tier = promptTokens > 200_000
+                ? pricing["gemini-2.5-pro"]?.over200k
+                : pricing["gemini-2.5-pro"]?.under200k;
+            inputPerK = tier?.inputPerK ?? 0;
+            outputPerK = tier?.outputPerK ?? 0;
         } else {
-        const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
-        const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0 };
-        inputPerK = tier.inputPerK;
-        outputPerK = tier.outputPerK;
+            const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
+            const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0 };
+            inputPerK = tier.inputPerK;
+            outputPerK = tier.outputPerK;
         }
 
         return (promptTokens * inputPerK) / 1000 + (completionTokens * outputPerK) / 1000;
@@ -604,17 +618,29 @@ export class TrackedAPIClient {
      * - requestTokens/responseTokens/totalTokens: 임의값
      * - cost: 0~0.003 랜덤
      */
-    
     async logAPICallTest(days: number, count: number) {
-        // 모델/프로바이더 목록 준비
-        const openaiModels = [
-            'gpt-4o', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1-mini', 'o3-mini', 'whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe'
-        ];
-        const geminiModels = [
-            'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-latest-lite', 'gemini-1.5-lite', 'gemini-1.0-lite'
-        ];
-        const features = ['stt', 'web', 'custom', 'pdf', 'stt-summary', 'stt-refine'];
-        const providers: ('openai' | 'gemini')[] = ['openai', 'gemini'];
+        // feature-model 매핑
+        const modelFeatureMap = {
+            webModel: ['web'],
+            pdfModel: ['pdf'],
+            sttModel: ['stt'],
+            transcriptSummaryModel: ['stt-summary', 'stt-refine'],
+            customModel: ['custom']
+        };
+        const modelList = this.plugin.modelsJson?.model_list || {};
+
+        // SummarDebug.log(1, "modelList in logAPICallTest:\n", JSON.stringify(modelList));
+
+        // feature별 모델 목록 생성
+        const featureModels: Record<string, string[]> = {};
+        Object.entries(modelFeatureMap).forEach(([modelKey, features]) => {
+            const modelsObj = modelList[modelKey]?.models || {};
+            const models = Object.keys(modelsObj);
+            features.forEach(f => {
+                featureModels[f] = models;
+            });
+        });
+        const features = Object.keys(featureModels);
         const now = Date.now();
         const oneYear = days * 24 * 60 * 60 * 1000;
         function randomStr(len: number) {
@@ -627,21 +653,21 @@ export class TrackedAPIClient {
             // 날짜 랜덤
             const timestamp = now - Math.floor(Math.random() * oneYear);
             const timestampISO = new Date(timestamp).toISOString();
-            // provider/model 짝 랜덤
-            const provider: 'openai' | 'gemini' = providers[Math.floor(Math.random() * providers.length)] as 'openai' | 'gemini';
-            let model = '';
-            if (provider === 'openai') {
-                model = openaiModels[Math.floor(Math.random() * openaiModels.length)];
-            } else {
-                model = geminiModels[Math.floor(Math.random() * geminiModels.length)];
-            }
             // feature 랜덤
             const feature = features[Math.floor(Math.random() * features.length)];
+            const models = featureModels[feature] || [];
+            if (models.length === 0) continue; // 모델 없으면 skip
+            // 모델 랜덤
+            const model = models[Math.floor(Math.random() * models.length)];
+            // provider 추정
+            let provider: 'openai' | 'gemini' = 'openai';
+            if (model.startsWith('gemini')) provider = 'gemini';
+            else if (model.startsWith('gpt') || model.startsWith('o') || model.startsWith('whisper')) provider = 'openai';
             // 기타 값 랜덤
             const requestSize = 100 + Math.floor(Math.random() * 101);
             const responseSize = 100 + Math.floor(Math.random() * 101);
             const latency = 1000 + Math.floor(Math.random() * 3001);
-            const success = Math.random() < 0.8; // 성공 80% 확률
+            const success = Math.random() < 0.8;
             const errorMessage = success ? undefined : 'Error occurred: ' + randomStr(8);
             const sessionId = randomStr(10 + Math.floor(Math.random() * 11));
             const userAgent = `Obsidian-Summar/${this.plugin.manifest?.version ?? '1.0.0'}`;
@@ -649,107 +675,38 @@ export class TrackedAPIClient {
             const requestTokens = 100 + Math.floor(Math.random() * 100);
             const responseTokens = 100 + Math.floor(Math.random() * 100);
             const totalTokens = requestTokens + responseTokens;
-            const cost = Math.random() * 0.003;
             let duration: number;
-            if (provider === 'openai' && feature === 'stt') {
-                duration = 10 + Math.floor(Math.random() * 91); // 10~100
+            // if (provider === 'openai' && feature === 'stt') {
+            if (feature === 'stt') {
+                duration = (10000 + Math.floor(Math.random() * 91000))/1000; // 10~100
             } else {
                 duration = -1;
-            }            
-            const log = {
-                id: crypto.randomUUID(),
-                timestamp,
-                timestampISO,
-                provider,
-                model,
-                endpoint: 'test',
-                feature,
-                requestSize,
-                responseSize,
-                requestTokens,
-                responseTokens,
-                totalTokens,
-                duration,
-                cost: Number(cost.toFixed(6)),
-                latency,
-                success,
-                errorMessage,
-                sessionId,
-                userAgent,
-                version
-            };
-            await this.dbManager.addLog(log);
-        }
-    }
-
-    /*
-    async logAPICallTest(days: number, count: number) {
-        // models.json에서 feature별 허용 모델 매핑
-        const modelFeatureMap = {
-            web: 'webModel',
-            pdf: 'pdfModel',
-            stt: 'sttModel',
-            'stt-summary': 'transcriptSummaryModel',
-            'stt-refine': 'transcriptSummaryModel',
-            custom: 'customModel'
-        };
-        // models.json import (이미 로드된 객체를 사용하거나 import 필요)
-        // 예시: import modelsJson from './models.json';
-        const modelsJson = this.plugin.modelsJson;
-        const modelList = modelsJson.model_list || {};
-
-        const features = ['web', 'pdf', 'stt', 'stt-summary', 'stt-refine', 'custom'] as const;
-        type FeatureType = typeof features[number];
-        const providers: ('openai' | 'gemini')[] = ['openai', 'gemini'];
-        const now = Date.now();
-        const oneYear = days * 24 * 60 * 60 * 1000;
-        function randomStr(len: number) {
-            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let s = '';
-            for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
-            return s;
-        }
-        for (let i = 0; i < count; i++) {
-            // 날짜 랜덤
-            const timestamp = now - Math.floor(Math.random() * oneYear);
-            const timestampISO = new Date(timestamp).toISOString();
-            // feature 랜덤
-            const feature = features[Math.floor(Math.random() * features.length)] as FeatureType;
-            // feature에 맞는 모델리스트
-            const modelKey = modelFeatureMap[feature];
-            const modelObj = modelList[modelKey]?.models || {};
-            const allModels = Object.keys(modelObj);
-            // openai/gemini 분리
-            const openaiModels = allModels.filter(m => m.startsWith('gpt') || m.startsWith('o'));
-            const geminiModels = allModels.filter(m => m.startsWith('gemini'));
-            // provider 랜덤
-            const provider: 'openai' | 'gemini' = providers[Math.floor(Math.random() * providers.length)] as 'openai' | 'gemini';
-            let model = '';
-            if (provider === 'openai') {
-                if (openaiModels.length === 0) continue;
-                model = openaiModels[Math.floor(Math.random() * openaiModels.length)];
-            } else {
-                if (geminiModels.length === 0) continue;
-                model = geminiModels[Math.floor(Math.random() * geminiModels.length)];
             }
-            // 기타 값 랜덤
-            const requestSize = 100 + Math.floor(Math.random() * 101);
-            const responseSize = 100 + Math.floor(Math.random() * 101);
-            const latency = 1000 + Math.floor(Math.random() * 3001);
-            const success = Math.random() < 0.8; // 성공 80% 확률
-            const errorMessage = success ? undefined : 'Error occurred: ' + randomStr(8);
-            const sessionId = randomStr(10 + Math.floor(Math.random() * 11));
-            const userAgent = `Obsidian-Summar/${this.plugin.manifest?.version ?? '1.0.0'}`;
-            const version = '1.0.0';
-            const requestTokens = 100 + Math.floor(Math.random() * 100);
-            const responseTokens = 100 + Math.floor(Math.random() * 100);
-            const totalTokens = requestTokens + responseTokens;
-            const cost = Math.random() * 0.003;
-            let duration: number;
-            if (provider === 'openai' && feature === 'stt') {
-                duration = 1000 + Math.floor(Math.random() * 9100)/100; // 10~100
-            } else {
-                duration = -1;
+            // const cost = Math.random() * 0.003;
+            let cost = 0;
+            if (provider==='openai') {
+                if (feature==='stt') {
+                    cost = this.calculateOpenAIAudioTranscriptionCost(
+                        model, duration
+                    )
+                } else {
+                    cost = this.calculateOpenAICost(
+                        model, 
+                        { 
+                            prompt_tokens: requestTokens,
+                            completion_tokens: responseTokens,
+                            totalTokens: totalTokens,
+                        }
+                    );
+                }
+            } else if (provider==='gemini'){
+                cost = this.calculateGeminiCost(
+                    model,
+                    {
+                        promptTokenCount: requestTokens,
+                        candidatesTokenCount: responseTokens,
+                    }
+                );
             }
             const log = {
                 id: crypto.randomUUID(),
@@ -765,7 +722,7 @@ export class TrackedAPIClient {
                 responseTokens,
                 totalTokens,
                 duration,
-                cost: Number(cost.toFixed(6)),
+                cost,//: Number(cost.toFixed(6)),
                 latency,
                 success,
                 errorMessage,
@@ -776,8 +733,42 @@ export class TrackedAPIClient {
             await this.dbManager.addLog(log);
         }
     }
-    */
-   
+
+    /**
+     * DB의 모든 로그에 대해 cost를 재계산하고, 변경된 경우 업데이트합니다.
+     * @returns 업데이트된 row 개수
+     */
+    async recalcCost(): Promise<number> {
+        const logs = await this.dbManager.getLogs();
+        let updated = 0;
+        for (const log of logs) {
+            let newCost = log.cost ?? 0;
+            if (log.provider === 'openai' && log.feature === 'stt') {
+                newCost = this.calculateOpenAIAudioTranscriptionCost(log.model, log.duration ?? 0) ?? log.cost ?? 0;
+            } else if (log.provider === 'openai' && log.requestTokens !== undefined && log.responseTokens !== undefined) {
+                const usage = {
+                    prompt_tokens: log.requestTokens ?? 0,
+                    completion_tokens: log.responseTokens ?? 0,
+                    totalTokens: log.totalTokens ?? 0
+                };
+                newCost = this.calculateOpenAICost(log.model, usage) ?? log.cost ?? 0;
+            } else if (log.provider === 'gemini' && log.totalTokens !== undefined) {
+                const usage = {
+                    promptTokenCount: log.requestTokens ?? 0,
+                    candidatesTokenCount: log.responseTokens ?? 0,
+                };
+                newCost = this.calculateGeminiCost(log.model, usage) ?? log.cost ?? 0;
+            }
+            if (log.cost !== newCost) {
+                // SummarDebug.log(3, `recalcCost()\noldcost: ${log.cost}, newcost: ${newCost}, provider: ${log.provider}, feature: ${log.feature}`);
+                log.cost = newCost;
+                updated++;
+                await this.dbManager.addLog(log, true); // addLog는 기존 id면 update
+            }
+        }
+        return updated;
+    }
+
     async deleteTestLog(): Promise<number> {
         return this.dbManager.deleteIf(log => log.endpoint === 'test');
     }

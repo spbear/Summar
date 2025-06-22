@@ -101,7 +101,7 @@ export class SummarAI extends SummarViewContainer {
   }
 
 //   async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
-  async chatWithBody( bodyContent: string ): Promise<boolean> {
+  async chatWithBody( bodyContent: string, duration = -1 ): Promise<boolean> {
     try {
       const trackapi = new TrackedAPIClient(this.plugin);
 
@@ -122,14 +122,34 @@ export class SummarAI extends SummarViewContainer {
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.choices[0].message.content || '';
-            trackapi.logAPICall('openai', this.aiModel, 'chat/completions', this.feature, bodyContent, response.json, true);
+            //trackapi.logAPICall('openai', this.aiModel, 'chat/completions', this.feature, bodyContent, response.json, true);
+
+            trackapi.logAPICall({ 
+                provider: 'openai', 
+                model: this.aiModel, 
+                endpoint: 'chat/completions', 
+                feature: this.feature, 
+                requestData: bodyContent, 
+                responseData: response.json,
+                duration: duration,
+            });
             return true;
           } else {
             SummarDebug.log(1, `OpenAI chat/completion response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
-            trackapi.logAPICall('openai', this.aiModel, 'chat/completions', this.feature, bodyContent, response.json, false, this.response.text);
+            // trackapi.logAPICall('openai', this.aiModel, 'chat/completions', this.feature, bodyContent, response.json, false, this.response.text);
+            trackapi.logAPICall({
+                provider: 'openai',
+                model: this.aiModel,
+                endpoint: 'chat/completions',
+                feature: this.feature,
+                requestData: bodyContent,
+                responseData: response.json,
+                success: false,
+                errorMessage: this.response.text,
+            });
             return false
           }
         }
@@ -150,14 +170,32 @@ export class SummarAI extends SummarViewContainer {
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.candidates[0].content.parts[0].text || '';
-            trackapi.logAPICall('gemini', this.aiModel, 'generateContent', this.feature, bodyContent, response.json, true);
+            // trackapi.logAPICall('gemini', this.aiModel, 'generateContent', this.feature, bodyContent, response.json, true);
+            trackapi.logAPICall({
+              provider: 'gemini',
+              model: this.aiModel,
+              endpoint: 'generateContent',
+              feature: this.feature,
+              requestData: bodyContent,
+              responseData: response.json, 
+            });
             return true;
           } else {
             SummarDebug.log(1, `Gemini generateContent response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
-            trackapi.logAPICall('gemini', this.aiModel, 'generateContent', this.feature, bodyContent, response.json, false, this.response.text);
+            // trackapi.logAPICall('gemini', this.aiModel, 'generateContent', this.feature, bodyContent, response.json, false, this.response.text);
+            trackapi.logAPICall({
+              provider: 'gemini',
+              model: this.aiModel,
+              endpoint: 'generateContent',
+              feature: this.feature,
+              requestData: bodyContent,
+              responseData: response.json,
+              success: false, 
+              errorMessage: this.response.text,
+            });
             return false
           }
           SummarDebug.log(1, `API responses error: \n${JSON.stringify(response.json)}`);
@@ -204,11 +242,31 @@ export class SummarAI extends SummarViewContainer {
               if (response.json.duration) {
                 duration = response.json.duration;
               }
-              trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true, "", duration);
+              // trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true, "", duration);
+              trackapi.logAPICall({
+                provider: 'openai',
+                model: this.aiModel,
+                endpoint: 'audio/transcription',
+                feature: this.feature,
+                requestData: bodyContent,
+                responseData: response.json,
+                duration: duration,
+              });
             }
             else {
               this.response.text = response.json.error ? response.json.error.message : 'No content available';
-              trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, false, this.response.text, duration);
+              // trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, false, this.response.text, duration);
+              trackapi.logAPICall({
+                provider: 'openai',
+                model: this.aiModel,
+                endpoint: 'audio/transcription',
+                feature: this.feature,
+                requestData: bodyContent,
+                responseData: response.json,
+                success: false,
+                errorMessage: this.response.text,
+                duration: duration,
+              });
             }
           }
 //          trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true);
