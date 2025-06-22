@@ -25,6 +25,7 @@ export class SummarStatsModal {
   private summaryStats: any[] = [];
 
   private currentProvider: string = 'all';
+  private visibleFeatures: Set<string> = new Set();
 
   constructor(plugin: SummarPlugin) {
     this.plugin = plugin;
@@ -458,6 +459,19 @@ export class SummarStatsModal {
     });
     // 차트 갱신
     this.updateChart();
+
+    // --- 추가: legend를 모두 on으로 초기화 ---
+    // feature 목록 추출
+    let features: string[] = [];
+    if (this.summaryStats.length > 0 && this.summaryStats[0].features) {
+      const allFeatures = new Set<string>();
+      this.summaryStats.forEach(s => {
+        Object.keys(s.features || {}).forEach(f => allFeatures.add(f));
+      });
+      features = Array.from(allFeatures);
+    }
+    this.visibleFeatures = new Set(features);
+    this.updateSummaryCards(this.summaryStats, this.visibleFeatures);    
   }
 
   async updateStatsAndChart() {
@@ -798,25 +812,63 @@ export class SummarStatsModal {
     return stats;
   }
 
-  updateSummaryCards(stats: any[]) {
-    // 합계/평균 계산
-    let totalCalls = 0, totalTokens = 0, totalCost = 0, latencySum = 0, successSum = 0;
-    stats.forEach(s => {
-      totalCalls += s.totalCalls || 0;
-      totalTokens += s.totalTokens || 0;
-      totalCost += s.totalCost || 0;
-      latencySum += (s.avgLatency || 0) * (s.totalCalls || 1);
-      successSum += (s.successRate || 0) * (s.totalCalls || 1);
-    });
-    const total = stats.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1;
-    const avgLatency = total ? latencySum / total : 0;
-    const avgSuccess = total ? successSum / total : 100;
-    (document.getElementById('ai-total-calls') as HTMLElement).textContent = totalCalls.toLocaleString();
-    (document.getElementById('ai-total-tokens') as HTMLElement).textContent = totalTokens.toLocaleString();
-    (document.getElementById('ai-total-cost') as HTMLElement).textContent = totalCost.toFixed(4);
-    (document.getElementById('ai-avg-latency') as HTMLElement).textContent = avgLatency.toFixed(1);
-    (document.getElementById('ai-success-rate') as HTMLElement).textContent = avgSuccess.toFixed(1);
+  // updateSummaryCards(stats: any[]) {
+  //   // 합계/평균 계산
+  //   let totalCalls = 0, totalTokens = 0, totalCost = 0, latencySum = 0, successSum = 0;
+  //   stats.forEach(s => {
+  //     totalCalls += s.totalCalls || 0;
+  //     totalTokens += s.totalTokens || 0;
+  //     totalCost += s.totalCost || 0;
+  //     latencySum += (s.avgLatency || 0) * (s.totalCalls || 1);
+  //     successSum += (s.successRate || 0) * (s.totalCalls || 1);
+  //   });
+  //   const total = stats.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1;
+  //   const avgLatency = total ? latencySum / total : 0;
+  //   const avgSuccess = total ? successSum / total : 100;
+  //   (document.getElementById('ai-total-calls') as HTMLElement).textContent = totalCalls.toLocaleString();
+  //   (document.getElementById('ai-total-tokens') as HTMLElement).textContent = totalTokens.toLocaleString();
+  //   (document.getElementById('ai-total-cost') as HTMLElement).textContent = totalCost.toFixed(4);
+  //   (document.getElementById('ai-avg-latency') as HTMLElement).textContent = avgLatency.toFixed(1);
+  //   (document.getElementById('ai-success-rate') as HTMLElement).textContent = avgSuccess.toFixed(1);
+  // }
+  updateSummaryCards(stats: any[], visibleFeatures?: Set<string>) {
+  // 1. 모든 legend가 off면 바로 '-'로 표시 후 return
+  if (visibleFeatures && visibleFeatures.size === 0) {
+    (document.getElementById('ai-total-calls') as HTMLElement).textContent = '-';
+    (document.getElementById('ai-total-tokens') as HTMLElement).textContent = '-';
+    (document.getElementById('ai-total-cost') as HTMLElement).textContent = '-';
+    (document.getElementById('ai-avg-latency') as HTMLElement).textContent = '-';
+    (document.getElementById('ai-success-rate') as HTMLElement).textContent = '-';
+    return;
   }
+  // 2. 누적 계산
+  let totalCalls = 0, totalTokens = 0, totalCost = 0, latencySum = 0, successSum = 0, total = 0;
+  stats.forEach(s => {
+    let features = Object.keys(s.features || {});
+    if (visibleFeatures && visibleFeatures.size > 0) {
+      features = features.filter(f => visibleFeatures.has(f));
+    }
+    let calls = features.reduce((sum, f) => sum + (s.features[f] || 0), 0);
+    let tokens = features.reduce((sum, f) => sum + (s.featureTokens[f] || 0), 0);
+    let cost = features.reduce((sum, f) => sum + (s.featureCosts[f] || 0), 0);
+    let latency = features.reduce((sum, f) => sum + (s.featureLatencies[f] || 0), 0);
+    let success = features.reduce((sum, f) => sum + (s.featureSuccessRates[f] || 0), 0);
+
+    totalCalls += calls;
+    totalTokens += tokens;
+    totalCost += cost;
+    latencySum += latency;
+    successSum += success;
+    total += calls;
+  });
+  const avgLatency = total ? latencySum / total : 0;
+  const avgSuccess = total ? successSum / total : 100;
+  (document.getElementById('ai-total-calls') as HTMLElement).textContent = totalCalls.toLocaleString();
+  (document.getElementById('ai-total-tokens') as HTMLElement).textContent = totalTokens.toLocaleString();
+  (document.getElementById('ai-total-cost') as HTMLElement).textContent = totalCost.toFixed(4);
+  (document.getElementById('ai-avg-latency') as HTMLElement).textContent = avgLatency.toFixed(1);
+  (document.getElementById('ai-success-rate') as HTMLElement).textContent = avgSuccess.toFixed(1);
+}
 
   updateChart() {
     if (!this.chartArea) return;
@@ -936,8 +988,28 @@ export class SummarStatsModal {
           options: {
             responsive: true,
             plugins: {
-              legend: { display: true, position: 'bottom' },
+              // legend: { display: true, position: 'bottom' },
               title: { display: false },
+              legend: {
+                display: true,
+                position: 'bottom',
+                onClick: (_e: any, legendItem: any, legend: any) => {
+                  // Default toggle
+                  const ci = legend.chart;
+                  const index = legendItem.datasetIndex;
+                  const meta = ci.getDatasetMeta(index);
+                  meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+                  ci.update();
+
+                  // Update visibleFeatures set
+                  this.visibleFeatures = new Set(
+                    ci.data.datasets
+                      .map((ds: any, i: number) => !ci.getDatasetMeta(i).hidden ? ds.label.replace(/^[0-9]+\. /, '') : null)
+                      .filter((f: any) => f)
+                  );
+                  this.updateSummaryCards(this.summaryStats, this.visibleFeatures);
+                }
+              }              
             },
             scales: {
               x: { title: { display: true, text: '기간' }, stacked: true },
@@ -962,8 +1034,28 @@ export class SummarStatsModal {
           options: {
             responsive: true,
             plugins: {
-              legend: { display: true, position: 'bottom' },
+              // legend: { display: true, position: 'bottom' },
               title: { display: false },
+              legend: {
+                display: true,
+                position: 'bottom',
+                onClick: (_e: any, legendItem: any, legend: any) => {
+                  // Default toggle
+                  const ci = legend.chart;
+                  const index = legendItem.datasetIndex;
+                  const meta = ci.getDatasetMeta(index);
+                  meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+                  ci.update();
+
+                  // Update visibleFeatures set
+                  this.visibleFeatures = new Set(
+                    ci.data.datasets
+                      .map((ds: any, i: number) => !ci.getDatasetMeta(i).hidden ? ds.label.replace(/^[0-9]+\. /, '') : null)
+                      .filter((f: any) => f)
+                  );
+                  this.updateSummaryCards(this.summaryStats, this.visibleFeatures);
+                }
+              }              
             },
             scales: {
               x: { title: { display: true, text: '기간' }, stacked: true },
@@ -978,8 +1070,28 @@ export class SummarStatsModal {
           options: {
             responsive: true,
             plugins: {
-              legend: { display: true, position: 'bottom' },
+              // legend: { display: true, position: 'bottom' },
               title: { display: false },
+              legend: {
+                display: true,
+                position: 'bottom',
+                onClick: (_e: any, legendItem: any, legend: any) => {
+                  // Default toggle
+                  const ci = legend.chart;
+                  const index = legendItem.datasetIndex;
+                  const meta = ci.getDatasetMeta(index);
+                  meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+                  ci.update();
+
+                  // Update visibleFeatures set
+                  this.visibleFeatures = new Set(
+                    ci.data.datasets
+                      .map((ds: any, i: number) => !ci.getDatasetMeta(i).hidden ? ds.label.replace(/^[0-9]+\. /, '') : null)
+                      .filter((f: any) => f)
+                  );
+                  this.updateSummaryCards(this.summaryStats, this.visibleFeatures);
+                }
+              }              
             },
             scales: {
               x: {
