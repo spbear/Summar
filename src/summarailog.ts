@@ -509,7 +509,7 @@ if (this.plugin.settings.debugLevel < 1) {
             userAgent: `Obsidian-Summar/${this.plugin.manifest.version}`,
             version: this.dbManager.version,//'1.0.0',
             
-            ...this.parseUsageData(provider, responseData, model, duration)
+            ...this.parseUsageData(provider, responseData, feature, model, duration)
         };
 
         try {
@@ -519,22 +519,22 @@ if (this.plugin.settings.debugLevel < 1) {
         }
     }
 
-    private parseUsageData(provider: string, responseData: any, model: string = '', duration: number = -1): any {
+    private parseUsageData(provider: string, responseData: any, feature: string, model: string = '', duration: number = -1): any {
         if (!responseData) return {};
 
         if (provider === 'openai') {
-            if (responseData.usage && (duration < 0)) {
+            if (feature === 'stt') {
+                return {
+                    requestTokens: 0,
+                    responseTokens: 0,
+                    cost : this.calculateOpenAIAudioTranscriptionCost(model || '', duration) 
+                };
+            } else if (responseData.usage) {
                 return {
                     requestTokens: responseData.usage.prompt_tokens,
                     responseTokens: responseData.usage.completion_tokens,
                     totalTokens: responseData.usage.total_tokens,
                     cost: this.calculateOpenAICost(responseData.model || '', responseData.usage)
-                };
-            } else {
-                return {
-                    requestTokens: 0,
-                    responseTokens: 0,
-                    cost : this.calculateOpenAIAudioTranscriptionCost(model || '', duration) 
                 };
             }
         }
@@ -544,7 +544,12 @@ if (this.plugin.settings.debugLevel < 1) {
                 requestTokens: responseData.usageMetadata.promptTokenCount,
                 responseTokens: responseData.usageMetadata.candidatesTokenCount,
                 totalTokens: responseData.usageMetadata.totalTokenCount,
-                cost: this.calculateGeminiCost(responseData.modelVersion, responseData.usageMetadata)
+                cost: this.calculateGeminiCost(responseData.modelVersion, 
+                    { 
+                        promptTokenCount: responseData.usageMetadata.promptTokenCount,
+                        candidatesTokenCount: responseData.usageMetadata.candidatesTokenCount
+                    }, 
+                    (feature === 'stt'))
             };
         }
 
@@ -577,9 +582,10 @@ if (this.plugin.settings.debugLevel < 1) {
     calculateGeminiCost(
         modelVersion: string,
         usage: {
-            promptTokenCount?: number;
-            candidatesTokenCount?: number;
-        }
+            promptTokenCount: number;
+            candidatesTokenCount: number;
+        },
+        sttFlag: boolean
     ): number {
         const model = (modelVersion || '').toLowerCase();
         const promptTokens = usage.promptTokenCount || 0;
@@ -596,9 +602,12 @@ if (this.plugin.settings.debugLevel < 1) {
             outputPerK = tier?.outputPerK ?? 0;
         } else {
             const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
-            const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0 };
-            inputPerK = tier.inputPerK;
+            const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0, audioPerK: 0 };
+// SummarDebug.log(1, `calculateGemini() - ${model}, stt:${sttFlag}, audioPerK:${tier.audioPerK}, inputPerK: ${tier.inputPerK}, outputPerK: ${tier.outputPerK}`);
+            inputPerK = (sttFlag === true) ? tier.audioPerK : tier.inputPerK;
             outputPerK = tier.outputPerK;
+// SummarDebug.log(1, `inputPerK 계산: (${promptTokens} * inputPerK / 1000 + ${completionTokens} * outputPerK / 1000) = ${(promptTokens * tier.inputPerK / 1000 + completionTokens * tier.outputPerK / 1000 )}`);
+// SummarDebug.log(1, `audioPerK 계산: (${promptTokens} * audioPerK / 1000 + ${completionTokens} * outputPerK / 1000) = ${(promptTokens * tier.audioPerK / 1000 + completionTokens * tier.outputPerK / 1000 )}`);
         }
 
         return (promptTokens * inputPerK) / 1000 + (completionTokens * outputPerK) / 1000;
@@ -697,7 +706,8 @@ if (this.plugin.settings.debugLevel < 1) {
                     {
                         promptTokenCount: requestTokens,
                         candidatesTokenCount: responseTokens,
-                    }
+                    },
+                    (feature==='stt')
                 );
             }
             const log = {
@@ -749,10 +759,17 @@ if (this.plugin.settings.debugLevel < 1) {
                     promptTokenCount: log.requestTokens ?? 0,
                     candidatesTokenCount: log.responseTokens ?? 0,
                 };
-                newCost = this.calculateGeminiCost(log.model, usage) ?? log.cost ?? 0;
+                newCost = this.calculateGeminiCost(
+                    log.model, 
+                    {
+                        promptTokenCount: usage.promptTokenCount,
+                        candidatesTokenCount: usage.candidatesTokenCount,
+                        
+                    }, (log.feature === 'stt')
+                ) ?? log.cost ?? 0;
             }
             if (log.cost !== newCost) {
-                // SummarDebug.log(3, `recalcCost()\noldcost: ${log.cost}, newcost: ${newCost}, provider: ${log.provider}, feature: ${log.feature}`);
+                SummarDebug.log(3, `recalcCost()\noldcost: ${log.cost}, newcost: ${newCost}, provider: ${log.provider}, feature: ${log.feature}`);
                 log.cost = newCost;
                 updated++;
                 await this.dbManager.addLog(log, true); // addLog는 기존 id면 update

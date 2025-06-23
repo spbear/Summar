@@ -17,8 +17,8 @@
       "under200k":   { "inputPerK": 0.00125, "outputPerK": 0.01 },
       "over200k":    { "inputPerK": 0.0025,  "outputPerK": 0.015 }
     },
-    "gemini-2.5-flash":       { "inputPerK": 0.0003,  "outputPerK": 0.0025 },
-    "gemini-2.0-flash":       { "inputPerK": 0.0001,  "outputPerK": 0.0004 },
+    "gemini-2.5-flash":       { "inputPerK": 0.0003,  "outputPerK": 0.0025, "audioPerK": 0.001 },
+    "gemini-2.0-flash":       { "inputPerK": 0.0001,  "outputPerK": 0.0004, "audioPerK": 0.0007 },
     "gemini-2.0-latest-lite": { "inputPerK": 0.00005, "outputPerK": 0.0002 },
     "gemini-1.5-lite":        { "inputPerK": 0.00005, "outputPerK": 0.0002 },
     "gemini-1.0-lite":        { "inputPerK": 0.00002, "outputPerK": 0.0001 }

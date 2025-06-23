@@ -812,63 +812,50 @@ export class SummarStatsModal {
     return stats;
   }
 
-  // updateSummaryCards(stats: any[]) {
-  //   // 합계/평균 계산
-  //   let totalCalls = 0, totalTokens = 0, totalCost = 0, latencySum = 0, successSum = 0;
-  //   stats.forEach(s => {
-  //     totalCalls += s.totalCalls || 0;
-  //     totalTokens += s.totalTokens || 0;
-  //     totalCost += s.totalCost || 0;
-  //     latencySum += (s.avgLatency || 0) * (s.totalCalls || 1);
-  //     successSum += (s.successRate || 0) * (s.totalCalls || 1);
-  //   });
-  //   const total = stats.reduce((a, b) => a + (b.totalCalls || 0), 0) || 1;
-  //   const avgLatency = total ? latencySum / total : 0;
-  //   const avgSuccess = total ? successSum / total : 100;
-  //   (document.getElementById('ai-total-calls') as HTMLElement).textContent = totalCalls.toLocaleString();
-  //   (document.getElementById('ai-total-tokens') as HTMLElement).textContent = totalTokens.toLocaleString();
-  //   (document.getElementById('ai-total-cost') as HTMLElement).textContent = totalCost.toFixed(4);
-  //   (document.getElementById('ai-avg-latency') as HTMLElement).textContent = avgLatency.toFixed(1);
-  //   (document.getElementById('ai-success-rate') as HTMLElement).textContent = avgSuccess.toFixed(1);
-  // }
   updateSummaryCards(stats: any[], visibleFeatures?: Set<string>) {
-  // 1. 모든 legend가 off면 바로 '-'로 표시 후 return
-  if (visibleFeatures && visibleFeatures.size === 0) {
-    (document.getElementById('ai-total-calls') as HTMLElement).textContent = '-';
-    (document.getElementById('ai-total-tokens') as HTMLElement).textContent = '-';
-    (document.getElementById('ai-total-cost') as HTMLElement).textContent = '-';
-    (document.getElementById('ai-avg-latency') as HTMLElement).textContent = '-';
-    (document.getElementById('ai-success-rate') as HTMLElement).textContent = '-';
-    return;
-  }
-  // 2. 누적 계산
-  let totalCalls = 0, totalTokens = 0, totalCost = 0, latencySum = 0, successSum = 0, total = 0;
-  stats.forEach(s => {
-    let features = Object.keys(s.features || {});
-    if (visibleFeatures && visibleFeatures.size > 0) {
-      features = features.filter(f => visibleFeatures.has(f));
+    if (visibleFeatures && visibleFeatures.size === 0) {
+      (document.getElementById('ai-total-calls') as HTMLElement).textContent = '-';
+      (document.getElementById('ai-total-tokens') as HTMLElement).textContent = '-';
+      (document.getElementById('ai-total-cost') as HTMLElement).textContent = '-';
+      (document.getElementById('ai-avg-latency') as HTMLElement).textContent = '-';
+      (document.getElementById('ai-success-rate') as HTMLElement).textContent = '-';
+      return;
     }
-    let calls = features.reduce((sum, f) => sum + (s.features[f] || 0), 0);
-    let tokens = features.reduce((sum, f) => sum + (s.featureTokens[f] || 0), 0);
-    let cost = features.reduce((sum, f) => sum + (s.featureCosts[f] || 0), 0);
-    let latency = features.reduce((sum, f) => sum + (s.featureLatencies[f] || 0), 0);
-    let success = features.reduce((sum, f) => sum + (s.featureSuccessRates[f] || 0), 0);
-
-    totalCalls += calls;
-    totalTokens += tokens;
-    totalCost += cost;
-    latencySum += latency;
-    successSum += success;
-    total += calls;
-  });
-  const avgLatency = total ? latencySum / total : 0;
-  const avgSuccess = total ? successSum / total : 100;
-  (document.getElementById('ai-total-calls') as HTMLElement).textContent = totalCalls.toLocaleString();
-  (document.getElementById('ai-total-tokens') as HTMLElement).textContent = totalTokens.toLocaleString();
-  (document.getElementById('ai-total-cost') as HTMLElement).textContent = totalCost.toFixed(4);
-  (document.getElementById('ai-avg-latency') as HTMLElement).textContent = avgLatency.toFixed(1);
-  (document.getElementById('ai-success-rate') as HTMLElement).textContent = avgSuccess.toFixed(1);
-}
+    let totalCalls = 0, totalTokens = 0, totalCost = 0;
+    let latencySum = 0, latencyCount = 0;
+    let successSum = 0, successCount = 0;
+    stats.forEach(s => {
+      let features = Object.keys(s.features || {});
+      if (visibleFeatures && visibleFeatures.size > 0) {
+        features = features.filter(f => visibleFeatures.has(f));
+      }
+      // 호출수, 토큰, 비용은 기존대로 합산
+      let calls = features.reduce((sum, f) => sum + (s.features[f] || 0), 0);
+      let tokens = features.reduce((sum, f) => sum + (s.featureTokens[f] || 0), 0);
+      let cost = features.reduce((sum, f) => sum + (s.featureCosts[f] || 0), 0);
+      totalCalls += calls;
+      totalTokens += tokens;
+      totalCost += cost;
+      // 평균지연: feature별 latency * 호출수의 합 / 호출수의 합
+      features.forEach(f => {
+        const callCount = s.features[f] || 0;
+        const latency = s.featureLatencies[f] || 0;
+        latencySum += latency * callCount;
+        latencyCount += callCount;
+        const successRate = s.featureSuccessRates[f] || 0;
+        // 성공률은 퍼센트이므로, 성공횟수 = 성공률(%) * 호출수 / 100
+        successSum += (successRate * callCount) / 100;
+        successCount += callCount;
+      });
+    });
+    const avgLatency = latencyCount ? latencySum / latencyCount : 0;
+    const avgSuccess = successCount ? (successSum / successCount) * 100 : 100;
+    (document.getElementById('ai-total-calls') as HTMLElement).textContent = totalCalls.toLocaleString();
+    (document.getElementById('ai-total-tokens') as HTMLElement).textContent = totalTokens.toLocaleString();
+    (document.getElementById('ai-total-cost') as HTMLElement).textContent = totalCost.toFixed(4);
+    (document.getElementById('ai-avg-latency') as HTMLElement).textContent = avgLatency.toFixed(1);
+    (document.getElementById('ai-success-rate') as HTMLElement).textContent = avgSuccess.toFixed(1);
+  }
 
   updateChart() {
     if (!this.chartArea) return;
