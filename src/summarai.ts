@@ -108,7 +108,7 @@ export class SummarAI extends SummarViewContainer {
       if ( bodyContent && bodyContent.length > 0 ) {
     //   if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
         if (this.aiProvider === 'openai') {
-          SummarDebug.log(1, `SummarAI.chat() - Using OpenAI chat/completion with model: ${this.aiModel}`);
+          // SummarDebug.log(1, `SummarAI.chat() - Using OpenAI chat/completion with model: ${this.aiModel}`);
           
         //   const response = await this.chatOpenai(bodyContent, false, contentType, apiUrl);
         const response = await this.chatOpenai(bodyContent, false);
@@ -118,7 +118,7 @@ export class SummarAI extends SummarViewContainer {
             response.json.choices[0].message &&
             response.json.choices[0].message.content
           ) {
-            SummarDebug.log(1, `OpenAI chat/completion response: \n${JSON.stringify(response.json)}`);
+            // SummarDebug.log(1, `OpenAI chat/completion response: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.choices[0].message.content || '';
@@ -135,7 +135,7 @@ export class SummarAI extends SummarViewContainer {
             });
             return true;
           } else {
-            SummarDebug.log(1, `OpenAI chat/completion response without content: \n${JSON.stringify(response.json)}`);
+            // SummarDebug.log(1, `OpenAI chat/completion response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
@@ -154,7 +154,7 @@ export class SummarAI extends SummarViewContainer {
           }
         }
         else if (this.aiProvider === 'gemini') {
-          SummarDebug.log(1, `SummarAI.chat() - Using Gemini generateContent with model: ${this.aiModel}`);
+          // SummarDebug.log(1, `SummarAI.chat() - Using Gemini generateContent with model: ${this.aiModel}`);
 
         //   const response = await this.chatGemini(bodyContent as string, false, contentType);
           const response = await this.chatGemini(bodyContent, false);
@@ -166,7 +166,7 @@ export class SummarAI extends SummarViewContainer {
             response.json.candidates[0].content.parts.length > 0 &&
             response.json.candidates[0].content.parts[0].text
           ) {
-            SummarDebug.log(1, `Gemini generateContent response: \n${JSON.stringify(response.json)}`);
+            // SummarDebug.log(1, `Gemini generateContent response: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.candidates[0].content.parts[0].text || '';
@@ -181,7 +181,7 @@ export class SummarAI extends SummarViewContainer {
             });
             return true;
           } else {
-            SummarDebug.log(1, `Gemini generateContent response without content: \n${JSON.stringify(response.json)}`);
+            // SummarDebug.log(1, `Gemini generateContent response without content: \n${JSON.stringify(response.json)}`);
             this.response.status = response.status;
             this.response.json = response.json;
             this.response.text = response.json.error ? response.json.error.message : 'No content available';
@@ -216,7 +216,7 @@ export class SummarAI extends SummarViewContainer {
 
       if (bodyContent && bodyContent.byteLength > 0) {
         if (this.aiProvider === 'openai') {
-          SummarDebug.log(1, `SummarAI.audioTranscription() - Using OpenAI audio/transcription with model: ${this.aiModel}`);
+          SummarDebug.log(1, `SummarAI.audioTranscription() - Using OpenAI audio/transcription with model: ${this.aiModel}, feature: ${this.feature}`);
 
           const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
           const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
@@ -231,7 +231,7 @@ export class SummarAI extends SummarViewContainer {
             body: bodyContent,
             throw: false
           });
-          SummarDebug.log(1, `OpenAI audio/transcription response: \n${JSON.stringify(response.json)}`);
+          SummarDebug.log(1, `SummarAI.audioTranscription() response: \n${JSON.stringify(response.json)}`);
           // SummarDebug.log(1, `OpenAI model: ${this.aiModel}, feature: ${this.feature}, duration: ${duration}`);
 
           if (response && response.json) {
@@ -313,10 +313,10 @@ export class SummarAI extends SummarViewContainer {
     apiUrl?: string
   ): Promise<any> {
     try {
-      SummarDebug.log(1, `openaiApiKey: ${this.aiKey}`);
-      SummarDebug.log(2, `bodyContent: ${bodyContent}`);
-      SummarDebug.log(3, `contentType: ${contentType}`);
-      SummarDebug.log(4, `apiUrl: ${apiUrl}`);
+      // SummarDebug.log(1, `openaiApiKey: ${this.aiKey}`);
+      // SummarDebug.log(1, `bodyContent: ${bodyContent}`);
+      // SummarDebug.log(1, `contentType: ${contentType}`);
+      // SummarDebug.log(1, `apiUrl: ${apiUrl}`);
 
       // 엔드포인트 설정 (비어있으면 기본값)
       let url = '';
@@ -326,6 +326,8 @@ export class SummarAI extends SummarViewContainer {
         const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
         url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
       }
+      SummarDebug.log(1, `SummarAI.chatOpenai() with model: ${this.aiModel}, feature: ${this.feature}`);
+
       const response = await SummarRequestUrl(this.plugin, {
         url: url,
         method: "POST",
@@ -336,6 +338,8 @@ export class SummarAI extends SummarViewContainer {
         body: bodyContent,
         throw: throwFlag,
       });
+      SummarDebug.log(1, `SummarAI.chatOpenai() response: \n${JSON.stringify(response.json)}`);
+
       return response;
     } catch (error) {
       SummarDebug.error(1, "Error fetching data from OpenAI API:", error);
@@ -349,8 +353,9 @@ export class SummarAI extends SummarViewContainer {
     contentType: string = 'application/json' 
   ): Promise<any> {
     try {
-      SummarDebug.log(1, `geminiApiKey: ${this.aiKey}`);
-      SummarDebug.log(2, `bodyContent: ${bodyContent}`);
+      // SummarDebug.log(1, `geminiApiKey: ${this.aiKey}`);
+      // SummarDebug.log(1, `bodyContent: ${bodyContent}`);
+      SummarDebug.log(1, `SummarAI.chatGemini() with model: ${this.aiModel}, feature: ${this.feature}`);
 
       const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${this.aiModel}:generateContent?key=${this.aiKey}`;
 
@@ -363,7 +368,8 @@ export class SummarAI extends SummarViewContainer {
         body: bodyContent,
         throw: throwFlag,
       });
-      
+
+      SummarDebug.log(1, `SummarAI.chatGemini() response: \n${JSON.stringify(response.json)}`);
       return response;
     } catch (error) {
       SummarDebug.error(1, "Error fetching data from Gemini API:", error);
