@@ -31,27 +31,19 @@ export class SummarStatsModal {
     this.plugin = plugin;
   }
 
-  async open() {
+  /**
+   * 외부 컨테이너에 대시보드 UI를 렌더링합니다.
+   * containerEl: HTMLElement (예: settings 탭의 div)
+   * options: { showDialogUI?: boolean } - true면 모달(닫기버튼 등), false면 내용만
+   */
+  async buildStatsView(containerEl: HTMLElement, options?: { showDialogUI?: boolean }) {
     await loadChartJs();
-    this.modalBg = document.createElement('div');
-    this.modalBg.style.position = 'fixed';
-    this.modalBg.style.top = '0';
-    this.modalBg.style.left = '0';
-    this.modalBg.style.width = '100vw';
-    this.modalBg.style.height = '100vh';
-    this.modalBg.style.background = 'rgba(0,0,0,0.3)';
-    this.modalBg.style.zIndex = '9999';
 
-    // 모달 바깥 클릭 시 닫기
-    this.modalBg.addEventListener('mousedown', this.handleBgClick);
-    // ESC 키로 닫기
-    window.addEventListener('keydown', this.handleEscKey);
+    // 기존 내용 비우기(중복 방지)
+    containerEl.innerHTML = '';
 
+    // 모달 스타일
     const modal = document.createElement('div');
-    modal.style.position = 'absolute';
-    modal.style.top = '50%';
-    modal.style.left = '50%';
-    modal.style.transform = 'translate(-50%, -50%)';
     modal.style.background = 'var(--background-primary)';
     modal.style.borderRadius = '12px';
     modal.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
@@ -60,46 +52,45 @@ export class SummarStatsModal {
     modal.style.maxWidth = '90vw';
     modal.style.maxHeight = '80vh';
     modal.style.overflowY = 'auto';
+    modal.style.position = options?.showDialogUI ? 'absolute' : '';
+    modal.style.top = options?.showDialogUI ? '50%' : '';
+    modal.style.left = options?.showDialogUI ? '50%' : '';
+    modal.style.transform = options?.showDialogUI ? 'translate(-50%, -50%)' : '';
 
-    // 모달 내부 클릭 시 닫히지 않게
-    modal.addEventListener('mousedown', (e) => e.stopPropagation());
-
-    this.modalBg.appendChild(modal);
-
-    // 헤더 + 닫기 버튼
+    // 헤더
     const header = document.createElement('div');
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
     header.style.alignItems = 'center';
     header.style.marginBottom = '16px';
-    
     const title = document.createElement('span');
     title.innerHTML = '<b>AI API 통계 대시보드</b>';
     title.style.fontSize = '1.5em';
     header.appendChild(title);
 
-    // 닫기 버튼
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '&times;';
-    closeBtn.setAttribute('aria-label', 'Close');
-    closeBtn.style.fontSize = '1.7em';
-    closeBtn.style.background = 'none';
-    closeBtn.style.border = 'none';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.style.color = 'var(--text-normal)';
-    closeBtn.style.marginLeft = '16px';
-    closeBtn.style.lineHeight = '1';
-    closeBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.close();
-    };
-    header.appendChild(closeBtn);
+    // 닫기 버튼(옵션에 따라)
+    if (options?.showDialogUI) {
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.setAttribute('aria-label', 'Close');
+      closeBtn.style.fontSize = '1.7em';
+      closeBtn.style.background = 'none';
+      closeBtn.style.border = 'none';
+      closeBtn.style.cursor = 'pointer';
+      closeBtn.style.color = 'var(--text-normal)';
+      closeBtn.style.marginLeft = '16px';
+      closeBtn.style.lineHeight = '1';
+      closeBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.close();
+      };
+      header.appendChild(closeBtn);
+    }
     modal.appendChild(header);
 
     // 기간/필터 행 생성
     const filterRow = document.createElement('div');
     filterRow.style.display = 'flex';
-    // filterRow.style.gap = '8px';
     filterRow.style.justifyContent = 'space-between';
     filterRow.style.alignItems = 'center';
     filterRow.style.marginBottom = '16px';
@@ -122,25 +113,20 @@ export class SummarStatsModal {
       btn.style.border = '1px solid var(--background-modifier-border)';
       btn.style.background = 'var(--background-secondary)';
       btn.style.cursor = 'pointer';
-      btn.onclick = () => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
         this.setPeriod(value as any);
+        // 모달 닫힘 방지
+        if (options?.showDialogUI) e.preventDefault();
       };
       this.periodButtons[value] = btn;
       periodTabs.appendChild(btn);
     });
-    // modal.appendChild(periodTabs);
 
     const providerBox = document.createElement('div');
     providerBox.style.display = 'flex';
     providerBox.style.alignItems = 'center';
     providerBox.style.gap = '4px';
-
-    // const providerLabel = document.createElement('span');
-    // providerLabel.textContent = 'provider:';
-    // // providerLabel.style.fontWeight = 'bold';
-    // providerLabel.style.fontSize = '1em';
-    // providerLabel.style.color = 'var(--text-normal)';
-    // providerBox.appendChild(providerLabel);
 
     // provider select
     const providerSelect = document.createElement('select');
@@ -157,10 +143,14 @@ export class SummarStatsModal {
       providerSelect.appendChild(opt);
     });
     providerSelect.value = this.currentProvider;
-    providerSelect.onchange = () => this.setProvider(providerSelect.value);
+    providerSelect.onchange = (e) => {
+      e.stopPropagation();
+      this.setProvider(providerSelect.value);
+      // 모달 닫힘 방지
+      if (options?.showDialogUI) e.preventDefault();
+    };
     providerBox.appendChild(providerSelect);
 
-    // filterRow에 좌/우측 요소 추가
     filterRow.appendChild(periodTabs);
     filterRow.appendChild(providerBox);
 
@@ -202,6 +192,8 @@ export class SummarStatsModal {
       div.onclick = (e) => {
         e.stopPropagation();
         this.setMetric(metric as any);
+        // 모달 닫힘 방지
+        if (options?.showDialogUI) e.preventDefault();
       };
     });
 
@@ -218,7 +210,6 @@ export class SummarStatsModal {
     modal.appendChild(this.chartArea);
 
     // 내보내기/비교/예측/알림 등 고급 기능 버튼(placeholder)
-    // if (this.plugin.settings.debugLevel > 0) {
     const actions = document.createElement('div');
     actions.style.display = 'flex';
     actions.style.gap = '12px';
@@ -240,7 +231,8 @@ export class SummarStatsModal {
 
     // CSV 내보내기 버튼 이벤트
     const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
-    exportCsvBtn.onclick = async () => {
+    exportCsvBtn.onclick = async (e) => {
+        e?.stopPropagation?.();
         // summar-ai-api-logs-db 전체 로그를 CSV로 변환
         const logs = await this.plugin.dbManager.getLogs();
         if (!logs || logs.length === 0) {
@@ -274,16 +266,19 @@ export class SummarStatsModal {
 
     // 비용 재계산 버튼 이벤트
     const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
-    recalcBtn.onclick = async () => {
+    if (recalcBtn) recalcBtn.onclick = async (e) => {
+      e?.stopPropagation?.();
       const trackapi = new TrackedAPIClient(this.plugin);
       const updated = await trackapi.recalcCost();
         alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
         await this.updateStatsAndChart();
+      if (options?.showDialogUI) e?.preventDefault?.();
     };
 
     // 초기화 버튼 이벤트
     const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
-    resetBtn.onclick = async () => {
+    if (resetBtn) resetBtn.onclick = async (e) => {
+      e?.stopPropagation?.();
       // 커스텀 경고 모달 생성
       const confirmBg = document.createElement('div');
       confirmBg.style.position = 'fixed';
@@ -353,16 +348,19 @@ export class SummarStatsModal {
 
     // 테스트 데이터 생성 버튼 이벤트
     const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
-    testDataBtn.onclick = async () => {
-        const client = new TrackedAPIClient(this.plugin);
-        await client.logAPICallTest(300, 1000);
-        alert('테스트 데이터가 추가되었습니다');
-        await this.updateStatsAndChart();
+    if (testDataBtn) testDataBtn.onclick = async (e) => {
+      e?.stopPropagation?.();
+      const client = new TrackedAPIClient(this.plugin);
+      await client.logAPICallTest(300, 1000);
+      alert('테스트 데이터가 추가되었습니다');
+      await this.updateStatsAndChart();
+      if (options?.showDialogUI) e?.preventDefault?.();
     };
 
     // 테스트 데이터 삭제 버튼 이벤트
     const deleteTestDataBtn = actions.querySelector('#ai-delete-test-data') as HTMLButtonElement;
-    deleteTestDataBtn.onclick = async () => {
+    if (deleteTestDataBtn) deleteTestDataBtn.onclick = async (e) => {
+      e?.stopPropagation?.();
       // 커스텀 경고 모달 생성
       const confirmBg = document.createElement('div');
       confirmBg.style.position = 'fixed';
@@ -416,6 +414,35 @@ export class SummarStatsModal {
       }
     };
 
+    containerEl.appendChild(modal);
+
+    // 디폴트: 시간별, 총호출수
+    this.setPeriod('hourly');
+
+    // 모달 내부 클릭 시 이벤트 버블링 방지 (중요!)
+    modal.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  async open() {
+    await loadChartJs();
+    this.modalBg = document.createElement('div');
+    this.modalBg.style.position = 'fixed';
+    this.modalBg.style.top = '0';
+    this.modalBg.style.left = '0';
+    this.modalBg.style.width = '100vw';
+    this.modalBg.style.height = '100vh';
+    this.modalBg.style.background = 'rgba(0,0,0,0.3)';
+    this.modalBg.style.zIndex = '9999';
+
+    // 모달 바깥 클릭 시 닫기
+    this.modalBg.addEventListener('mousedown', this.handleBgClick);
+    // ESC 키로 닫기
+    window.addEventListener('keydown', this.handleEscKey);
+
+    // 모달 내부 생성은 buildStatsView를 사용 (showDialogUI: true)
+    this.buildStatsView(this.modalBg, { showDialogUI: true });
     document.body.appendChild(this.modalBg);
 
     // 디폴트: 시간별, 총호출수
