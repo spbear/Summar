@@ -210,9 +210,17 @@ export class SummarSettingsTab extends PluginSettingTab {
             break;
           case 'stats-tab':
             // 통계 대시보드 탭에 SummarStatsModal의 buildStatsView 사용
-            if (this.plugin.settings.debugLevel > 0) {    
-              const statsModal = new SummarStatsModal(this.plugin);
-              await statsModal.buildStatsView(tabContent);
+            if (this.plugin.settings.debugLevel > 0) {
+              // 1. 로딩중 표시 먼저 보여주기
+              tabContent.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:320px;">
+                <span style="color:var(--text-muted);font-size:1.1em;">통계 대시보드 로딩 중...</span>
+              </div>`;
+              // 2. 다음 tick에 실제 대시보드 렌더링 (UI thread 양보)
+              setTimeout(async () => {
+                tabContent.innerHTML = ""; // 기존 로딩중 메시지 제거
+                const statsModal = new SummarStatsModal(this.plugin);
+                await statsModal.buildStatsView(tabContent);
+              }, 0);
             }
             break;
 

@@ -37,392 +37,436 @@ export class SummarStatsModal {
    * options: { showDialogUI?: boolean } - true면 모달(닫기버튼 등), false면 내용만
    */
   async buildStatsView(containerEl: HTMLElement, options?: { showDialogUI?: boolean }) {
-    await loadChartJs();
-
     // 기존 내용 비우기(중복 방지)
     containerEl.innerHTML = '';
 
-    // 모달 스타일
-    const modal = document.createElement('div');
-    modal.style.background = 'var(--background-primary)';
-    modal.style.borderRadius = '12px';
-    modal.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
-    modal.style.padding = '32px 24px';
-    modal.style.minWidth = '600px';
-    modal.style.maxWidth = '90vw';
-    modal.style.maxHeight = '80vh';
-    modal.style.overflowY = 'auto';
-    modal.style.position = options?.showDialogUI ? 'absolute' : '';
-    modal.style.top = options?.showDialogUI ? '50%' : '';
-    modal.style.left = options?.showDialogUI ? '50%' : '';
-    modal.style.transform = options?.showDialogUI ? 'translate(-50%, -50%)' : '';
+    // 1. "로딩중" 표시만 먼저 보여주기
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.display = 'flex';
+    loadingDiv.style.alignItems = 'center';
+    loadingDiv.style.justifyContent = 'center';
+    loadingDiv.style.height = '320px';
+    loadingDiv.innerHTML = `<span style="color:var(--text-muted);font-size:1.1em;">통계 대시보드 로딩 중...</span>`;
+    containerEl.appendChild(loadingDiv);
 
-    // 헤더
-    const header = document.createElement('div');
-    header.style.display = 'flex';
-    header.style.justifyContent = 'space-between';
-    header.style.alignItems = 'center';
-    header.style.marginBottom = '16px';
-    const title = document.createElement('span');
-    title.innerHTML = '<b>AI API 통계 대시보드</b>';
-    title.style.fontSize = '1.5em';
-    header.appendChild(title);
+    // 2. 다음 tick(이벤트 루프)에서 실제 UI 렌더링
+    setTimeout(() => {
+      containerEl.innerHTML = ''; // 로딩중 표시 제거
 
-    // 닫기 버튼(옵션에 따라)
-    if (options?.showDialogUI) {
-      const closeBtn = document.createElement('button');
-      closeBtn.innerHTML = '&times;';
-      closeBtn.setAttribute('aria-label', 'Close');
-      closeBtn.style.fontSize = '1.7em';
-      closeBtn.style.background = 'none';
-      closeBtn.style.border = 'none';
-      closeBtn.style.cursor = 'pointer';
-      closeBtn.style.color = 'var(--text-normal)';
-      closeBtn.style.marginLeft = '16px';
-      closeBtn.style.lineHeight = '1';
-      closeBtn.onclick = (e) => {
-        e.stopPropagation();
-        this.close();
-      };
-      header.appendChild(closeBtn);
-    }
-    modal.appendChild(header);
-
-    // 기간/필터 행 생성
-    const filterRow = document.createElement('div');
-    filterRow.style.display = 'flex';
-    filterRow.style.justifyContent = 'space-between';
-    filterRow.style.alignItems = 'center';
-    filterRow.style.marginBottom = '16px';
-
-    // 기간 선택 탭
-    const periodTabs = document.createElement('div');
-    periodTabs.style.display = 'flex';
-    periodTabs.style.gap = '8px';
-    const periods: [string, string, number][] = [
-      ['일간', 'hourly', 24],
-      ['주간', 'daily', 7],
-      ['월간', 'weekly', 8],
-      ['연간', 'monthly', 12],
-    ];
-    periods.forEach(([label, value]) => {
-      const btn = document.createElement('button');
-      btn.textContent = label;
-      btn.style.padding = '6px 16px';
-      btn.style.borderRadius = '6px';
-      btn.style.border = '1px solid var(--background-modifier-border)';
-      btn.style.background = 'var(--background-secondary)';
-      btn.style.cursor = 'pointer';
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        this.setPeriod(value as any);
-        // 모달 닫힘 방지
-        if (options?.showDialogUI) e.preventDefault();
-      };
-      this.periodButtons[value] = btn;
-      periodTabs.appendChild(btn);
-    });
-
-    const providerBox = document.createElement('div');
-    providerBox.style.display = 'flex';
-    providerBox.style.alignItems = 'center';
-    providerBox.style.gap = '4px';
-
-    // provider select
-    const providerSelect = document.createElement('select');
-    providerSelect.style.marginLeft = '16px';
-    providerSelect.style.padding = '6px 12px';
-    providerSelect.style.borderRadius = '6px';
-    providerSelect.style.border = '1px solid var(--background-modifier-border)';
-    providerSelect.style.background = 'var(--background-secondary)';
-    providerSelect.style.cursor = 'pointer';
-    ['all', 'openai', 'gemini'].forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p;
-      opt.textContent = p === 'all' ? '전체' : p;
-      providerSelect.appendChild(opt);
-    });
-    providerSelect.value = this.currentProvider;
-    providerSelect.onchange = (e) => {
-      e.stopPropagation();
-      this.setProvider(providerSelect.value);
-      // 모달 닫힘 방지
-      if (options?.showDialogUI) e.preventDefault();
-    };
-    providerBox.appendChild(providerSelect);
-
-    filterRow.appendChild(periodTabs);
-    filterRow.appendChild(providerBox);
-
-    modal.appendChild(filterRow);
-
-    // 요약 카드 영역
-    const summaryCards = document.createElement('div');
-    summaryCards.style.display = 'flex';
-    summaryCards.style.gap = '16px';
-    summaryCards.style.marginBottom = '24px';
-    summaryCards.innerHTML = `
-      <div id="ai-card-totalCalls" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-        <div>총 호출수</div><div id="ai-total-calls" style="font-size:1.3em;font-weight:bold;">-</div>
-      </div>
-      <div id="ai-card-totalTokens" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-        <div>총 토큰수</div><div id="ai-total-tokens" style="font-size:1.3em;font-weight:bold;">-</div>
-      </div>
-      <div id="ai-card-totalCost" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-        <div>총 비용($)</div><div id="ai-total-cost" style="font-size:1.3em;font-weight:bold;">-</div>
-      </div>
-      <div id="ai-card-avgLatency" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-        <div>평균 지연(ms)</div><div id="ai-avg-latency" style="font-size:1.3em;font-weight:bold;">-</div>
-      </div>
-      <div id="ai-card-successRate" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-        <div>성공률(%)</div><div id="ai-success-rate" style="font-size:1.3em;font-weight:bold;">-</div>
-      </div>
-    `;
-    modal.appendChild(summaryCards);
-
-    // 카드 클릭 이벤트 등록
-    this.metricDivs = {
-      totalCalls: summaryCards.querySelector('#ai-card-totalCalls') as HTMLDivElement,
-      totalTokens: summaryCards.querySelector('#ai-card-totalTokens') as HTMLDivElement,
-      totalCost: summaryCards.querySelector('#ai-card-totalCost') as HTMLDivElement,
-      avgLatency: summaryCards.querySelector('#ai-card-avgLatency') as HTMLDivElement,
-      successRate: summaryCards.querySelector('#ai-card-successRate') as HTMLDivElement,
-    };
-    Object.entries(this.metricDivs).forEach(([metric, div]) => {
-      div.onclick = (e) => {
-        e.stopPropagation();
-        this.setMetric(metric as any);
-        // 모달 닫힘 방지
-        if (options?.showDialogUI) e.preventDefault();
-      };
-    });
-
-    // 차트 영역
-    this.chartArea = document.createElement('div');
-    this.chartArea.style.height = '260px';
-    this.chartArea.style.background = 'var(--background-secondary)';
-    this.chartArea.style.borderRadius = '8px';
-    this.chartArea.style.marginBottom = '16px';
-    this.chartArea.style.display = 'flex';
-    this.chartArea.style.alignItems = 'center';
-    this.chartArea.style.justifyContent = 'center';
-    this.chartArea.innerHTML = '<canvas id="ai-trend-chart" style="width:100%;height:100%"></canvas>';
-    modal.appendChild(this.chartArea);
-
-    // 내보내기/비교/예측/알림 등 고급 기능 버튼(placeholder)
-    const actions = document.createElement('div');
-    actions.style.display = 'flex';
-    actions.style.gap = '12px';
-    actions.style.marginTop = '12px';
-    if (this.plugin.settings.debugLevel > 0) {
-        actions.innerHTML = `
-        <button id="ai-export-csv">CSV 내보내기</button>
-        <button id="ai-recalc-cost">비용 재계산</button>
-        <button id="ai-reset-db">초기화</button>
-        <button id="ai-create-test-data">테스트 데이터 생성</button>
-        <button id="ai-delete-test-data">테스트 데이터 삭제</button>
-        `;
-    } else {
-        actions.innerHTML = `
-        <button id="ai-export-csv">CSV 내보내기</button>
-        `;
-    }
-    modal.appendChild(actions);
-
-    // CSV 내보내기 버튼 이벤트
-    const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
-    exportCsvBtn.onclick = async (e) => {
-        e?.stopPropagation?.();
-        // summar-ai-api-logs-db 전체 로그를 CSV로 변환
-        const logs = await this.plugin.dbManager.getLogs();
-        if (!logs || logs.length === 0) {
-            alert('내보낼 데이터가 없습니다.');
-            return;
-        }
-        // CSV 헤더
-        const headers = [
-            'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
-        ];
-        const rows = logs.map(log => headers.map(h => {
-            let v = log[h as keyof typeof log];
-            if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
-            if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
-            return v ?? '';
-        }).join(','));
-        const csv = [headers.join(','), ...rows].join('\n');
-        // 파일 저장 dialog
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.plugin.dbManager.dbName}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 100);
-    };
-
-    // 비용 재계산 버튼 이벤트
-    const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
-    if (recalcBtn) recalcBtn.onclick = async (e) => {
-      e?.stopPropagation?.();
-      const trackapi = new TrackedAPIClient(this.plugin);
-      const updated = await trackapi.recalcCost();
-        alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
-        await this.updateStatsAndChart();
-      if (options?.showDialogUI) e?.preventDefault?.();
-    };
-
-    // 초기화 버튼 이벤트
-    const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
-    if (resetBtn) resetBtn.onclick = async (e) => {
-      e?.stopPropagation?.();
-      // 커스텀 경고 모달 생성
-      const confirmBg = document.createElement('div');
-      confirmBg.style.position = 'fixed';
-      confirmBg.style.top = '0';
-      confirmBg.style.left = '0';
-      confirmBg.style.width = '100vw';
-      confirmBg.style.height = '100vh';
-      confirmBg.style.background = 'rgba(0,0,0,0.3)';
-      confirmBg.style.zIndex = '10000';
-      const confirmBox = document.createElement('div');
-      confirmBox.style.position = 'absolute';
-      confirmBox.style.top = '50%';
-      confirmBox.style.left = '50%';
-      confirmBox.style.transform = 'translate(-50%, -50%)';
-      confirmBox.style.background = 'var(--background-primary)';
-      confirmBox.style.borderRadius = '12px';
-      confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
-      confirmBox.style.padding = '32px 24px';
-      confirmBox.style.minWidth = '320px';
-      confirmBox.style.textAlign = 'center';
-      confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
-      const yesBtn = document.createElement('button');
-      yesBtn.textContent = 'Yes';
-      yesBtn.style.margin = '0 12px';
-      yesBtn.style.padding = '8px 24px';
-      yesBtn.style.background = 'var(--background-secondary)';
-      yesBtn.style.color = 'var(--text-normal)';
-      yesBtn.style.border = '1px solid var(--background-modifier-border)';
-      yesBtn.style.borderRadius = '6px';
-      yesBtn.style.cursor = 'pointer';
-      const noBtn = document.createElement('button');
-      noBtn.textContent = 'No';
-      noBtn.style.margin = '0 12px';
-      noBtn.style.padding = '8px 24px';
-      noBtn.style.background = 'var(--color-accent)';
-      noBtn.style.color = 'white';
-      noBtn.style.border = 'none';
-      noBtn.style.borderRadius = '6px';
-      noBtn.style.cursor = 'pointer';
-      confirmBox.appendChild(yesBtn);
-      confirmBox.appendChild(noBtn);
-      confirmBg.appendChild(confirmBox);
-      document.body.appendChild(confirmBg);
-      noBtn.onclick = () => { document.body.removeChild(confirmBg); };
-      yesBtn.onclick = async () => {
-          document.body.removeChild(confirmBg);
-          if (!this.plugin.dbManager) return;
-          const db = this.plugin.dbManager['db'];
-          if (db) {
-              await new Promise((resolve, reject) => {
-                  const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
-                  const logsStore = tx.objectStore('api_logs');
-                  const statsStore = tx.objectStore('daily_stats');
-                  const clear1 = logsStore.clear();
-                  const clear2 = statsStore.clear();
-                  let done = 0;
-                  const check = () => { if (++done === 2) resolve(undefined); };
-                  clear1.onsuccess = check; clear2.onsuccess = check;
-                  clear1.onerror = () => reject(clear1.error);
-                  clear2.onerror = () => reject(clear2.error);
-              });
-          }
-          alert('DB가 초기화되었습니다.');
-          await this.updateStatsAndChart();
-      };
-    };
-
-    // 테스트 데이터 생성 버튼 이벤트
-    const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
-    if (testDataBtn) testDataBtn.onclick = async (e) => {
-      e?.stopPropagation?.();
-      const client = new TrackedAPIClient(this.plugin);
-      await client.logAPICallTest(300, 1000);
-      alert('테스트 데이터가 추가되었습니다');
-      await this.updateStatsAndChart();
-      if (options?.showDialogUI) e?.preventDefault?.();
-    };
-
-    // 테스트 데이터 삭제 버튼 이벤트
-    const deleteTestDataBtn = actions.querySelector('#ai-delete-test-data') as HTMLButtonElement;
-    if (deleteTestDataBtn) deleteTestDataBtn.onclick = async (e) => {
-      e?.stopPropagation?.();
-      // 커스텀 경고 모달 생성
-      const confirmBg = document.createElement('div');
-      confirmBg.style.position = 'fixed';
-      confirmBg.style.top = '0';
-      confirmBg.style.left = '0';
-      confirmBg.style.width = '100vw';
-      confirmBg.style.height = '100vh';
-      confirmBg.style.background = 'rgba(0,0,0,0.3)';
-      confirmBg.style.zIndex = '10000';
-      const confirmBox = document.createElement('div');
-      confirmBox.style.position = 'absolute';
-      confirmBox.style.top = '50%';
-      confirmBox.style.left = '50%';
-      confirmBox.style.transform = 'translate(-50%, -50%)';
-      confirmBox.style.background = 'var(--background-primary)';
-      confirmBox.style.borderRadius = '12px';
-      confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
-      confirmBox.style.padding = '32px 24px';
-      confirmBox.style.minWidth = '320px';
-      confirmBox.style.textAlign = 'center';
-      confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">테스트 데이터를 정말 삭제하시겠습니까?</div>`;
-      const yesBtn = document.createElement('button');
-      yesBtn.textContent = 'Yes';
-      yesBtn.style.margin = '0 12px';
-      yesBtn.style.padding = '8px 24px';
-      yesBtn.style.background = 'var(--background-secondary)';
-      yesBtn.style.color = 'var(--text-normal)';
-      yesBtn.style.border = '1px solid var(--background-modifier-border)';
-      yesBtn.style.borderRadius = '6px';
-      yesBtn.style.cursor = 'pointer';
-      const noBtn = document.createElement('button');
-      noBtn.textContent = 'No';
-      noBtn.style.margin = '0 12px';
-      noBtn.style.padding = '8px 24px';
-      noBtn.style.background = 'var(--color-accent)';
-      noBtn.style.color = 'white';
-      noBtn.style.border = 'none';
-      noBtn.style.borderRadius = '6px';
-      noBtn.style.cursor = 'pointer';
-      confirmBox.appendChild(yesBtn);
-      confirmBox.appendChild(noBtn);
-      confirmBg.appendChild(confirmBox);
-      document.body.appendChild(confirmBg);
-      noBtn.onclick = () => { document.body.removeChild(confirmBg); };
-      yesBtn.onclick = async () => {
-        document.body.removeChild(confirmBg);
-        const client = new TrackedAPIClient(this.plugin);
-        const number = await client.deleteTestLog();
-        alert(`테스트 데이터 ${number}건 삭제`);
-        await this.updateStatsAndChart();
+      // 모달 스타일
+      const modal = document.createElement('div');
+      modal.style.background = 'var(--background-primary)';
+      modal.style.borderRadius = '12px';
+      modal.style.padding = '32px 24px';
+      modal.style.minWidth = '600px';
+      modal.style.maxWidth = '90vw';
+      modal.style.maxHeight = '80vh';
+      modal.style.overflowY = 'auto';
+      modal.style.position = options?.showDialogUI ? 'absolute' : '';
+      modal.style.top = options?.showDialogUI ? '50%' : '';
+      modal.style.left = options?.showDialogUI ? '50%' : '';
+      modal.style.transform = options?.showDialogUI ? 'translate(-50%, -50%)' : '';
+      // border, shadow 조건 분기
+      if (options?.showDialogUI) {
+        modal.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+        modal.style.border = '';
+      } else {
+        modal.style.boxShadow = 'none';
+        modal.style.border = 'none';
       }
-    };
 
-    containerEl.appendChild(modal);
+      // 헤더
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+      header.style.marginBottom = '16px';
+      const title = document.createElement('span');
+      title.innerHTML = '<b>AI API 통계 대시보드</b>';
+      title.style.fontSize = '1.5em';
+      header.appendChild(title);
 
-    // 디폴트: 시간별, 총호출수
-    this.setPeriod('hourly');
+      // 닫기 버튼(옵션에 따라)
+      if (options?.showDialogUI) {
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.setAttribute('aria-label', 'Close');
+        closeBtn.style.fontSize = '1.7em';
+        closeBtn.style.background = 'none';
+        closeBtn.style.border = 'none';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.color = 'var(--text-normal)';
+        closeBtn.style.marginLeft = '16px';
+        closeBtn.style.lineHeight = '1';
+        closeBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.close();
+        };
+        header.appendChild(closeBtn);
+      }
+      modal.appendChild(header);
 
-    // 모달 내부 클릭 시 이벤트 버블링 방지 (중요!)
-    modal.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
-    });
+      // 기간/필터 행 생성
+      const filterRow = document.createElement('div');
+      filterRow.style.display = 'flex';
+      filterRow.style.justifyContent = 'space-between';
+      filterRow.style.alignItems = 'center';
+      filterRow.style.marginBottom = '16px';
+
+      // 기간 선택 탭
+      const periodTabs = document.createElement('div');
+      periodTabs.style.display = 'flex';
+      periodTabs.style.gap = '8px';
+      const periods: [string, string, number][] = [
+        ['일간', 'hourly', 24],
+        ['주간', 'daily', 7],
+        ['월간', 'weekly', 8],
+        ['연간', 'monthly', 12],
+      ];
+      periods.forEach(([label, value]) => {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.style.padding = '6px 16px';
+        btn.style.borderRadius = '6px';
+        btn.style.border = '1px solid var(--background-modifier-border)';
+        btn.style.background = 'var(--background-secondary)';
+        btn.style.cursor = 'pointer';
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          this.setPeriod(value as any);
+          // 모달 닫힘 방지
+          if (options?.showDialogUI) e.preventDefault();
+        };
+        this.periodButtons[value] = btn;
+        periodTabs.appendChild(btn);
+      });
+
+      const providerBox = document.createElement('div');
+      providerBox.style.display = 'flex';
+      providerBox.style.alignItems = 'center';
+      providerBox.style.gap = '4px';
+
+      // provider select
+      const providerSelect = document.createElement('select');
+      providerSelect.style.marginLeft = '16px';
+      providerSelect.style.padding = '6px 12px';
+      providerSelect.style.borderRadius = '6px';
+      providerSelect.style.border = '1px solid var(--background-modifier-border)';
+      providerSelect.style.background = 'var(--background-secondary)';
+      providerSelect.style.cursor = 'pointer';
+      ['all', 'openai', 'gemini'].forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p === 'all' ? '전체' : p;
+        providerSelect.appendChild(opt);
+      });
+      providerSelect.value = this.currentProvider;
+      providerSelect.onchange = (e) => {
+        e.stopPropagation();
+        this.setProvider(providerSelect.value);
+        // 모달 닫힘 방지
+        if (options?.showDialogUI) e.preventDefault();
+      };
+      providerBox.appendChild(providerSelect);
+
+      filterRow.appendChild(periodTabs);
+      filterRow.appendChild(providerBox);
+
+      modal.appendChild(filterRow);
+
+      // 요약 카드 영역
+      const summaryCards = document.createElement('div');
+      summaryCards.style.display = 'flex';
+      summaryCards.style.gap = '16px';
+      summaryCards.style.marginBottom = '24px';
+      summaryCards.innerHTML = `
+        <div id="ai-card-totalCalls" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
+          <div>총 호출수</div><div id="ai-total-calls" style="font-size:1.3em;font-weight:bold;">-</div>
+        </div>
+        <div id="ai-card-totalTokens" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
+          <div>총 토큰수</div><div id="ai-total-tokens" style="font-size:1.3em;font-weight:bold;">-</div>
+        </div>
+        <div id="ai-card-totalCost" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
+          <div>총 비용($)</div><div id="ai-total-cost" style="font-size:1.3em;font-weight:bold;">-</div>
+        </div>
+        <div id="ai-card-avgLatency" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
+          <div>평균 지연(ms)</div><div id="ai-avg-latency" style="font-size:1.3em;font-weight:bold;">-</div>
+        </div>
+        <div id="ai-card-successRate" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
+          <div>성공률(%)</div><div id="ai-success-rate" style="font-size:1.3em;font-weight:bold;">-</div>
+        </div>
+      `;
+      modal.appendChild(summaryCards);
+
+      // 카드 클릭 이벤트 등록
+      this.metricDivs = {
+        totalCalls: summaryCards.querySelector('#ai-card-totalCalls') as HTMLDivElement,
+        totalTokens: summaryCards.querySelector('#ai-card-totalTokens') as HTMLDivElement,
+        totalCost: summaryCards.querySelector('#ai-card-totalCost') as HTMLDivElement,
+        avgLatency: summaryCards.querySelector('#ai-card-avgLatency') as HTMLDivElement,
+        successRate: summaryCards.querySelector('#ai-card-successRate') as HTMLDivElement,
+      };
+      Object.entries(this.metricDivs).forEach(([metric, div]) => {
+        div.onclick = (e) => {
+          e.stopPropagation();
+          this.setMetric(metric as any);
+          // 모달 닫힘 방지
+          if (options?.showDialogUI) e.preventDefault();
+        };
+      });
+
+      // 차트 영역(로딩 표시)
+      this.chartArea = document.createElement('div');
+      this.chartArea.style.height = '260px';
+      this.chartArea.style.background = 'var(--background-secondary)';
+      this.chartArea.style.borderRadius = '8px';
+      this.chartArea.style.marginBottom = '16px';
+      this.chartArea.style.display = 'flex';
+      this.chartArea.style.alignItems = 'center';
+      this.chartArea.style.justifyContent = 'center';
+      this.chartArea.innerHTML = `<span style="color:var(--text-muted);font-size:1.1em;">차트 로딩 중...</span>`;
+      modal.appendChild(this.chartArea);
+
+      // 내보내기/비교/예측/알림 등 고급 기능 버튼(placeholder)
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '12px';
+      actions.style.marginTop = '12px';
+      if (this.plugin.settings.debugLevel > 0) {
+          actions.innerHTML = `
+          <button id="ai-export-csv">CSV 내보내기</button>
+          <button id="ai-recalc-cost">비용 재계산</button>
+          <button id="ai-reset-db">초기화</button>
+          <button id="ai-create-test-data">테스트 데이터 생성</button>
+          <button id="ai-delete-test-data">테스트 데이터 삭제</button>
+          `;
+      } else {
+          actions.innerHTML = `
+          <button id="ai-export-csv">CSV 내보내기</button>
+          `;
+      }
+      modal.appendChild(actions);
+
+      // CSV 내보내기 버튼 이벤트
+      const exportCsvBtn = actions.querySelector('#ai-export-csv') as HTMLButtonElement;
+      exportCsvBtn.onclick = async (e) => {
+          e?.stopPropagation?.();
+          // summar-ai-api-logs-db 전체 로그를 CSV로 변환
+          const logs = await this.plugin.dbManager.getLogs();
+          if (!logs || logs.length === 0) {
+              alert('내보낼 데이터가 없습니다.');
+              return;
+          }
+          // CSV 헤더
+          const headers = [
+              'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
+          ];
+          const rows = logs.map(log => headers.map(h => {
+              let v = log[h as keyof typeof log];
+              if (typeof v === 'string') return '"' + v.replace(/"/g, '""') + '"';
+              if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+              return v ?? '';
+          }).join(','));
+          const csv = [headers.join(','), ...rows].join('\n');
+          // 파일 저장 dialog
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${this.plugin.dbManager.dbName}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+          }, 100);
+      };
+
+      // 비용 재계산 버튼 이벤트
+      const recalcBtn = actions.querySelector('#ai-recalc-cost') as HTMLButtonElement;
+      if (recalcBtn) recalcBtn.onclick = async (e) => {
+        e?.stopPropagation?.();
+        const trackapi = new TrackedAPIClient(this.plugin);
+        const updated = await trackapi.recalcCost();
+          alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
+          await this.updateStatsAndChart();
+        if (options?.showDialogUI) e?.preventDefault?.();
+      };
+
+      // 초기화 버튼 이벤트
+      const resetBtn = actions.querySelector('#ai-reset-db') as HTMLButtonElement;
+      if (resetBtn) resetBtn.onclick = async (e) => {
+        e?.stopPropagation?.();
+        // 커스텀 경고 모달 생성
+        const confirmBg = document.createElement('div');
+        confirmBg.style.position = 'fixed';
+        confirmBg.style.top = '0';
+        confirmBg.style.left = '0';
+        confirmBg.style.width = '100vw';
+        confirmBg.style.height = '100vh';
+        confirmBg.style.background = 'rgba(0,0,0,0.3)';
+        confirmBg.style.zIndex = '10000';
+        const confirmBox = document.createElement('div');
+        confirmBox.style.position = 'absolute';
+        confirmBox.style.top = '50%';
+        confirmBox.style.left = '50%';
+        confirmBox.style.transform = 'translate(-50%, -50%)';
+        confirmBox.style.background = 'var(--background-primary)';
+        confirmBox.style.borderRadius = '12px';
+        confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+        confirmBox.style.padding = '32px 24px';
+        confirmBox.style.minWidth = '320px';
+        confirmBox.style.textAlign = 'center';
+        confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
+        const yesBtn = document.createElement('button');
+        yesBtn.textContent = 'Yes';
+        yesBtn.style.margin = '0 12px';
+        yesBtn.style.padding = '8px 24px';
+        yesBtn.style.background = 'var(--background-secondary)';
+        yesBtn.style.color = 'var(--text-normal)';
+        yesBtn.style.border = '1px solid var(--background-modifier-border)';
+        yesBtn.style.borderRadius = '6px';
+        yesBtn.style.cursor = 'pointer';
+        const noBtn = document.createElement('button');
+        noBtn.textContent = 'No';
+        noBtn.style.margin = '0 12px';
+        noBtn.style.padding = '8px 24px';
+        noBtn.style.background = 'var(--color-accent)';
+        noBtn.style.color = 'white';
+        noBtn.style.border = 'none';
+        noBtn.style.borderRadius = '6px';
+        noBtn.style.cursor = 'pointer';
+        confirmBox.appendChild(yesBtn);
+        confirmBox.appendChild(noBtn);
+        confirmBg.appendChild(confirmBox);
+        document.body.appendChild(confirmBg);
+        noBtn.onclick = () => { document.body.removeChild(confirmBg); };
+        yesBtn.onclick = async () => {
+            document.body.removeChild(confirmBg);
+            if (!this.plugin.dbManager) return;
+            const db = this.plugin.dbManager['db'];
+            if (db) {
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(['api_logs', 'daily_stats'], 'readwrite');
+                    const logsStore = tx.objectStore('api_logs');
+                    const statsStore = tx.objectStore('daily_stats');
+                    const clear1 = logsStore.clear();
+                    const clear2 = statsStore.clear();
+                    let done = 0;
+                    const check = () => { if (++done === 2) resolve(undefined); };
+                    clear1.onsuccess = check; clear2.onsuccess = check;
+                    clear1.onerror = () => reject(clear1.error);
+                    clear2.onerror = () => reject(clear2.error);
+                });
+            }
+            alert('DB가 초기화되었습니다.');
+            await this.updateStatsAndChart();
+        };
+      };
+
+      // 테스트 데이터 생성 버튼 이벤트
+      const testDataBtn = actions.querySelector('#ai-create-test-data') as HTMLButtonElement;
+      if (testDataBtn) testDataBtn.onclick = async (e) => {
+        e?.stopPropagation?.();
+        const client = new TrackedAPIClient(this.plugin);
+        await client.logAPICallTest(300, 1000);
+        alert('테스트 데이터가 추가되었습니다');
+        await this.updateStatsAndChart();
+        if (options?.showDialogUI) e?.preventDefault?.();
+      };
+
+      // 테스트 데이터 삭제 버튼 이벤트
+      const deleteTestDataBtn = actions.querySelector('#ai-delete-test-data') as HTMLButtonElement;
+      if (deleteTestDataBtn) deleteTestDataBtn.onclick = async (e) => {
+        e?.stopPropagation?.();
+        // 커스텀 경고 모달 생성
+        const confirmBg = document.createElement('div');
+        confirmBg.style.position = 'fixed';
+        confirmBg.style.top = '0';
+        confirmBg.style.left = '0';
+        confirmBg.style.width = '100vw';
+        confirmBg.style.height = '100vh';
+        confirmBg.style.background = 'rgba(0,0,0,0.3)';
+        confirmBg.style.zIndex = '10000';
+        const confirmBox = document.createElement('div');
+        confirmBox.style.position = 'absolute';
+        confirmBox.style.top = '50%';
+        confirmBox.style.left = '50%';
+        confirmBox.style.transform = 'translate(-50%, -50%)';
+        confirmBox.style.background = 'var(--background-primary)';
+        confirmBox.style.borderRadius = '12px';
+        confirmBox.style.boxShadow = '0 4px 32px rgba(0,0,0,0.2)';
+        confirmBox.style.padding = '32px 24px';
+        confirmBox.style.minWidth = '320px';
+        confirmBox.style.textAlign = 'center';
+        confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">테스트 데이터를 정말 삭제하시겠습니까?</div>`;
+        const yesBtn = document.createElement('button');
+        yesBtn.textContent = 'Yes';
+        yesBtn.style.margin = '0 12px';
+        yesBtn.style.padding = '8px 24px';
+        yesBtn.style.background = 'var(--background-secondary)';
+        yesBtn.style.color = 'var(--text-normal)';
+        yesBtn.style.border = '1px solid var(--background-modifier-border)';
+        yesBtn.style.borderRadius = '6px';
+        yesBtn.style.cursor = 'pointer';
+        const noBtn = document.createElement('button');
+        noBtn.textContent = 'No';
+        noBtn.style.margin = '0 12px';
+        noBtn.style.padding = '8px 24px';
+        noBtn.style.background = 'var(--color-accent)';
+        noBtn.style.color = 'white';
+        noBtn.style.border = 'none';
+        noBtn.style.borderRadius = '6px';
+        noBtn.style.cursor = 'pointer';
+        confirmBox.appendChild(yesBtn);
+        confirmBox.appendChild(noBtn);
+        confirmBg.appendChild(confirmBox);
+        document.body.appendChild(confirmBg);
+        noBtn.onclick = () => { document.body.removeChild(confirmBg); };
+        yesBtn.onclick = async () => {
+          document.body.removeChild(confirmBg);
+          const client = new TrackedAPIClient(this.plugin);
+          const number = await client.deleteTestLog();
+          alert(`테스트 데이터 ${number}건 삭제`);
+          await this.updateStatsAndChart();
+        }
+      };
+
+      containerEl.appendChild(modal);
+
+      // 디폴트: 시간별, 총호출수
+      // Chart.js 로딩과 데이터 fetch를 병렬로 처리
+      let chartJsLoaded = false;
+      let statsReady = false;
+
+      // 1. UI(카드 등) 먼저 그리기
+      this.setPeriod('hourly');
+
+      // 2. Chart.js 비동기 로드
+      loadChartJs().then(() => {
+        chartJsLoaded = true;
+        // 차트가 이미 준비된 경우 차트 그리기
+        if (statsReady) this.updateChart();
+      });
+
+      // 3. 데이터 fetch 후 차트 그리기(Chart.js가 준비된 경우)
+      // setPeriod('hourly')에서 updateStatsAndChart()가 호출되며, updateChart()도 호출됨
+      // updateChart()에서 Chart.js가 없으면 아무것도 하지 않음
+      // Chart.js가 로드된 후 updateChart()를 다시 호출
+      const origUpdateChart = this.updateChart.bind(this);
+      this.updateChart = () => {
+        if (!chartJsLoaded) return; // Chart.js가 아직 없으면 대기
+        origUpdateChart();
+      };
+
+      // 4. 데이터 준비 완료 플래그
+      statsReady = true;
+
+      // 모달 내부 클릭 시 이벤트 버블링 방지 (중요!)
+      modal.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+      });
+    }, 0);
   }
 
   async open() {
