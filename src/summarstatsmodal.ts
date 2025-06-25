@@ -1078,7 +1078,47 @@ export class SummarStatsModal {
                   );
                   this.updateSummaryCards(this.summaryStats, this.visibleFeatures);
                 }
-              }              
+              },
+              tooltip: {
+                callbacks: {
+                  title: (items: any[]) => {
+                    // items[0].raw.x는 period 문자열임
+                    const period = items[0].raw.x;
+                    // 기간 문자열을 시스템 locale 시간으로 변환
+                    // hourly: '0시', '1시' ... daily: 'YYYY-MM-DD', weekly: 'YYYY-W##', monthly: 'YYYY-MM'
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(period)) {
+                      // daily
+                      const d = new Date(period);
+                      return d.toLocaleDateString();
+                    } else if (/^\d{4}-\d{2}$/.test(period)) {
+                      // monthly
+                      const [y, m] = period.split('-');
+                      const d = new Date(Number(y), Number(m) - 1, 1);
+                      return d.toLocaleString(undefined, { year: 'numeric', month: 'long' });
+                    } else if (/^\d{4}-W\d{2}$/.test(period)) {
+                      // weekly (ISO week)
+                      const [y, w] = period.split('-W');
+                      // ISO week -> date (월요일)
+                      const simple = (y: number, w: number) => {
+                        const d = new Date(Number(y), 0, 1 + (Number(w) - 1) * 7);
+                        // 보정: 해당 주의 월요일 찾기
+                        const day = d.getDay();
+                        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                        return new Date(d.setDate(diff));
+                      };
+                      const monday = simple(Number(y), Number(w));
+                      return `${monday.toLocaleDateString()} (주 시작)`;
+                    } else if (/^\d+시$/.test(period)) {
+                      // hourly
+                      const hour = Number(period.replace('시', ''));
+                      const now = new Date();
+                      now.setHours(hour, 0, 0, 0);
+                      return now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                    }
+                    return period;
+                  }
+                }
+              }
             },
             scales: {
               x: {
