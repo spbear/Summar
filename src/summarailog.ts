@@ -710,13 +710,23 @@ if (this.plugin.settings.debugLevel < 1) {
                     (feature==='stt')
                 );
             }
+            let endpoint = 'test';
+            if (provider === 'gemini') {
+                endpoint = 'generateContent';
+            } else if (provider === 'openai') { 
+                if (feature === 'stt') {
+                    endpoint = 'audio/transcription';
+                } else {
+                    endpoint = 'chat/completions';
+                }
+            }
             const log = {
                 id: crypto.randomUUID(),
                 timestamp,
                 timestampISO,
                 provider,
                 model,
-                endpoint: 'test',
+                endpoint,
                 feature,
                 requestSize,
                 responseSize,

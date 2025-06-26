@@ -141,10 +141,6 @@ export default class SummarPlugin extends Plugin {
     this.PLUGIN_DIR = normalizePath(this.OBSIDIAN_PLUGIN_DIR + "/" + this.PLUGIN_ID);
     this.PLUGIN_MANIFEST = normalizePath(this.PLUGIN_DIR + "/manifest.json");
 
-    this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
-    this.settings = await this.loadSettingsFromFile();
-    SummarDebug.initialize(this.settings.debugLevel);
-
     this.PLUGIN_MODELS = normalizePath(this.PLUGIN_DIR + "/models.json");    
     await this.loadModelsFromFile();
 
@@ -154,7 +150,9 @@ export default class SummarPlugin extends Plugin {
     this.PLUGIN_MODELPRICING = normalizePath(this.PLUGIN_DIR + "/model-pricing.json");
     await this.loadModelPricingFromFile();
 
-
+    this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
+    this.settings = await this.loadSettingsFromFile();
+    SummarDebug.initialize(this.settings.debugLevel);
 
 
 

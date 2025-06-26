@@ -4,6 +4,7 @@ import { SummarDebug, SummarRequestUrl, getDeviceId, sanitizeLabel, SummarToolti
 import { PluginUpdater } from "./pluginupdater";
 import SummarPlugin from "./main";
 import { ConfluenceAPI } from "./confluenceapi";
+import { SummarStatsModal } from "./summarstatsmodal";
 
 export class SummarSettingsTab extends PluginSettingTab {
   plugin: SummarPlugin;
@@ -126,49 +127,53 @@ export class SummarSettingsTab extends PluginSettingTab {
       { name: 'Recording', icon: 'voicemail', id: 'recording-tab', tooltip: 'Transcription Summary' },
       { name: 'Schedule', icon: 'calendar-check', id: 'schedule-tab', tooltip: 'Auto recording' },
       { name: 'Custom command', icon: 'wand-sparkles', id: 'custom-tab', tooltip: 'Custom Commands' },
-
+      { name: 'Stats', icon: 'bar-chart', id: 'stats-tab', tooltip: 'AI API Stats' },
     ];
 
     let activeTab = this.savedTabId;
 
     // Create tabs
     tabs.forEach((tab) => {
-      if ((tab.id !== 'pdf-tab' && tab.id !== 'schedule-tab') || (Platform.isMacOS && Platform.isDesktopApp)) {
-        const setting = new Setting(tabsContainer);
+      if (this.plugin.settings.debugLevel === 0 && tab.id === 'stats-tab') {
+        
+      } else {  
+        if ((tab.id !== 'pdf-tab' && tab.id !== 'schedule-tab') || (Platform.isMacOS && Platform.isDesktopApp)) {
+          const setting = new Setting(tabsContainer);
 
-        const tabButton = setting.addExtraButton((button) => {
-          button.setIcon(tab.icon) // 적절한 아이콘 선택
-            .setTooltip(tab.tooltip)
-            .onClick(() => {
-              // SummarDebug.log(3, `savedTabId: ${this.savedTabId}, tab.id: ${tab.id}`);
+          const tabButton = setting.addExtraButton((button) => {
+            button.setIcon(tab.icon) // 적절한 아이콘 선택
+              .setTooltip(tab.tooltip)
+              .onClick(() => {
+                // SummarDebug.log(3, `savedTabId: ${this.savedTabId}, tab.id: ${tab.id}`);
 
-              this.savedTabId = activeTab = tab.id;
+                this.savedTabId = activeTab = tab.id;
 
-              // Update active state
-              tabsContainer.querySelectorAll('.clickable-icon').forEach((btn) => {
-                btn.removeClass('active');
+                // Update active state
+                tabsContainer.querySelectorAll('.clickable-icon').forEach((btn) => {
+                  btn.removeClass('active');
+                });
+
+                // ExtraButton의 내부 요소에 클래스 추가
+                const buttonEl = setting.settingEl.querySelector('.clickable-icon');
+                if (buttonEl) {
+                  buttonEl.addClass('active');
+                }
+                // Show active tab content
+                tabContents.querySelectorAll('.settings-tab-content').forEach((content) => {
+                  // SummarDebug.log(3, `content.id: ${content.id}, activeTab: ${activeTab}`);
+                  content.toggleClass('hidden', content.id !== activeTab);
+                });
               });
+          });
 
-              // ExtraButton의 내부 요소에 클래스 추가
-              const buttonEl = setting.settingEl.querySelector('.clickable-icon');
-              if (buttonEl) {
-                buttonEl.addClass('active');
-              }
-              // Show active tab content
-              tabContents.querySelectorAll('.settings-tab-content').forEach((content) => {
-                // SummarDebug.log(3, `content.id: ${content.id}, activeTab: ${activeTab}`);
-                content.toggleClass('hidden', content.id !== activeTab);
-              });
-            });
-        });
+          // ExtraButton의 요소 직접 가져와 활성화
+          const buttonEl = setting.settingEl.querySelector('.clickable-icon');
+          (buttonEl as HTMLElement).dataset.id = tab.id;
+          if (tab.id === activeTab) {
+            if (buttonEl) buttonEl.addClass('active');
+          }
 
-        // ExtraButton의 요소 직접 가져와 활성화
-        const buttonEl = setting.settingEl.querySelector('.clickable-icon');
-        (buttonEl as HTMLElement).dataset.id = tab.id;
-        if (tab.id === activeTab) {
-          if (buttonEl) buttonEl.addClass('active');
         }
-
       }
     });
 
@@ -202,6 +207,21 @@ export class SummarSettingsTab extends PluginSettingTab {
             break;
           case 'custom-tab':
             await this.buildCustomCommandSettings(tabContent);
+            break;
+          case 'stats-tab':
+            // 통계 대시보드 탭에 SummarStatsModal의 buildStatsView 사용
+            if (this.plugin.settings.debugLevel > 0) {
+              // 1. 로딩중 표시 먼저 보여주기
+              tabContent.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:320px;">
+                <span style="color:var(--text-muted);font-size:1.1em;">통계 대시보드 로딩 중...</span>
+              </div>`;
+              // 2. 다음 tick에 실제 대시보드 렌더링 (UI thread 양보)
+              setTimeout(async () => {
+                tabContent.innerHTML = ""; // 기존 로딩중 메시지 제거
+                const statsModal = new SummarStatsModal(this.plugin);
+                await statsModal.buildStatsView(tabContent);
+              }, 0);
+            }
             break;
 
           case 'schedule-tab':
