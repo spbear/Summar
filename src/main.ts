@@ -66,6 +66,7 @@ export default class SummarPlugin extends Plugin {
     calendar_fetchdays: 1,
     calendar_polling_interval: 600000,
     autoLaunchZoomOnSchedule: false,
+    autoLaunchZoomOnlyAccepted: true,
     /// deprecated variables // before 1.0.0
     recordingResultNewNote: true,
     transcriptSTT: "",

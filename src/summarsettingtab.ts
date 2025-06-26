@@ -1412,7 +1412,35 @@ async activateTab(tabId: string): Promise<void> {
           } else {
             this.plugin.reservedStatus.setStatusbarIcon('calendar-x', 'var(--text-muted)');
           }
+          // 하위 옵션 활성화/비활성화
+          const onlyAcceptedSetting = containerEl.querySelector('.only-accepted-setting') as HTMLElement;
+          if (onlyAcceptedSetting) {
+            if (value) {
+              onlyAcceptedSetting.removeClass('disabled');
+            } else {
+              onlyAcceptedSetting.addClass('disabled');
+            }
+          }
         }));
+    
+    const onlyAcceptedSetting = new Setting(containerEl)
+      .setName('Only join Zoom meetings that I have accepted')
+      .setDesc('When enabled, auto-launch will only work for calendar events where I have accepted the invitation. Disabled means all events with Zoom links will auto-launch.')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.autoLaunchZoomOnlyAccepted).onChange(async (value) => {
+          this.plugin.settings.autoLaunchZoomOnlyAccepted = value;
+          await this.plugin.saveSettingsToFile();
+          // 설정 변경 시 이벤트 리스트 다시 렌더링
+          await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule);
+        }));
+    
+    // 클래스 추가하여 CSS로 제어할 수 있도록 함
+    onlyAcceptedSetting.settingEl.addClass('only-accepted-setting');
+    
+    // 초기 상태 설정
+    if (!this.plugin.settings.autoLaunchZoomOnSchedule) {
+      onlyAcceptedSetting.settingEl.addClass('disabled');
+    }
     await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, containerEl.createDiv());
   }
 
