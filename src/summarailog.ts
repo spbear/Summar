@@ -799,12 +799,15 @@ SummarDebug.log(3, `model: ${model}, matched: ${matchedKey}, inputPerK: ${inputP
             }
             if (log.cost !== newCost) {
                 SummarDebug.log(3, `recalcCost()\noldcost: ${log.cost}, newcost: ${newCost}, provider: ${log.provider}, feature: ${log.feature}`);
-                log.cost = newCost;
                 updated++;
             }
-            condition++;
-            log.version = this.dbManager.version;
-            await this.dbManager.addLog(log, true); // addLog는 기존 id면 update
+            if ((log.cost !== newCost) || (log.version !== this.dbManager.version))
+            {
+                log.cost = newCost;
+                log.version = this.dbManager.version;
+                condition++;
+                await this.dbManager.addLog(log, true); // addLog는 기존 id면 update
+            }
         }
         SummarDebug.log(3, `TrackedAPIClient.recalcCost(): ${condition} rows updated`)
         return updated;
