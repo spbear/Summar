@@ -8,7 +8,8 @@
         "gpt-4.1-mini": "gpt-4.1-mini",
         "o1-mini": "o1-mini",
         "o3-mini": "o3-mini",
-        "gemini-2.0-flash": "gemini-2.0-flash"
+        "gemini-2.0-flash": "gemini-2.0-flash",
+        "gemini-2.5-flash": "gemini-2.5-flash"
       }
     },
     "pdfModel": {
@@ -25,7 +26,8 @@
         "whisper-1": "whisper-1",
         "gpt-4o-mini-transcribe": "gpt-4o-mini-transcribe",
         "gpt-4o-transcribe": "gpt-4o-transcribe",
-        "gemini-2.0-flash": "gemini-2.0-flash"
+        "gemini-2.0-flash": "gemini-2.0-flash",
+        "gemini-2.5-flash": "gemini-2.5-flash"
       }
     },
     "transcriptSummaryModel": {
@@ -36,7 +38,8 @@
         "gpt-4.1-mini": "gpt-4.1-mini",
         "o1-mini": "o1-mini",
         "o3-mini": "o3-mini",
-        "gemini-2.0-flash": "gemini-2.0-flash"
+        "gemini-2.0-flash": "gemini-2.0-flash",
+        "gemini-2.5-flash": "gemini-2.5-flash"
       }
     },
     "customModel": {
@@ -47,7 +50,8 @@
         "gpt-4.1-mini": "gpt-4.1-mini",
         "o1-mini": "o1-mini",
         "o3-mini": "o3-mini",
-        "gemini-2.0-flash": "gemini-2.0-flash"
+        "gemini-2.0-flash": "gemini-2.0-flash",
+        "gemini-2.5-flash": "gemini-2.5-flash"
       }
     }
   }
