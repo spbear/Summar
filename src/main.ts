@@ -14,7 +14,7 @@ import { StatusBar } from "./statusbar";
 import { SummarStatsModal } from "./summarstatsmodal";
 import { IndexedDBManager } from "./summarailog";
 import semver from "semver";
-
+import { TrackedAPIClient } from "./summarailog";
 
 export default class SummarPlugin extends Plugin {
   settings: PluginSettings = {
@@ -157,7 +157,6 @@ export default class SummarPlugin extends Plugin {
     SummarDebug.initialize(this.settings.debugLevel);
 
 
-
     SummarDebug.log(1, `OBSIDIAN_PLUGIN_DIR: ${this.OBSIDIAN_PLUGIN_DIR}`);
     SummarDebug.log(1, `PLUGIN_ID: ${this.PLUGIN_ID}`);
     SummarDebug.log(1, `PLUGIN_DIR: ${this.PLUGIN_DIR}`);
@@ -195,6 +194,9 @@ export default class SummarPlugin extends Plugin {
 
     this.dbManager = new IndexedDBManager();
     await this.dbManager.init(this);
+
+    const trackapi = new TrackedAPIClient(this);
+    const updated = await trackapi.fixDB();
 
 
     if (Platform.isDesktopApp) {

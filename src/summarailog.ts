@@ -1,5 +1,6 @@
 import SummarPlugin from "./main";
 import { SummarDebug } from "./globals";
+import semver from "semver"
 
 // API 로그 인터페이스
 export interface APICallLog {
@@ -31,7 +32,7 @@ export interface APICallLog {
 // IndexedDB 관리 클래스
 export class IndexedDBManager {
     dbName = `summar-ai-api-logs-db`;
-    version = '1.0.1';
+    version = '1.0.2'; 
     private dbVersion = 2;
     private db: IDBDatabase | null = null;
 
@@ -445,6 +446,13 @@ export class TrackedAPIClient {
     getLatency() : number {
         return Date.now() - this.startTime;
     }
+
+    async fixDB() : Promise<number> {
+        const fixed = await this.recalcCost(log => semver.lt(log.version, this.dbManager.version));
+        SummarDebug.log(1, `TrackedAPIClient.fixDB(): ${fixed} fixed.`)
+        return fixed;
+    }
+
     /**
      * loadAPICall()
      * - provider: string;
@@ -561,9 +569,11 @@ if (this.plugin.settings.debugLevel < 1) {
         const m = model.toLowerCase();
 
         const pricing = this.plugin.modelPricing?.openai ?? {};
-        const matchedKey = Object.keys(pricing).find(key => m.includes(key.toLowerCase())) ?? '';
+        // const matchedKey = Object.keys(pricing).find(key => m.includes(key.toLowerCase())) ?? '';
+        const matchedKey = Object.keys(pricing).find(key => key.toLowerCase() === m) ?? '';
         const price = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0 };
 
+SummarDebug.log(3, `model: ${m}, matched: ${matchedKey}, inputPerK: ${price.inputPerK}, outputPerK: ${price.outputPerK}`);
         if (m.includes('whisper') || m.includes('transcribe')) return 0;
         return (usage.prompt_tokens * price.inputPerK / 1000) + (usage.completion_tokens * price.outputPerK / 1000);
     }
@@ -594,21 +604,25 @@ if (this.plugin.settings.debugLevel < 1) {
         const pricing = this.plugin.modelPricing?.gemini ?? {};
         let inputPerK = 0, outputPerK = 0;
 
-        if (model.includes('2.5-pro')) {
+        // if (model.includes('2.5-pro')) {
+        if (model.toLocaleLowerCase() === 'gemini-2.5-pro') {
             const tier = promptTokens > 200_000
                 ? pricing["gemini-2.5-pro"]?.over200k
                 : pricing["gemini-2.5-pro"]?.under200k;
             inputPerK = tier?.inputPerK ?? 0;
             outputPerK = tier?.outputPerK ?? 0;
         } else {
-            const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
+            // const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
+            const matchedKey = Object.keys(pricing).find(key => key.toLowerCase() === model) ?? '';            
             const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0, audioPerK: 0 };
+SummarDebug.log(3, `model: ${model}, matched: ${matchedKey}, inputPerK: ${inputPerK}, outputPerK: ${outputPerK}`);
 // SummarDebug.log(1, `calculateGemini() - ${model}, stt:${sttFlag}, audioPerK:${tier.audioPerK}, inputPerK: ${tier.inputPerK}, outputPerK: ${tier.outputPerK}`);
             inputPerK = (sttFlag === true) ? tier.audioPerK : tier.inputPerK;
             outputPerK = tier.outputPerK;
 // SummarDebug.log(1, `inputPerK 계산: (${promptTokens} * inputPerK / 1000 + ${completionTokens} * outputPerK / 1000) = ${(promptTokens * tier.inputPerK / 1000 + completionTokens * tier.outputPerK / 1000 )}`);
 // SummarDebug.log(1, `audioPerK 계산: (${promptTokens} * audioPerK / 1000 + ${completionTokens} * outputPerK / 1000) = ${(promptTokens * tier.audioPerK / 1000 + completionTokens * tier.outputPerK / 1000 )}`);
         }
+
 
         return (promptTokens * inputPerK) / 1000 + (completionTokens * outputPerK) / 1000;
 
@@ -747,13 +761,19 @@ if (this.plugin.settings.debugLevel < 1) {
     }
 
     /**
-     * DB의 모든 로그에 대해 cost를 재계산하고, 변경된 경우 업데이트합니다.
+     * DB의 로그 중 조건에 맞는 것만 cost를 재계산하고, 변경된 경우 업데이트합니다.
+     * @param predicate 재계산할 log를 선택하는 함수 (true 반환 시 재계산)
      * @returns 업데이트된 row 개수
+     * 사용 예시:
+     *   - 모든 log 재계산: await recalcCost(() => true)
+     *   - 특정 조건만: await recalcCost(log => log.version < '1.0.2')
      */
-    async recalcCost(): Promise<number> {
+    async recalcCost(predicate: (log: APICallLog) => boolean = () => true): Promise<number> {
         const logs = await this.dbManager.getLogs();
         let updated = 0;
+        let condition = 0;
         for (const log of logs) {
+            if (!predicate(log)) continue;
             let newCost = log.cost ?? 0;
             if (log.provider === 'openai' && log.feature === 'stt') {
                 newCost = this.calculateOpenAIAudioTranscriptionCost(log.model, log.duration ?? 0) ?? log.cost ?? 0;
@@ -774,7 +794,6 @@ if (this.plugin.settings.debugLevel < 1) {
                     {
                         promptTokenCount: usage.promptTokenCount,
                         candidatesTokenCount: usage.candidatesTokenCount,
-                        
                     }, (log.feature === 'stt')
                 ) ?? log.cost ?? 0;
             }
@@ -782,9 +801,12 @@ if (this.plugin.settings.debugLevel < 1) {
                 SummarDebug.log(3, `recalcCost()\noldcost: ${log.cost}, newcost: ${newCost}, provider: ${log.provider}, feature: ${log.feature}`);
                 log.cost = newCost;
                 updated++;
-                await this.dbManager.addLog(log, true); // addLog는 기존 id면 update
             }
+            condition++;
+            log.version = this.dbManager.version;
+            await this.dbManager.addLog(log, true); // addLog는 기존 id면 update
         }
+        SummarDebug.log(3, `TrackedAPIClient.recalcCost(): ${condition} rows updated`)
         return updated;
     }
 
