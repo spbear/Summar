@@ -97,6 +97,56 @@ if CommandLine.arguments.contains("--list-calendars") {
             let endDate = event.endDate ?? now
             let location = event.location ?? ""
             let notes = event.notes ?? ""
+            
+            // 내가 참석 수락한 이벤트인지 확인
+            var isAccepted = true // 기본값: 내가 생성한 이벤트는 참석한 것으로 간주
+            var myParticipantStatus = "unknown"
+            
+            if let eventAttendees = event.attendees {
+                // 내 계정 정보 (현재 사용자)
+                var foundMyself = false
+                
+                for attendee in eventAttendees {
+                    // isCurrentUser로 확인하거나, organizer인 경우 확인
+                    if attendee.isCurrentUser {
+                        foundMyself = true
+                        switch attendee.participantStatus {
+                        case .accepted:
+                            isAccepted = true
+                            myParticipantStatus = "accepted"
+                        case .declined:
+                            isAccepted = false
+                            myParticipantStatus = "declined"
+                        case .tentative:
+                            isAccepted = false // tentative는 자동 참석하지 않음
+                            myParticipantStatus = "tentative"
+                        case .pending:
+                            isAccepted = false // 아직 응답하지 않은 경우 참석하지 않는 것으로 간주
+                            myParticipantStatus = "pending"
+                        default:
+                            myParticipantStatus = "unknown"
+                        }
+                        break
+                    }
+                }
+                
+                // organizer가 나인 경우 (내가 생성한 이벤트)
+                if !foundMyself {
+                    if let organizer = event.organizer, organizer.isCurrentUser {
+                        foundMyself = true
+                        isAccepted = true
+                        myParticipantStatus = "organizer"
+                    }
+                }
+                
+                // 참석자가 없거나 내가 찾아지지 않은 경우, 내 캘린더의 이벤트이므로 참석으로 간주
+                if !foundMyself {
+                    isAccepted = true
+                    myParticipantStatus = "unknown"
+                }
+            }
+            
+            // 모든 이벤트를 리스트에 추가 (참석 상태와 관계없이)
             // 참석자 정보 추출
             var attendees: [String] = []
             if let eventAttendees = event.attendees {
@@ -116,6 +166,7 @@ if CommandLine.arguments.contains("--list-calendars") {
                     }
                 }
             }
+            
             // Zoom 키워드가 포함된 일정만 필터링
             //if containsZoom(text: title) || containsZoom(text: location) || containsZoom(text: notes) {
                 let zoomLink = extractZoomLink(from: notes) ?? extractZoomLink(from: location) ?? ""
@@ -127,7 +178,8 @@ if CommandLine.arguments.contains("--list-calendars") {
                     "description": notes,
                     "location": location,
                     "zoom_link": zoomLink,
-                    "attendees": attendees
+                    "attendees": attendees,
+                    "participant_status": myParticipantStatus
                 ]
                 filteredEvents.append(eventData)
             //}

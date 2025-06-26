@@ -12,6 +12,8 @@ interface CalendarEvent {
     description?: string;
     location?: string;
     zoom_link?: string;
+    attendees?: string[];
+    participant_status?: string;
 }
 
 interface ZoomMeeting {
@@ -21,6 +23,8 @@ interface ZoomMeeting {
     description: string;
     location: string;
     zoom_link: string;
+    attendees: string[];
+    participant_status?: string;
 }
 
 export class CalendarHandler {
@@ -175,6 +179,8 @@ export class CalendarHandler {
                 description: meeting.description,
                 location: meeting.location,
                 zoom_link: meeting.zoom_link,
+                attendees: meeting.attendees || [],
+                participant_status: meeting.participant_status || "unknown",
             })));
 
             // this.timers.forEach(({ timeoutId, title }) => {
@@ -197,6 +203,7 @@ export class CalendarHandler {
                 SummarDebug.log(1, `📅 Event ${index + 1}: ${event.title}`);
                 SummarDebug.log(1, `   ⏳ Start: ${event.start}`);
                 SummarDebug.log(1, `   ⏳ End: ${event.end}`);
+                SummarDebug.log(1, `   👤 Participant Status: ${event.participant_status || "unknown"}`);
                 // SummarDebug.log(1, `   📍 Location: ${event.location}`);
                 // SummarDebug.log(1, `   📝 Description: ${event.description || "No description"}`);
                 SummarDebug.log(1, `   🔗 Zoom Link: ${event.zoom_link || "No Zoom link"}`);
@@ -205,10 +212,17 @@ export class CalendarHandler {
                 const now = new Date();
                 const delayMs = event.start.getTime() - now.getTime();
 
-                if (this.plugin.settings.autoLaunchZoomOnSchedule &&
+                // 자동 줌 미팅 참석 조건 확인
+                const shouldAutoLaunch = this.plugin.settings.autoLaunchZoomOnSchedule &&
                     delayMs > 0 && delayMs < MAX_DELAY &&
                     !this.timers.has(event.start.getTime()) &&
-                    event.zoom_link && event.zoom_link.length > 0) {
+                    event.zoom_link && event.zoom_link.length > 0 &&
+                    (!this.plugin.settings.autoLaunchZoomOnlyAccepted || 
+                     event.participant_status === "accepted" || 
+                     event.participant_status === "organizer" ||
+                     event.participant_status === "unknown"); // tentative 제거
+
+                if (shouldAutoLaunch) {
                     const timer = setTimeout(async () => {
                         // if (this.plugin.recordingManager.getRecorderState() !== "recording") {
                         //     await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
@@ -216,9 +230,24 @@ export class CalendarHandler {
                         this.launchZoomMeeting(event.zoom_link as string);
                         clearTimeout(timer);
                     }, delayMs);
-                    SummarDebug.log(1, `   🚀 Zoom meeting reserved: ${event.start}`);
+                    SummarDebug.log(1, `   🚀 Zoom meeting reserved: ${event.start} (Status: ${event.participant_status || "unknown"})`);
                     // this.timers.push({ title: event.title, start: event.start, timeoutId: timer });
                     this.timers.set(event.start.getTime(), timer);
+                } else if (this.plugin.settings.autoLaunchZoomOnSchedule && 
+                          this.plugin.settings.autoLaunchZoomOnlyAccepted &&
+                          event.zoom_link && event.zoom_link.length > 0 &&
+                          event.participant_status === "declined") {
+                    SummarDebug.log(1, `   ❌ Zoom meeting skipped (declined): ${event.start}`);
+                } else if (this.plugin.settings.autoLaunchZoomOnSchedule && 
+                          this.plugin.settings.autoLaunchZoomOnlyAccepted &&
+                          event.zoom_link && event.zoom_link.length > 0 &&
+                          event.participant_status === "pending") {
+                    SummarDebug.log(1, `   ⏸️ Zoom meeting skipped (pending response): ${event.start}`);
+                } else if (this.plugin.settings.autoLaunchZoomOnSchedule && 
+                          this.plugin.settings.autoLaunchZoomOnlyAccepted &&
+                          event.zoom_link && event.zoom_link.length > 0 &&
+                          event.participant_status === "tentative") {
+                    SummarDebug.log(1, `   ❓ Zoom meeting skipped (tentative): ${event.start}`);
                 }
                 SummarDebug.log(1, "================================================");
             });
@@ -247,7 +276,15 @@ export class CalendarHandler {
             this.events.forEach((event, index) => {
                 const eventEl = this.createEventElement(event, index);
                 // autoRecord가 true이고, 해당 이벤트에 zoom_link가 있을 때만 선택 효과
-                if (this.autoRecord && event.zoom_link && event.zoom_link.length > 0) {
+                // 그리고 새로운 설정에 따라 참석 상태도 확인
+                const shouldAutoLaunch = this.autoRecord && 
+                    event.zoom_link && event.zoom_link.length > 0 &&
+                    (!this.plugin.settings.autoLaunchZoomOnlyAccepted || 
+                     event.participant_status === "accepted" || 
+                     event.participant_status === "organizer" ||
+                     event.participant_status === "unknown");
+                     
+                if (shouldAutoLaunch) {
                     eventEl.classList.add("event-selected");
                 } else {
                     eventEl.classList.remove("event-selected");
@@ -268,10 +305,51 @@ export class CalendarHandler {
             event.start.getMinutes().toString().padStart(2, "0");
 
         eventEl.classList.add("event");
+        
+        // 참석 상태에 따른 이모지와 스타일 결정
+        let statusEmoji = "";
+        let statusText = "";
+        let statusClass = "";
+        
+        switch (event.participant_status) {
+            case "accepted":
+                statusEmoji = "✅";
+                statusText = "Accepted";
+                statusClass = "status-accepted";
+                break;
+            case "declined":
+                statusEmoji = "❌";
+                statusText = "Declined";
+                statusClass = "status-declined";
+                break;
+            case "tentative":
+                statusEmoji = "❓";
+                statusText = "Maybe";
+                statusClass = "status-tentative";
+                break;
+            case "pending":
+                statusEmoji = "⏸️";
+                statusText = "Pending";
+                statusClass = "status-pending";
+                break;
+            case "organizer":
+                statusEmoji = "�";
+                statusText = "Organizer";
+                statusClass = "status-organizer";
+                break;
+            default:
+                statusEmoji = "👤";
+                statusText = "My Event";
+                statusClass = "status-organizer";
+        }
+        
+        eventEl.classList.add(statusClass);
+        
         // 강제 색상 지정 제거, 의미별 클래스만 부여
         let strInnerHTML = `
         <div class="event-title">📅 ${event.title}</div>
-        <div class="event-time">⏳${event.start.toLocaleString()} - ⏳${event.end.toLocaleString()}</div>`;
+        <div class="event-time">⏳${event.start.toLocaleString()} - ⏳${event.end.toLocaleString()}</div>
+        <div class="event-status">${statusEmoji} ${statusText}</div>`;
         if (event.zoom_link && event.zoom_link.length > 0) {
             strInnerHTML += `<a href="${event.zoom_link}" class="event-zoom-link" target="_blank">🔗Join Zoom Meeting</a>`;
         }

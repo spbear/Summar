@@ -92,6 +92,7 @@ AI 모델 목록 및 분류
   - `calendar_count`: 연동된 캘린더 개수
   - `calendar_N`: N번째 캘린더 이름/ID
   - `autoLaunchZoomOnSchedule`: 일정에 따라 Zoom 자동 실행 여부
+  - `autoLaunchZoomOnlyAccepted`: 수락한 일정에만 Zoom 자동 실행 여부
   - `customModel`: 커스텀 명령 기본 모델명
   - `cmd_count`: 커스텀 명령 개수
   - `cmd_max`: 커스텀 명령 최대 개수
