@@ -263,6 +263,48 @@ export class AudioHandler extends SummarViewContainer {
 
 		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
 
+		// 미팅 정보가 있는지 확인하고 가져오기
+		let meetingInfoContent = "";
+		const meetingInfoPath = normalizePath(`${noteFilePath}/${folderPath} meeting-info.md`);
+		SummarDebug.log(1, `Checking for meeting info at: ${meetingInfoPath}`);
+		SummarDebug.log(1, `Calendar handler available: ${!!this.plugin.calendarHandler}`);
+		SummarDebug.log(1, `Audio files count: ${audioSortedFiles.length}`);
+		
+		try {
+			const meetingInfoExists = await this.plugin.app.vault.adapter.exists(meetingInfoPath);
+			if (meetingInfoExists) {
+				meetingInfoContent = await this.plugin.app.vault.adapter.read(meetingInfoPath);
+				SummarDebug.log(1, `Meeting info found and loaded from: ${meetingInfoPath}`);
+			} else {
+				SummarDebug.log(1, `No existing meeting-info.md found, attempting to generate from audio files`);
+				// meeting-info.md가 없으면 오디오 파일들의 타임스탬프를 기반으로 캘린더 이벤트 찾기
+				if (this.plugin.calendarHandler && audioSortedFiles.length > 0) {
+					SummarDebug.log(1, `Searching calendar events for ${audioSortedFiles.length} audio files`);
+					SummarDebug.log(1, `Audio file names: ${audioSortedFiles.map(f => f.name).join(', ')}`);
+					
+					const event = await this.plugin.calendarHandler.findEventFromAudioFiles(audioSortedFiles);
+					if (event) {
+						SummarDebug.log(1, `Calendar event found: ${event.title}`);
+						meetingInfoContent = this.plugin.calendarHandler.formatEventInfo(event);
+						// 찾은 미팅 정보를 파일로 저장 (다음에 재사용하기 위해)
+						try {
+							await this.plugin.app.vault.adapter.mkdir(noteFilePath);
+							await this.plugin.app.vault.adapter.write(meetingInfoPath, meetingInfoContent);
+							SummarDebug.log(1, `Meeting info generated and saved to: ${meetingInfoPath}`);
+						} catch (error) {
+							SummarDebug.log(1, `Failed to save meeting info: ${error}`);
+						}
+					} else {
+						SummarDebug.log(1, `No calendar event found for audio files`);
+					}
+				} else {
+					SummarDebug.log(1, `Calendar handler not available or no audio files`);
+				}
+			}
+		} catch (error) {
+			SummarDebug.log(1, `Error loading meeting info from: ${meetingInfoPath}`, error);
+		}
+
 		const existingFile = this.plugin.app.vault.getAbstractFileByPath(`${baseFilePath} transcript.md`);
 		let newFilePath = "";
 		if (existingFile && existingFile instanceof TFile) {
@@ -274,7 +316,18 @@ export class AudioHandler extends SummarViewContainer {
 			newFilePath = `${baseFilePath} transcript.md`;
 			SummarDebug.log(1, `File created: ${newFilePath}`);
 		}
-		await this.plugin.app.vault.create(newFilePath, `${audioList}\n${transcriptedText}`);
+
+		// 미팅 정보를 포함한 transcription 내용 생성
+		let transcriptionContent = "";
+		if (meetingInfoContent) {
+			transcriptionContent = `${meetingInfoContent}\n\n---\n\n## Audio Files\n${audioList}\n## Transcription\n${transcriptedText}`;
+		} else {
+			// 미팅 정보를 찾지 못한 경우 안내 메시지 추가
+			const noMeetingInfo = `## Meeting Information\n\n⚠️ **No calendar event found for this recording time**\n\nThis transcription was created without associated calendar information. You can manually add meeting details if needed.\n\n---\n\n`;
+			transcriptionContent = `${noMeetingInfo}## Audio Files\n${audioList}\n## Transcription\n${transcriptedText}`;
+		}
+
+		await this.plugin.app.vault.create(newFilePath, transcriptionContent);
 		await this.plugin.app.workspace.openLinkText(
 			normalizePath(newFilePath),
 			"",
