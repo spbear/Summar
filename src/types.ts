@@ -10,7 +10,7 @@ export interface PluginSettings {
   useConfluenceAPI: boolean;
 
   confluenceDomain: string;
-  systemPrompt: string;
+  systemPrompt: string; // before 1.0.0
   webPrompt: string;
   pdfPrompt: string;
   /////

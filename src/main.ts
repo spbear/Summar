@@ -13,6 +13,7 @@ import { CalendarHandler } from "./calendarhandler";
 import { StatusBar } from "./statusbar";
 import { SummarStatsModal } from "./summarstatsmodal";
 import { IndexedDBManager } from "./summarailog";
+import semver from "semver";
 
 
 export default class SummarPlugin extends Plugin {
@@ -105,7 +106,7 @@ export default class SummarPlugin extends Plugin {
   PLUGIN_MODELS: string = "";  // 플러그인 디렉토리의 models.json
   PLUGIN_PROMPTS: string = "";  // 플러그인 디렉토리의 prompts.json
   PLUGIN_MODELPRICING: any = {}; // 플러그인 디렉토리의 model-pricing.json
-  PLUGIN_SETTINGS_SCHEMA_VERSION = "1.0.0"; // 플러그인 설정 스키마 버전
+  PLUGIN_SETTINGS_SCHEMA_VERSION = "1.0.1"; // 플러그인 설정 스키마 버전
   modelsJson: any = {}; // models.json
   
   modelsByCategory: Record<ModelCategory, ModelInfo> = {
@@ -677,23 +678,34 @@ if (this.settings.debugLevel > 0) {
         } else {
           settings.confluenceDomain = "";
         }
-        if (settings.settingsSchemaVersion !== this.PLUGIN_SETTINGS_SCHEMA_VERSION) {
+        // if (settings.settingsSchemaVersion !== this.PLUGIN_SETTINGS_SCHEMA_VERSION) {
+        if (settings.settingsSchemaVersion === '' ||
+            semver.gt(this.PLUGIN_SETTINGS_SCHEMA_VERSION, settings.settingsSchemaVersion)) {
+          if (settings.settingsSchemaVersion === '') {
           // 1.0.0 이전 버전의 설정 파일을 읽는 경우, 필요한 변환 작업을 수행합니다.
-          settings.saveTranscriptAndRefineToNewNote = settings.recordingResultNewNote;
-          settings.sttModel = settings.transcriptSTT;
-          settings.sttPrompt = settings.transcribingPrompt;
-          settings.transcriptSummaryModel = settings.transcriptModel;
-          settings.transcriptSummaryPrompt = settings.recordingPrompt;
-          settings.refineSummaryPrompt = settings.refiningPrompt;
-
+            settings.saveTranscriptAndRefineToNewNote = settings.recordingResultNewNote;
+            settings.sttModel = settings.transcriptSTT;
+            settings.sttPrompt = settings.transcribingPrompt;
+            settings.transcriptSummaryModel = settings.transcriptModel;
+            settings.transcriptSummaryPrompt = settings.recordingPrompt;
+            settings.refineSummaryPrompt = settings.refiningPrompt;
+          }
           settings.recordingResultNewNote = false; // 이전 버전의 설정을 제거합니다.
           settings.transcriptSTT = ""; // 이전 버전의 설정을 제거합니다.
           settings.transcribingPrompt = ""; // 이전 버전의 설정을 제거합니다.
           settings.transcriptModel = ""; // 이전 버전의 설정을 제거합니다.
           settings.recordingPrompt = ""; // 이전 버전의 설정을 제거합니다.
           settings.refiningPrompt = ""; // 이전 버전의 설정을 제거합니다.
+          settings.systemPrompt = ""; // 이전 버전의 설정을 제거합니다.
+          settings.userPrompt = ""; // 이전 버전의 설정을 제거합니다. 
+          settings.confluenceBaseUrl = ""; // 이전 버전의 설정을 제거합니다.
+          settings.autoRecording = false; // 이전 버전의 설정을 제거합니다.
+          settings.resultNewNote = false; // 이전 버전의 설정을 제거합니다.
+          settings.transcriptEndpoint = ""; // 이전 버전의 설정을 제거합니다.
+          settings.calendar_zoom_only = false; // 이전 버전의 설정을 제거합니다.
   
           settings.settingsSchemaVersion = this.PLUGIN_SETTINGS_SCHEMA_VERSION;
+          this.saveSettingsToFile();
         } 
         return settings;
       } catch (error) {
