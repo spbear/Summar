@@ -149,7 +149,8 @@ export class AudioHandler extends SummarViewContainer {
 				let lastError = null;
 				for (let attempt = 1; attempt <= 3; attempt++) {
 					try {
-						if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
+						// if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
+						if (this.plugin.settings.sttModel.toLowerCase().includes("gemini")) {
 							const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
 							const blob = file.slice(0, file.size, file.type);
 							const duration = await getAudioDurationFromBlob(blob, fileName);
