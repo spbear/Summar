@@ -218,16 +218,39 @@ export class AudioRecordingManager extends SummarViewContainer {
 			}
 			const selectedDeviceId = await getDeviceIdFromLabel(selectedDeviceLabel) as string;
 			await this.recorder.startRecording(selectedDeviceId);
+		this.startTime = new Date();
+		this.timeStamp = this.getTimestamp();
+		this.elapsedTime = 0;
+		this.recordingCounter = 0;
 
-			this.startTime = new Date();
-			this.timeStamp = this.getTimestamp();
-			this.elapsedTime = 0;
-			this.recordingCounter = 0;
+		// 현재 시간에 해당하는 캘린더 이벤트 찾기
+		let meetingInfo = "";
+		let folderSuffix = "";
+		if (this.plugin.calendarHandler) {
+			const currentEvent = this.plugin.calendarHandler.findEventAtTime(this.startTime);
+			if (currentEvent) {
+				meetingInfo = this.plugin.calendarHandler.formatEventInfo(currentEvent);
+				// 미팅 제목을 폴더명에 포함 (파일시스템에 안전한 문자만 사용)
+				const safeMeetingTitle = currentEvent.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+				folderSuffix = `_${safeMeetingTitle}`;
+				SummarDebug.log(1, `Found calendar event: ${currentEvent.title}`);
+			} else {
+				SummarDebug.log(1, "No calendar event found for current time");
+			}
+		}
 
-			SummarDebug.log(1, `recordingDir: ${this.plugin.settings.recordingDir}`);
-			this.recordingPath = normalizePath(this.plugin.settings.recordingDir + "/" + this.timeStamp);
-			await this.plugin.app.vault.adapter.mkdir(this.recordingPath);
-			SummarDebug.log(1,`recordingPath: ${this.recordingPath}`);
+		SummarDebug.log(1, `recordingDir: ${this.plugin.settings.recordingDir}`);
+		this.recordingPath = normalizePath(this.plugin.settings.recordingDir + "/" + this.timeStamp + folderSuffix);
+		await this.plugin.app.vault.adapter.mkdir(this.recordingPath);
+		SummarDebug.log(1,`recordingPath: ${this.recordingPath}`);
+
+		// 미팅 정보가 있으면 (폴더명) meeting-info.md 파일로 저장
+		if (meetingInfo) {
+			const folderName = this.recordingPath.split('/').pop() || this.timeStamp;
+			const meetingInfoPath = normalizePath(this.recordingPath + `/${folderName} meeting-info.md`);
+			await this.plugin.app.vault.adapter.write(meetingInfoPath, meetingInfo);
+			SummarDebug.log(1, `Meeting info saved to: ${meetingInfoPath}`);
+		}
 
 			this.recordingInterval = window.setInterval(async () => {
 				if (!this.isRecording || !this.startTime) {

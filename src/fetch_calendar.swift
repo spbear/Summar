@@ -1,8 +1,8 @@
 import EventKit
+import Foundation
 
 let eventStore = EKEventStore()
 let now = Date()
-let endDate = Calendar.current.date(byAdding: .day, value: 1, to: now)!
 
 // 명령줄 인자 파싱: --list-calendars가 있으면 캘린더 목록만 출력
 var targetCalendars: Set<String> = []
@@ -10,6 +10,44 @@ if let fetchCalendarsArg = CommandLine.arguments.first(where: { $0.hasPrefix("--
     let value = fetchCalendarsArg.replacingOccurrences(of: "--fetch-calendars=", with: "")
     let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
     targetCalendars = Set(names)
+}
+
+// --search-date 인자로 특정 날짜 검색 (예: --search-date=2024-12-26)
+var searchDate: Date? = nil
+if let searchDateArg = CommandLine.arguments.first(where: { $0.hasPrefix("--search-date=") }) {
+    let value = searchDateArg.replacingOccurrences(of: "--search-date=", with: "")
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.timeZone = TimeZone.current  // 현재 시스템 시간대 사용 (KST)
+    
+    // 먼저 문자열을 로컬 시간대로 파싱
+    if let parsedDate = formatter.date(from: value) {
+        searchDate = parsedDate
+    }
+}
+
+// 검색 범위 설정
+let startDate: Date
+let endDate: Date
+
+if let searchDate = searchDate {
+    // 특정 날짜가 지정된 경우: 해당 날짜만 검색 (0시부터 다음날 0시까지)
+    startDate = Calendar.current.startOfDay(for: searchDate)
+    endDate = Calendar.current.date(byAdding: .day, value: 1, to: startDate)!
+} else {
+    // 기본 동작: 현재 시간부터 내일까지
+    var fetchDays = 1  // 기본값: 미래 1일
+    
+    // --fetch-days 인자 처리 (기존 호환성 유지)
+    if let fetchDaysArg = CommandLine.arguments.first(where: { $0.hasPrefix("--fetch-days=") }) {
+        let value = fetchDaysArg.replacingOccurrences(of: "--fetch-days=", with: "")
+        if let days = Int(value) {
+            fetchDays = days
+        }
+    }
+    
+    startDate = now
+    endDate = Calendar.current.date(byAdding: .day, value: fetchDays, to: now)!
 }
 
 
@@ -86,7 +124,8 @@ if CommandLine.arguments.contains("--list-calendars") {
         // ✅ 특정 캘린더 필터링
         let calendars = eventStore.calendars(for: .event).filter { targetCalendars.contains($0.title) }
 
-        let predicate = eventStore.predicateForEvents(withStart: now, end: endDate, calendars: calendars)
+        // 설정된 날짜 범위로 이벤트 검색
+        let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
         let events = eventStore.events(matching: predicate)
 
         var filteredEvents: [[String: Any]] = []
@@ -99,7 +138,6 @@ if CommandLine.arguments.contains("--list-calendars") {
             let notes = event.notes ?? ""
             
             // 내가 참석 수락한 이벤트인지 확인
-            var isAccepted = true // 기본값: 내가 생성한 이벤트는 참석한 것으로 간주
             var myParticipantStatus = "unknown"
             
             if let eventAttendees = event.attendees {
@@ -112,16 +150,12 @@ if CommandLine.arguments.contains("--list-calendars") {
                         foundMyself = true
                         switch attendee.participantStatus {
                         case .accepted:
-                            isAccepted = true
                             myParticipantStatus = "accepted"
                         case .declined:
-                            isAccepted = false
                             myParticipantStatus = "declined"
                         case .tentative:
-                            isAccepted = false // tentative는 자동 참석하지 않음
                             myParticipantStatus = "tentative"
                         case .pending:
-                            isAccepted = false // 아직 응답하지 않은 경우 참석하지 않는 것으로 간주
                             myParticipantStatus = "pending"
                         default:
                             myParticipantStatus = "unknown"
@@ -134,35 +168,70 @@ if CommandLine.arguments.contains("--list-calendars") {
                 if !foundMyself {
                     if let organizer = event.organizer, organizer.isCurrentUser {
                         foundMyself = true
-                        isAccepted = true
                         myParticipantStatus = "organizer"
                     }
                 }
                 
                 // 참석자가 없거나 내가 찾아지지 않은 경우, 내 캘린더의 이벤트이므로 참석으로 간주
                 if !foundMyself {
-                    isAccepted = true
                     myParticipantStatus = "unknown"
                 }
             }
             
             // 모든 이벤트를 리스트에 추가 (참석 상태와 관계없이)
-            // 참석자 정보 추출
+            // 참석자 정보 추출 (주최자 포함)
             var attendees: [String] = []
+            
+            // 주최자 정보 먼저 추가
+            if let organizer = event.organizer {
+                var organizerInfo = ""
+                if let name = organizer.name, !name.isEmpty {
+                    organizerInfo = name
+                    if let email = organizer.url.absoluteString.hasPrefix("mailto:") ? 
+                        String(organizer.url.absoluteString.dropFirst("mailto:".count)) : nil,
+                       !email.isEmpty {
+                        organizerInfo += " <\(email)>"
+                    }
+                } else {
+                    let urlString = organizer.url.absoluteString
+                    if urlString.hasPrefix("mailto:") {
+                        let email = String(urlString.dropFirst("mailto:".count))
+                        if !email.isEmpty {
+                            organizerInfo = email
+                        }
+                    }
+                }
+                if !organizerInfo.isEmpty {
+                    attendees.append("👑 \(organizerInfo)") // 주최자 표시
+                }
+            }
+            
+            // 참석자 정보 추가
             if let eventAttendees = event.attendees {
                 for attendee in eventAttendees {
+                    var attendeeInfo = ""
                     if let name = attendee.name, !name.isEmpty {
-                        attendees.append(name)
+                        attendeeInfo = name
+                        let urlString = attendee.url.absoluteString
+                        if urlString.hasPrefix("mailto:") {
+                            let email = String(urlString.dropFirst("mailto:".count))
+                            if !email.isEmpty {
+                                attendeeInfo += " <\(email)>"
+                            }
+                        }
                     } else {
                         let urlString = attendee.url.absoluteString
                         if urlString.hasPrefix("mailto:") {
                             let email = String(urlString.dropFirst("mailto:".count))
                             if !email.isEmpty {
-                                attendees.append(email)
+                                attendeeInfo = email
                             }
                         } else if !urlString.isEmpty {
-                            attendees.append(urlString)
+                            attendeeInfo = urlString
                         }
+                    }
+                    if !attendeeInfo.isEmpty {
+                        attendees.append(attendeeInfo)
                     }
                 }
             }

@@ -449,6 +449,471 @@ export class CalendarHandler {
             });
         });
     }
+
+    /**
+     * 지정된 시간에 진행 중인 캘린더 이벤트를 찾습니다
+     * 현재 진행 중인 이벤트와 곧 시작할 이벤트(5분 이내)를 모두 고려합니다
+     * @param timestamp 찾을 시간 (Date 객체)
+     * @returns 해당 시간에 진행 중인 CalendarEvent 또는 null
+     */
+    findEventAtTime(timestamp: Date): CalendarEvent | null {
+        const UPCOMING_THRESHOLD_MINUTES = 10; // 10분 이내 시작하는 이벤트도 고려
+        const upcomingThreshold = new Date(timestamp.getTime() + UPCOMING_THRESHOLD_MINUTES * 60 * 1000);
+
+        const events = this.events.filter(event => {
+            // 현재 진행 중인 이벤트
+            const isOngoing = timestamp >= event.start && timestamp <= event.end;
+            
+            // 곧 시작할 이벤트 (5분 이내)
+            const isUpcoming = event.start > timestamp && event.start <= upcomingThreshold;
+            
+            return isOngoing || isUpcoming;
+        });
+
+        if (events.length === 0) return null;
+        if (events.length === 1) return events[0];
+
+        // 중복 이벤트가 있을 경우 스마트 선택
+        return this.selectBestEventWithTiming(events, timestamp);
+    }
+
+    /**
+     * 시간 정보를 고려하여 가장 적합한 이벤트를 선택합니다
+     * @param events 후보 이벤트 배열
+     * @param timestamp 기준 시간
+     * @returns 가장 적합한 CalendarEvent
+     */
+    private selectBestEventWithTiming(events: CalendarEvent[], timestamp: Date): CalendarEvent {
+        // 진행 중인 이벤트와 곧 시작할 이벤트 분리
+        const ongoingEvents = events.filter(event => 
+            timestamp >= event.start && timestamp <= event.end
+        );
+        const upcomingEvents = events.filter(event => 
+            event.start > timestamp
+        );
+
+        // 우선순위 계산 함수
+        const getEventPriority = (event: CalendarEvent): number => {
+            let score = 0;
+            
+            if (event.participant_status === "organizer") score += 1000;
+            else if (event.participant_status === "accepted") score += 100;
+            else if (event.participant_status === "tentative") score += 50;
+            else if (event.participant_status === "pending") score += 25;
+            else if (event.participant_status === "unknown") score += 10;
+            
+            return score;
+        };
+
+        // 로직 1: 진행 중인 이벤트가 거의 끝나가고 곧 시작할 이벤트가 있으면 곧 시작할 이벤트 우선
+        if (ongoingEvents.length > 0 && upcomingEvents.length > 0) {
+            const ongoingEvent = ongoingEvents[0];
+            const timeToEnd = ongoingEvent.end.getTime() - timestamp.getTime();
+            const minutesToEnd = timeToEnd / (60 * 1000);
+
+            // 현재 이벤트가 5분 이내에 끝나면 다음 이벤트 우선 고려
+            if (minutesToEnd <= 5) {
+                const bestUpcoming = upcomingEvents.sort((a, b) => {
+                    const priorityDiff = getEventPriority(b) - getEventPriority(a);
+                    if (priorityDiff !== 0) return priorityDiff;
+                    return a.start.getTime() - b.start.getTime();
+                })[0];
+
+                SummarDebug.log(1, `Current event "${ongoingEvent.title}" ends in ${minutesToEnd.toFixed(1)} minutes, selecting upcoming event "${bestUpcoming.title}"`);
+                return bestUpcoming;
+            }
+        }
+
+        // 로직 2: 일반적인 우선순위 적용
+        const allEventsSorted = events.sort((a, b) => {
+            const priorityDiff = getEventPriority(b) - getEventPriority(a);
+            if (priorityDiff !== 0) return priorityDiff;
+            
+            // 우선순위가 같으면 시작 시간이 빠른 순
+            return a.start.getTime() - b.start.getTime();
+        });
+
+        const selectedEvent = allEventsSorted[0];
+        
+        if (events.length > 1) {
+            const eventTypes = events.map(e => {
+                const isOngoing = timestamp >= e.start && timestamp <= e.end;
+                return `"${e.title}" (${e.participant_status}, ${isOngoing ? 'ongoing' : 'upcoming'})`;
+            });
+            SummarDebug.log(1, `Multiple events found at timestamp, selected: "${selectedEvent.title}" (status: ${selectedEvent.participant_status})`);
+            SummarDebug.log(1, `All candidates: ${eventTypes.join(', ')}`);
+        }
+        
+        return selectedEvent;
+    }
+
+    /**
+     * 중복된 이벤트들 중에서 가장 적합한 이벤트를 선택합니다
+     * 우선순위: 1) 개최자(organizer) 2) 수락(accepted) 3) 가장 먼저 시작한 이벤트
+     * @param events 중복된 이벤트 배열
+     * @returns 가장 적합한 CalendarEvent
+     */
+    private selectBestEvent(events: CalendarEvent[]): CalendarEvent {
+        // 우선순위 점수 계산
+        const getEventPriority = (event: CalendarEvent): number => {
+            let score = 0;
+            
+            // 1순위: 개최자인 경우 (가장 높은 점수)
+            if (event.participant_status === "organizer") {
+                score += 1000;
+            }
+            
+            // 2순위: 수락한 이벤트
+            else if (event.participant_status === "accepted") {
+                score += 100;
+            }
+            
+            // 3순위: 기타 상태들
+            else if (event.participant_status === "tentative") {
+                score += 50;
+            } else if (event.participant_status === "pending") {
+                score += 25;
+            } else if (event.participant_status === "unknown") {
+                score += 10;
+            }
+            // declined은 점수 0
+            
+            return score;
+        };
+
+        // 우선순위로 정렬
+        const sortedEvents = events.sort((a, b) => {
+            const priorityDiff = getEventPriority(b) - getEventPriority(a);
+            if (priorityDiff !== 0) return priorityDiff;
+            
+            // 우선순위가 같으면 시작 시간이 빠른 순
+            return a.start.getTime() - b.start.getTime();
+        });
+
+        const selectedEvent = sortedEvents[0];
+        
+        if (events.length > 1) {
+            SummarDebug.log(1, `Multiple events found at timestamp, selected: "${selectedEvent.title}" (status: ${selectedEvent.participant_status})`);
+            SummarDebug.log(1, `Other events: ${events.slice(1).map(e => `"${e.title}" (${e.participant_status})`).join(', ')}`);
+        }
+        
+        return selectedEvent;
+    }
+
+    /**
+     * 지정된 시간 범위와 겹치는 캘린더 이벤트들을 찾습니다
+     * @param startTime 시작 시간
+     * @param endTime 종료 시간
+     * @returns 해당 시간 범위와 겹치는 CalendarEvent 배열 (우선순위 정렬됨)
+     */
+    findEventsInTimeRange(startTime: Date, endTime: Date): CalendarEvent[] {
+        const events = this.events.filter(event => {
+            // 이벤트가 시간 범위와 겹치는지 확인
+            return (event.start < endTime && event.end > startTime);
+        });
+
+        // 우선순위로 정렬 (selectBestEvent의 로직과 동일)
+        return events.sort((a, b) => {
+            const getEventPriority = (event: CalendarEvent): number => {
+                let score = 0;
+                if (event.participant_status === "organizer") score += 1000;
+                else if (event.participant_status === "accepted") score += 100;
+                else if (event.participant_status === "tentative") score += 50;
+                else if (event.participant_status === "pending") score += 25;
+                else if (event.participant_status === "unknown") score += 10;
+                return score;
+            };
+
+            const priorityDiff = getEventPriority(b) - getEventPriority(a);
+            if (priorityDiff !== 0) return priorityDiff;
+            
+            // 우선순위가 같으면 시작 시간이 빠른 순
+            return a.start.getTime() - b.start.getTime();
+        });
+    }
+
+    /**
+     * 현재 진행 중인 캘린더 이벤트를 가져옵니다
+     * @returns 현재 진행 중인 CalendarEvent 또는 null
+     */
+    getCurrentEvent(): CalendarEvent | null {
+        return this.findEventAtTime(new Date());
+    }
+
+    /**
+     * 캘린더 이벤트 정보를 문자열로 포맷합니다
+     * @param event 포맷할 CalendarEvent
+     * @returns 포맷된 문자열
+     */
+    formatEventInfo(event: CalendarEvent): string {
+        const startTime = event.start.toLocaleString();
+        const endTime = event.end.toLocaleString();
+        
+        let info = `## Meeting Information\n`;
+        info += `- **Title**: ${event.title}\n`;
+        info += `- **Time**: ${startTime} - ${endTime}\n`;
+        
+        if (event.description) {
+            info += `- **Description**: ${event.description}\n`;
+        }
+        
+        if (event.location) {
+            info += `- **Location**: ${event.location}\n`;
+        }
+        
+        if (event.attendees && event.attendees.length > 0) {
+            info += `- **Attendees**: ${event.attendees.join(', ')}\n`;
+        }
+        
+        if (event.zoom_link) {
+            info += `- **Zoom Link**: ${event.zoom_link}\n`;
+        }
+        
+        return info;
+    }
+
+    /**
+     * 파일명에서 타임스탬프를 추출합니다
+     * @param fileName 파일명 (예: summar_audio_241226-143052_1000ms.webm)
+     * @returns Date 객체 또는 null
+     */
+    parseTimestampFromFileName(fileName: string): Date | null {
+        // Pattern: summar_audio_YYMMDD-HHMMSS_*.webm
+        const match = fileName.match(/summar_audio_(\d{6})-(\d{6})/);
+        if (!match) return null;
+
+        const dateStr = match[1]; // YYMMDD
+        const timeStr = match[2]; // HHMMSS
+
+        const year = parseInt("20" + dateStr.substring(0, 2));
+        const month = parseInt(dateStr.substring(2, 4)) - 1; // 0-based month
+        const day = parseInt(dateStr.substring(4, 6));
+        const hour = parseInt(timeStr.substring(0, 2));
+        const minute = parseInt(timeStr.substring(2, 4));
+        const second = parseInt(timeStr.substring(4, 6));
+
+        // 로컬 시간(KST)으로 Date 객체 생성
+        const timestamp = new Date(year, month, day, hour, minute, second);
+        SummarDebug.log(1, `📅 Parsed timestamp from '${fileName}': ${timestamp.toString()}`);
+        return timestamp;
+    }
+
+    /**
+     * 오디오 파일들의 타임스탬프를 기반으로 캘린더 이벤트를 찾습니다
+     * @param audioFiles 오디오 파일 배열
+     * @returns 가장 적합한 CalendarEvent 또는 null
+     */
+    async findEventFromAudioFiles(audioFiles: File[]): Promise<CalendarEvent | null> {
+        SummarDebug.log(1, `findEventFromAudioFiles called with ${audioFiles.length} files`);
+        SummarDebug.log(1, `Current calendar events count: ${this.events.length}`);
+        
+        let earliestTimestamp: Date | null = null;
+        let latestTimestamp: Date | null = null;
+
+        // 모든 오디오 파일의 타임스탬프 추출
+        for (const file of audioFiles) {
+            SummarDebug.log(1, `Processing file: ${file.name}`);
+            const timestamp = this.parseTimestampFromFileName(file.name);
+            if (timestamp) {
+                SummarDebug.log(1, `Extracted timestamp from ${file.name}: ${timestamp.toISOString()}`);
+                if (!earliestTimestamp || timestamp < earliestTimestamp) {
+                    earliestTimestamp = timestamp;
+                }
+                if (!latestTimestamp || timestamp > latestTimestamp) {
+                    latestTimestamp = timestamp;
+                }
+            } else {
+                SummarDebug.log(1, `No timestamp found in filename: ${file.name}, lastModified: ${new Date(file.lastModified).toISOString()}`);
+            }
+        }
+
+        // 타임스탬프를 찾을 수 없으면 파일 생성 시간 사용
+        if (!earliestTimestamp && audioFiles.length > 0) {
+            SummarDebug.log(1, `No timestamp from filenames, using file lastModified times`);
+            // File 객체의 lastModified 사용 (밀리초)
+            const timestamps = audioFiles
+                .map(file => new Date(file.lastModified))
+                .filter(date => !isNaN(date.getTime()));
+            
+            if (timestamps.length > 0) {
+                earliestTimestamp = new Date(Math.min(...timestamps.map(d => d.getTime())));
+                latestTimestamp = new Date(Math.max(...timestamps.map(d => d.getTime())));
+                SummarDebug.log(1, `Using file modification times - earliest: ${earliestTimestamp.toISOString()}, latest: ${latestTimestamp.toISOString()}`);
+            }
+        }
+
+        if (!earliestTimestamp) {
+            SummarDebug.log(1, `❌ No timestamp could be determined from audio files`);
+            return null;
+        }
+
+        // 해당 날짜의 이벤트를 새로 가져오기
+        try {
+            SummarDebug.log(1, `🔍 Fetching events for specific date: ${earliestTimestamp.toISOString()}`);
+            const meetings = await this.fetchEventsForDate(earliestTimestamp);
+            
+            if (meetings.length === 0) {
+                SummarDebug.log(1, `❌ No calendar events found for date: ${earliestTimestamp.toDateString()}`);
+                return null;
+            }
+
+            // 가져온 이벤트들을 CalendarEvent로 변환
+            const events: CalendarEvent[] = meetings.map(meeting => ({
+                title: meeting.title,
+                start: new Date(meeting.start),
+                end: new Date(meeting.end),
+                description: meeting.description,
+                location: meeting.location,
+                zoom_link: meeting.zoom_link,
+                attendees: meeting.attendees || [],
+                participant_status: meeting.participant_status || "unknown",
+            }));
+
+            SummarDebug.log(1, `Found ${events.length} events for date:`);
+            events.forEach((event, index) => {
+                SummarDebug.log(1, `  ${index + 1}. "${event.title}" (${event.start.toLocaleString()} - ${event.end.toLocaleString()})`);
+            });
+
+            // 정확한 시간에 진행 중인 이벤트 찾기
+            const exactEvent = events.find(event => 
+                earliestTimestamp! >= event.start && earliestTimestamp! <= event.end
+            );
+
+            if (exactEvent) {
+                SummarDebug.log(1, `✅ Found exact calendar event: ${exactEvent.title} (${exactEvent.participant_status})`);
+                return exactEvent;
+            }
+
+            // 시간 범위와 겹치는 이벤트 찾기
+            if (latestTimestamp) {
+                const overlappingEvents = events.filter(event => 
+                    event.start < latestTimestamp! && event.end > earliestTimestamp!
+                );
+
+                if (overlappingEvents.length > 0) {
+                    // 우선순위로 정렬
+                    const sortedEvents = overlappingEvents.sort((a, b) => {
+                        const getEventPriority = (event: CalendarEvent): number => {
+                            let score = 0;
+                            if (event.participant_status === "organizer") score += 1000;
+                            else if (event.participant_status === "accepted") score += 100;
+                            else if (event.participant_status === "tentative") score += 50;
+                            else if (event.participant_status === "pending") score += 25;
+                            else if (event.participant_status === "unknown") score += 10;
+                            return score;
+                        };
+
+                        const priorityDiff = getEventPriority(b) - getEventPriority(a);
+                        if (priorityDiff !== 0) return priorityDiff;
+                        
+                        return a.start.getTime() - b.start.getTime();
+                    });
+
+                    const selectedEvent = sortedEvents[0];
+                    SummarDebug.log(1, `✅ Found overlapping calendar event: ${selectedEvent.title} (status: ${selectedEvent.participant_status})`);
+                    return selectedEvent;
+                }
+            }
+
+            SummarDebug.log(1, `❌ No matching calendar event found for timestamp: ${earliestTimestamp.toISOString()}`);
+            return null;
+
+        } catch (error) {
+            SummarDebug.error(1, `Error fetching events for date:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * 특정 날짜의 캘린더 이벤트를 가져옵니다
+     * @param targetDate 검색할 날짜
+     * @returns ZoomMeeting 배열
+     */
+    async fetchEventsForDate(targetDate: Date): Promise<ZoomMeeting[]> {
+        if (!(Platform.isMacOS && Platform.isDesktopApp)) {
+            SummarDebug.log(1, "캘린더 기능은 macOS에서만 지원됩니다.");
+            return [];
+        }
+
+        // Check if Xcode is installed
+        const xcodeInstalled = await this.checkXcodeInstalled();
+        if (!xcodeInstalled) {
+            SummarDebug.log(1, "Xcode가 설치되지 않아 캘린더 기능을 사용할 수 없습니다.");
+            return [];
+        }
+
+        return new Promise((resolve, reject) => {
+            // calendar_count가 없거나 0이면 실행하지 않음
+            if (!this.plugin.settings.calendar_count || this.plugin.settings.calendar_count === 0) {
+                SummarDebug.log(1, "캘린더가 설정되지 않아 fetchEventsForDate를 실행하지 않습니다.");
+                resolve([]);
+                return;
+            }
+
+            // Build argument list for Swift
+            const args: string[] = [];
+            
+            // 날짜를 0시 기준으로 정규화 후 YYYY-MM-DD 형식으로 변환
+            const normalizedDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+            const dateString = normalizedDate.getFullYear() + '-' + 
+                String(normalizedDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(normalizedDate.getDate()).padStart(2, '0');
+            args.push(`--search-date=${dateString}`);
+            
+            SummarDebug.log(1, `Fetching events for normalized date: ${dateString} (original: ${targetDate.toISOString()})`);
+            
+            // 캘린더가 하나도 없으면 실행하지 않음
+            let calendarList: string[] = [];
+            for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
+                const cal = this.plugin.settings[`calendar_${i}`];
+                if (cal && typeof cal === 'string' && cal.trim().length > 0) {
+                    calendarList.push(cal.trim());
+                }
+            }
+            if (calendarList.length === 0) {
+                SummarDebug.log(1, "캘린더 목록이 비어 있어 fetchEventsForDate를 실행하지 않습니다.");
+                resolve([]);
+                return;
+            }
+
+            args.push(`--fetch-calendars=${calendarList.join(",")}`);
+            const scriptPath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath() + "/.obsidian/plugins/summar/fetch_calendar.swift");
+            const spawnArgs = [scriptPath, ...args];
+            SummarDebug.log(1, `Executing Swift command: swift ${spawnArgs.join(" ")}`);
+            const process = spawn("swift", spawnArgs);
+            let output = "";
+            let errorOutput = "";
+
+            process.stdout.on("data", (data) => {
+                output += data.toString();
+            });
+
+            process.stderr.on("data", (data) => {
+                errorOutput += data.toString();
+            });
+
+            process.on("close", (code) => {
+                if (code === 0) {
+                    try {
+                        const meetings: ZoomMeeting[] = JSON.parse(output.trim());
+                        SummarDebug.log(1, `Successfully fetched ${meetings.length} events for date ${dateString}.`);
+                        resolve(meetings);
+                    } catch (error) {
+                        SummarDebug.error(1, "JSON Parsing Error:", error);
+                        reject(new Error("Failed to parse Swift output as JSON"));
+                    }
+                } else {
+                    SummarDebug.error(1, "Swift Execution Error:", errorOutput);
+                    reject(new Error("Swift script execution failed"));
+                }
+            });
+
+            process.on("error", (err) => {
+                SummarDebug.error(1, "Swift Process Error:", err);
+                reject(new Error("Failed to start Swift process"));
+            });
+        });
+    }
 }
 
 // class ConfirmModal extends Modal {
