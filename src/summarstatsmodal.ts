@@ -46,7 +46,7 @@ export class SummarStatsModal {
     loadingDiv.style.alignItems = 'center';
     loadingDiv.style.justifyContent = 'center';
     loadingDiv.style.height = '320px';
-    loadingDiv.innerHTML = `<span style="color:var(--text-muted);font-size:1.1em;">통계 대시보드 로딩 중...</span>`;
+    loadingDiv.innerHTML = `<span style="color:var(--text-muted);font-size:1.1em;">Loading statistics dashboard...</span>`;
     containerEl.appendChild(loadingDiv);
 
     // 2. 다음 tick(이벤트 루프)에서 실제 UI 렌더링
@@ -82,7 +82,7 @@ export class SummarStatsModal {
       header.style.alignItems = 'center';
       header.style.marginBottom = '16px';
       const title = document.createElement('span');
-      title.innerHTML = '<b>AI API 통계 대시보드</b>';
+      title.innerHTML = '<b>AI API Statistics Dashboard</b>';
       title.style.fontSize = '1.5em';
       header.appendChild(title);
 
@@ -118,10 +118,10 @@ export class SummarStatsModal {
       periodTabs.style.display = 'flex';
       periodTabs.style.gap = '8px';
       const periods: [string, string, number][] = [
-        ['일간', 'hourly', 24],
-        ['주간', 'daily', 7],
-        ['월간', 'weekly', 8],
-        ['연간', 'monthly', 12],
+        ['Hourly', 'hourly', 24],
+        ['Daily', 'daily', 7],
+        ['Weekly', 'weekly', 8],
+        ['Monthly', 'monthly', 12],
       ];
       periods.forEach(([label, value]) => {
         const btn = document.createElement('button');
@@ -157,7 +157,7 @@ export class SummarStatsModal {
       ['all', 'openai', 'gemini'].forEach(p => {
         const opt = document.createElement('option');
         opt.value = p;
-        opt.textContent = p === 'all' ? '전체' : p;
+        opt.textContent = p === 'all' ? 'All' : p;
         providerSelect.appendChild(opt);
       });
       providerSelect.value = this.currentProvider;
@@ -181,19 +181,19 @@ export class SummarStatsModal {
       summaryCards.style.marginBottom = '24px';
       summaryCards.innerHTML = `
         <div id="ai-card-totalCalls" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-          <div>총 호출수</div><div id="ai-total-calls" style="font-size:1.3em;font-weight:bold;">-</div>
+          <div>Total Calls</div><div id="ai-total-calls" style="font-size:1.3em;font-weight:bold;">-</div>
         </div>
         <div id="ai-card-totalTokens" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-          <div>총 토큰수</div><div id="ai-total-tokens" style="font-size:1.3em;font-weight:bold;">-</div>
+          <div>Total Tokens</div><div id="ai-total-tokens" style="font-size:1.3em;font-weight:bold;">-</div>
         </div>
         <div id="ai-card-totalCost" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-          <div>총 비용($)</div><div id="ai-total-cost" style="font-size:1.3em;font-weight:bold;">-</div>
+          <div>Total Cost ($)</div><div id="ai-total-cost" style="font-size:1.3em;font-weight:bold;">-</div>
         </div>
         <div id="ai-card-avgLatency" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-          <div>평균 지연(ms)</div><div id="ai-avg-latency" style="font-size:1.3em;font-weight:bold;">-</div>
+          <div>Avg Latency (ms)</div><div id="ai-avg-latency" style="font-size:1.3em;font-weight:bold;">-</div>
         </div>
         <div id="ai-card-successRate" style="flex:1;background:var(--background-secondary);padding:16px;border-radius:8px;text-align:center;cursor:pointer;">
-          <div>성공률(%)</div><div id="ai-success-rate" style="font-size:1.3em;font-weight:bold;">-</div>
+          <div>Success Rate (%)</div><div id="ai-success-rate" style="font-size:1.3em;font-weight:bold;">-</div>
         </div>
       `;
       modal.appendChild(summaryCards);
@@ -224,7 +224,7 @@ export class SummarStatsModal {
       this.chartArea.style.display = 'flex';
       this.chartArea.style.alignItems = 'center';
       this.chartArea.style.justifyContent = 'center';
-      this.chartArea.innerHTML = `<span style="color:var(--text-muted);font-size:1.1em;">차트 로딩 중...</span>`;
+      this.chartArea.innerHTML = `<span style="color:var(--text-muted);font-size:1.1em;">Loading chart...</span>`;
       modal.appendChild(this.chartArea);
 
       // 내보내기/비교/예측/알림 등 고급 기능 버튼(placeholder)
@@ -234,15 +234,15 @@ export class SummarStatsModal {
       actions.style.marginTop = '12px';
       if (this.plugin.settings.debugLevel > 0) {
           actions.innerHTML = `
-          <button id="ai-export-csv">CSV 내보내기</button>
-          <button id="ai-recalc-cost">비용 재계산</button>
-          <button id="ai-reset-db">초기화</button>
-          <button id="ai-create-test-data">테스트 데이터 생성</button>
-          <button id="ai-delete-test-data">테스트 데이터 삭제</button>
+          <button id="ai-export-csv">Export CSV</button>
+          <button id="ai-recalc-cost">Recalculate Cost</button>
+          <button id="ai-reset-db">Reset DB</button>
+          <button id="ai-create-test-data">Create Test Data</button>
+          <button id="ai-delete-test-data">Delete Test Data</button>
           `;
       } else {
           actions.innerHTML = `
-          <button id="ai-export-csv">CSV 내보내기</button>
+          <button id="ai-export-csv">Export CSV</button>
           `;
       }
       modal.appendChild(actions);
@@ -254,7 +254,7 @@ export class SummarStatsModal {
           // summar-ai-api-logs-db 전체 로그를 CSV로 변환
           const logs = await this.plugin.dbManager.getLogs();
           if (!logs || logs.length === 0) {
-              alert('내보낼 데이터가 없습니다.');
+              alert('No data to export.');
               return;
           }
           // CSV 헤더
@@ -288,7 +288,7 @@ export class SummarStatsModal {
         e?.stopPropagation?.();
         const trackapi = new TrackedAPIClient(this.plugin);
         const updated = await trackapi.recalcCost();
-          alert(`비용 재계산 완료: ${updated}건 업데이트됨`);
+          alert(`Cost recalculation complete: ${updated} rows updated.`);
           await this.updateStatsAndChart();
         if (options?.showDialogUI) e?.preventDefault?.();
       };
@@ -317,7 +317,7 @@ export class SummarStatsModal {
         confirmBox.style.padding = '32px 24px';
         confirmBox.style.minWidth = '320px';
         confirmBox.style.textAlign = 'center';
-        confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">초기화를 하면 기록이 모두 지워집니다.<br>정말 지우시겠습니까?</div>`;
+        confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">Resetting will delete all records.<br>Are you sure?</div>`;
         const yesBtn = document.createElement('button');
         yesBtn.textContent = 'Yes';
         yesBtn.style.margin = '0 12px';
@@ -359,7 +359,7 @@ export class SummarStatsModal {
                     clear2.onerror = () => reject(clear2.error);
                 });
             }
-            alert('DB가 초기화되었습니다.');
+            alert('DB has been reset.');
             await this.updateStatsAndChart();
         };
       };
@@ -370,7 +370,7 @@ export class SummarStatsModal {
         e?.stopPropagation?.();
         const client = new TrackedAPIClient(this.plugin);
         await client.logAPICallTest(300, 1000);
-        alert('테스트 데이터가 추가되었습니다');
+        alert('Test data has been added.');
         await this.updateStatsAndChart();
         if (options?.showDialogUI) e?.preventDefault?.();
       };
@@ -399,7 +399,7 @@ export class SummarStatsModal {
         confirmBox.style.padding = '32px 24px';
         confirmBox.style.minWidth = '320px';
         confirmBox.style.textAlign = 'center';
-        confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">테스트 데이터를 정말 삭제하시겠습니까?</div>`;
+        confirmBox.innerHTML = `<div style="margin-bottom:18px;font-size:1.1em;">Are you sure you want to delete test data?</div>`;
         const yesBtn = document.createElement('button');
         yesBtn.textContent = 'Yes';
         yesBtn.style.margin = '0 12px';
@@ -427,7 +427,7 @@ export class SummarStatsModal {
           document.body.removeChild(confirmBg);
           const client = new TrackedAPIClient(this.plugin);
           const number = await client.deleteTestLog();
-          alert(`테스트 데이터 ${number}건 삭제`);
+          alert(`Deleted ${number} test data.`);
           await this.updateStatsAndChart();
         }
       };
