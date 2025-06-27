@@ -7,7 +7,7 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "npm run prebuild && npm run compile && npm run copy:pluginfiles && npm run copy:jsonfiles && npm run copy:swiftfile && npm run zip",
-		"install": "npm run build && node deploy.cjs",
+	
 		"prebuild": "mkdir -p dist && tsc -noEmit -skipLibCheck ",
 		"compile": "node esbuild.config.mjs production",
 		"copy:pluginfiles": "cp src/manifest.json dist/manifest.json && cp src/styles.css dist/styles.css",
