@@ -3,11 +3,24 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # Build outputs
 dist/
 build/
 out/
+
+# Electron specific
+*.app
+*.dmg
+*.deb
+*.rpm
+*.pkg
+*.exe
+*.zip
+
+# Electron cache
+electron-cache/
 
 # IDE files
 .vscode/
@@ -68,9 +81,19 @@ jspm_packages/
 # dotenv environment variables file
 .env
 
-# Installer build outputs
-installer/dist/
-installer/node_modules/
-installer/plugin/summar.zip
-installer/assets/icon.png
-installer/assets/icon.iconset/
+# Electron builder output
+electron-builder-output/
+
+# Plugin files (built from main project)
+plugin/summar.zip
+
+# Icon files (generated)
+assets/icon.png
+assets/icon.iconset/
+
+# Build configuration files (generated)
+builder-*.yml
+builder-*.yaml
+
+# Block map files
+*.blockmap

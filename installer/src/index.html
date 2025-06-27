@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summar Plugin Installer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="i18n.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <h1 data-i18n="app.title">📝 Summar</h1>
+                <p data-i18n="app.subtitle">AI-Powered Summarizer for Obsidian</p>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="step-indicator">
+                <div class="step active" id="step1">1</div>
+                <div class="step-line"></div>
+                <div class="step" id="step2">2</div>
+                <div class="step-line"></div>
+                <div class="step" id="step3">3</div>
+            </div>
+
+            <!-- Step 1: Vault Selection -->
+            <div class="step-content active" id="content-step1">
+                <h2 data-i18n="vault.title">Obsidian Vault 선택</h2>
+                <p data-i18n="vault.description">Summar 플러그인을 설치할 Obsidian vault를 선택해주세요.</p>
+                
+                <!-- 권한 알림 -->
+                <div class="permission-notice" id="permission-notice" style="display: none;">
+                    <div class="notice-icon">🔒</div>
+                    <div class="notice-content">
+                        <h4 data-i18n="permission.title">Better Vault Detection</h4>
+                        <p data-i18n="permission.description">For improved vault detection, please grant Full Disk Access permission.</p>
+                        <button id="grant-permission-btn" class="btn btn-secondary" data-i18n="permission.grantButton">
+                            Grant Permission
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="vault-section">
+                    <div class="vault-header">
+                        <h3 data-i18n="vault.autoDetected">자동 탐지된 Vault</h3>
+                        <div class="vault-selection-controls">
+                            <button id="select-all-btn" class="btn btn-small" data-i18n="vault.selectAll">모두 선택</button>
+                            <button id="clear-all-btn" class="btn btn-small" data-i18n="vault.clearAll">모두 해제</button>
+                        </div>
+                    </div>
+                    <div id="detected-vaults" class="vault-list">
+                        <div class="loading" data-i18n="vault.searching">Vault를 검색 중...</div>
+                    </div>
+                </div>
+
+                <div class="vault-section">
+                    <h3 data-i18n="vault.manualSelection">수동 선택</h3>
+                    <button id="select-folder-btn" class="btn btn-secondary" data-i18n="vault.selectFolder">
+                        📁 폴더 직접 선택
+                    </button>
+                </div>
+
+                <div class="selected-vaults" id="selected-vaults" style="display: none;">
+                    <h3 data-i18n="vault.selectedVaults">선택된 Vault들</h3>
+                    <div class="selected-count" id="selected-count">
+                        <span data-i18n="vault.selectedCount">0개 선택됨</span>
+                    </div>
+                    <div class="selected-vault-list" id="selected-vault-list">
+                        <!-- 선택된 vault들이 여기에 표시됨 -->
+                    </div>
+                </div>
+
+                <div class="step-actions">
+                    <button id="next-step1" class="btn btn-primary" data-i18n="buttons.next" disabled>다음</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Installation -->
+            <div class="step-content" id="content-step2">
+                <h2 data-i18n="install.title">플러그인 설치</h2>
+                <p data-i18n="install.description">선택된 vault들에 Summar 플러그인을 설치합니다.</p>
+                
+                <div class="installation-info">
+                    <div class="info-item">
+                        <strong data-i18n="install.selectedVaults">선택된 Vault들:</strong> 
+                        <span id="install-vault-count"></span>
+                    </div>
+                    <div class="vault-install-list" id="vault-install-list">
+                        <!-- 설치할 vault 목록이 여기에 표시됨 -->
+                    </div>
+                    <div class="info-item">
+                        <strong data-i18n="install.plugin">플러그인:</strong> 
+                        <span data-i18n="install.pluginName">Summar AI-Powered Summarizer</span>
+                    </div>
+                </div>
+
+                <div class="installation-progress" id="installation-progress" style="display: none;">
+                    <div class="overall-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="overall-progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="overall-progress-text" data-i18n="install.preparing">설치 준비 중...</div>
+                    </div>
+                    
+                    <div class="vault-progress-list" id="vault-progress-list">
+                        <!-- 각 vault별 설치 진행상황이 여기에 표시됨 -->
+                    </div>
+                </div>
+
+                <div class="step-actions">
+                    <button id="back-step2" class="btn btn-secondary" data-i18n="buttons.previous">이전</button>
+                    <button id="install-btn" class="btn btn-primary" data-i18n="install.startInstall">설치 시작</button>
+                    <button id="next-step2" class="btn btn-primary" data-i18n="buttons.next" style="display: none;">다음</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Completion -->
+            <div class="step-content" id="content-step3">
+                <h2 data-i18n="complete.title">설치 완료</h2>
+                <div class="completion-message">
+                    <div class="success-icon" data-i18n="complete.successIcon">✅</div>
+                    <h3 id="completion-message-text" data-i18n="complete.successMessage">Summar 플러그인이 성공적으로 설치되었습니다!</h3>
+                    
+                    <div class="installation-summary" id="installation-summary">
+                        <!-- 설치 결과 요약이 여기에 표시됨 -->
+                    </div>
+                    
+                    <div class="next-steps">
+                        <h4 data-i18n="complete.nextSteps">다음 단계:</h4>
+                        <ol id="next-steps-list">
+                            <!-- 동적으로 생성됨 -->
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="step-actions">
+                    <button id="finish-btn" class="btn btn-primary" data-i18n="buttons.finish">완료</button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="version" id="app-version" data-i18n="app.version" data-i18n-vars='{"version":"1.0.0"}'>v1.0.0</div>
+        </footer>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
