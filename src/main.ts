@@ -450,7 +450,7 @@ export default class SummarPlugin extends Plugin {
       },
     });
 
-// if (this.settings.debugLevel > 0) {    
+if (this.settings.debugLevel > 0) {    
     // Summar stats 대시보드 커맨드 추가
     this.addCommand({
       id: "show-summar-stats",
@@ -460,7 +460,7 @@ export default class SummarPlugin extends Plugin {
         modal.open();
       },
     });
-// }
+}
 
     this.registerCustomCommandAndMenus();
 

@@ -479,9 +479,9 @@ export class TrackedAPIClient {
             duration?: number;
         }
     ) {
-// if (this.plugin.settings.debugLevel < 1) {
-//     return;
-// }
+if (this.plugin.settings.debugLevel < 1) {
+    return;
+}
 
         let requestSize: number;
         if (requestData instanceof ArrayBuffer) {
