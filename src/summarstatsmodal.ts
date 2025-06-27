@@ -259,7 +259,7 @@ export class SummarStatsModal {
           }
           // CSV 헤더
           const headers = [
-              'id', 'timestamp', 'timestampISO', 'provider', 'model', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
+              'id', 'timestamp', 'timestampISO', 'provider', 'model', 'actualModelUsed', 'endpoint', 'feature', 'requestSize', 'responseSize', 'requestTokens', 'responseTokens', 'totalTokens', 'duration', 'cost', 'latency', 'success', 'errorMessage', 'sessionId', 'userAgent', 'version'
           ];
           const rows = logs.map(log => headers.map(h => {
               let v = log[h as keyof typeof log];

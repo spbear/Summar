@@ -9,6 +9,8 @@ export interface APICallLog {
     timestampISO: string;
     provider: 'openai' | 'gemini' | 'claude';
     model: string;
+    actualModelUsed: string;
+
     endpoint: string;
     feature: string;
     
@@ -31,9 +33,21 @@ export interface APICallLog {
 
 // IndexedDB 관리 클래스
 export class IndexedDBManager {
+    /**
+     * 현재 Summarailog 모듈의 버전을 나타냅니다.
+     * 이 버전 정보는 로그 데이터의 스키마나 계산 방식이 변경될 때 사용되며,
+     * 각 로그 항목에 기록되어 나중에 마이그레이션이나 비용 재계산 등 버전별 처리가 필요할 때 활용됩니다.
+     */
+    version = '1.0.3'; 
+    /**
+     * 현재 데이터베이스의 스키마 버전을 나타냅니다.
+     * 데이터베이스 구조가 변경될 때마다 이 값을 증가시켜 마이그레이션을 관리합니다.
+     */
+    private dbVersion = 3;
+
+
+
     dbName = `summar-ai-api-logs-db`;
-    version = '1.0.2'; 
-    private dbVersion = 2;
     private db: IDBDatabase | null = null;
 
     async init(plugin: SummarPlugin): Promise<void> {
@@ -479,9 +493,9 @@ export class TrackedAPIClient {
             duration?: number;
         }
     ) {
-if (this.plugin.settings.debugLevel < 1) {
-    return;
-}
+// if (this.plugin.settings.debugLevel < 1) {
+//     return;
+// }
 
         let requestSize: number;
         if (requestData instanceof ArrayBuffer) {
@@ -542,7 +556,8 @@ if (this.plugin.settings.debugLevel < 1) {
                     requestTokens: responseData.usage.prompt_tokens,
                     responseTokens: responseData.usage.completion_tokens,
                     totalTokens: responseData.usage.total_tokens,
-                    cost: this.calculateOpenAICost(responseData.model || '', responseData.usage)
+                    actualModelUsed: responseData.model,
+                    cost: this.calculateOpenAICost(model || '', responseData.usage)
                 };
             }
         }
@@ -552,7 +567,8 @@ if (this.plugin.settings.debugLevel < 1) {
                 requestTokens: responseData.usageMetadata.promptTokenCount,
                 responseTokens: responseData.usageMetadata.candidatesTokenCount,
                 totalTokens: responseData.usageMetadata.totalTokenCount,
-                cost: this.calculateGeminiCost(responseData.modelVersion, 
+                actualModelUsed: responseData.modelVersion,
+                cost: this.calculateGeminiCost(model, 
                     { 
                         promptTokenCount: responseData.usageMetadata.promptTokenCount,
                         candidatesTokenCount: responseData.usageMetadata.candidatesTokenCount
@@ -590,14 +606,14 @@ SummarDebug.log(3, `model: ${m}, matched: ${matchedKey}, inputPerK: ${price.inpu
     }
 
     calculateGeminiCost(
-        modelVersion: string,
+        model: string,
         usage: {
             promptTokenCount: number;
             candidatesTokenCount: number;
         },
         sttFlag: boolean
     ): number {
-        const model = (modelVersion || '').toLowerCase();
+        const m = (model || '').toLowerCase();
         const promptTokens = usage.promptTokenCount || 0;
         const completionTokens = usage.candidatesTokenCount || 0;
 
@@ -605,7 +621,7 @@ SummarDebug.log(3, `model: ${m}, matched: ${matchedKey}, inputPerK: ${price.inpu
         let inputPerK = 0, outputPerK = 0;
 
         // if (model.includes('2.5-pro')) {
-        if (model.toLocaleLowerCase() === 'gemini-2.5-pro') {
+        if (m.toLocaleLowerCase() === 'gemini-2.5-pro') {
             const tier = promptTokens > 200_000
                 ? pricing["gemini-2.5-pro"]?.over200k
                 : pricing["gemini-2.5-pro"]?.under200k;
@@ -613,9 +629,9 @@ SummarDebug.log(3, `model: ${m}, matched: ${matchedKey}, inputPerK: ${price.inpu
             outputPerK = tier?.outputPerK ?? 0;
         } else {
             // const matchedKey = Object.keys(pricing).find(key => model.includes(key)) ?? '';
-            const matchedKey = Object.keys(pricing).find(key => key.toLowerCase() === model) ?? '';            
+            const matchedKey = Object.keys(pricing).find(key => key.toLowerCase() === m) ?? '';            
             const tier = pricing[matchedKey] ?? { inputPerK: 0, outputPerK: 0, audioPerK: 0 };
-SummarDebug.log(3, `model: ${model}, matched: ${matchedKey}, inputPerK: ${inputPerK}, outputPerK: ${outputPerK}`);
+SummarDebug.log(3, `model: ${m}, matched: ${matchedKey}, inputPerK: ${inputPerK}, outputPerK: ${outputPerK}`);
 // SummarDebug.log(1, `calculateGemini() - ${model}, stt:${sttFlag}, audioPerK:${tier.audioPerK}, inputPerK: ${tier.inputPerK}, outputPerK: ${tier.outputPerK}`);
             inputPerK = (sttFlag === true) ? tier.audioPerK : tier.inputPerK;
             outputPerK = tier.outputPerK;
@@ -674,6 +690,7 @@ SummarDebug.log(3, `model: ${model}, matched: ${matchedKey}, inputPerK: ${inputP
             if (models.length === 0) continue; // 모델 없으면 skip
             // 모델 랜덤
             const model = models[Math.floor(Math.random() * models.length)];
+            const actualModelUsed = '';
             // provider 추정
             let provider: 'openai' | 'gemini' = 'openai';
             if (model.startsWith('gemini')) provider = 'gemini';
@@ -740,6 +757,7 @@ SummarDebug.log(3, `model: ${model}, matched: ${matchedKey}, inputPerK: ${inputP
                 timestampISO,
                 provider,
                 model,
+                actualModelUsed,
                 endpoint,
                 feature,
                 requestSize,
