@@ -52,13 +52,17 @@ export class AudioHandler extends SummarViewContainer {
 		// Calculate the common folder path
 		let folderPath = "";
 		let noteFilePath = "";
+		let originalFolderPath = ""; // 원본 폴더 경로 저장
+		
 		if (!givenFolderPath || givenFolderPath.length===0) {
 			if (sortedFiles.length === 1) {
 				folderPath  = sortedFiles[0].name.substring(0,sortedFiles[0].name.lastIndexOf('.')) || sortedFiles[0].name;
+				originalFolderPath = folderPath;
 				noteFilePath = normalizePath(`${this.plugin.settings.recordingDir}`);
 				SummarDebug.log(1, `sendAudioData - only one file`)
 			} else {
 				folderPath = getCommonFolderPath(sortedFiles);
+				originalFolderPath = folderPath;
 				SummarDebug.log(1, `sendAudioData - Detected folder path: ${folderPath}`); // Debug log
 				noteFilePath = normalizePath(`${this.plugin.settings.recordingDir}/${folderPath}`);
 			}
@@ -66,40 +70,21 @@ export class AudioHandler extends SummarViewContainer {
 			noteFilePath = givenFolderPath;
 			const match = givenFolderPath.match(/[^\/]+$/);
 			folderPath = match ? match[0] : noteFilePath;
+			originalFolderPath = folderPath;
 			SummarDebug.log(1, `sendAudioData - Given folder path: ${folderPath}`); // Debug log
 		}
 
 		SummarDebug.log(1, `sendAudioData - noteFilePath: ${noteFilePath}`);
 		SummarDebug.log(1, `Number of sorted files: ${sortedFiles.length}`);
 
+		// 임시로 파일들을 저장할 정보를 수집 (나중에 폴더명 변경 후 실제 저장)
+		const filesToSave: { file: File; fileName: string; }[] = [];
+		
 		for (const [index, file] of sortedFiles.entries()) {
 			const filePath = (file as any).webkitRelativePath || file.name;
 			SummarDebug.log(1, `File ${index + 1}: ${filePath}`);
 			if (isAudioFile(file)) {
-				const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
-				SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
-
-				// Check if the file already exists
-				const fileExists = await this.plugin.app.vault.adapter.exists(audioFilePath);
-				if (!fileExists) {
-					// save the file
-					await this.plugin.app.vault.adapter.mkdir(noteFilePath);
-
-					const fileContent = await file.arrayBuffer(); // Read the file as an ArrayBuffer
-					const binaryContent = new Uint8Array(fileContent);
-
-					try {
-						await this.plugin.app.vault.adapter.writeBinary(audioFilePath, binaryContent);
-						SummarDebug.log(1, `File saved at: ${audioFilePath}`);
-					} catch (error) {
-						SummarDebug.error(1, `Error saving file: ${audioFilePath}`, error);
-					}
-				} else {
-					SummarDebug.log(1, `File already exists: ${audioFilePath}`);
-				}
-
-				audioList += `![[${audioFilePath}]]\n`;
-				SummarDebug.log(1, `audioList: ${audioList}`);
+				filesToSave.push({ file, fileName: file.name });
 			}
 		}
 
@@ -136,10 +121,9 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		// transcriptionPromises를 함수 배열로 변경
-		const audioSortedFiles = sortedFiles.filter(isAudioFile);
-		const transcriptionTasks = audioSortedFiles.map((file) => async () => {
-			const fileName = file.name;
-			const audioFilePath = normalizePath(`${noteFilePath}/${file.name}`);
+		const transcriptionTasks = filesToSave.map((fileInfo) => async () => {
+			const { file, fileName } = fileInfo;
+			const audioFilePath = normalizePath(`${noteFilePath}/${fileName}`);
 			SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
 			const match = fileName.match(/_(\d+)s\.(webm|wav|mp3|ogg|m4a)$/); // find
 			const seconds = match ? parseInt(match[1], 10) : 0; // convert to seconds
@@ -228,14 +212,14 @@ export class AudioHandler extends SummarViewContainer {
 
         // 실패 파일 정보 수집
         const failedFiles: { name: string, error: any }[] = [];
-        audioSortedFiles.forEach((file, idx) => {
+        filesToSave.forEach((fileInfo, idx) => {
             const t = transcriptions[idx];
             const isEmpty = (typeof t === 'string') ? t.trim() === "" : !t;
             if (!t || isEmpty) {
                 if (typeof t === 'object' && t !== null && t.__isTranscribeError) {
-                    failedFiles.push({ name: file.name, error: t.error });
+                    failedFiles.push({ name: fileInfo.fileName, error: t.error });
                 } else {
-                    failedFiles.push({ name: file.name, error: null });
+                    failedFiles.push({ name: fileInfo.fileName, error: null });
                 }
             }
         });
@@ -252,59 +236,108 @@ export class AudioHandler extends SummarViewContainer {
         }
 
         // Combine all transcriptions with filename headers
-		transcriptedText = sortedFiles
-			.filter(isAudioFile)
-			.map((file, idx) => {
-				const header = `----- [${file.name}] ------\n`;
+		transcriptedText = filesToSave
+			.map((fileInfo, idx) => {
+				const header = `----- [${fileInfo.fileName}] ------\n`;
 				const t = transcriptions[idx];
 				// string이 아니면 빈 문자열로 대체
 				return header + (typeof t === "string" ? t : "");
 			})
 			.join("\n");
 
-		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
-
-		// 미팅 정보가 있는지 확인하고 가져오기
+		// 미팅 정보가 있는지 확인하고 가져오기 (폴더명 변경 가능성 때문에 baseFilePath는 나중에 계산)
 		let meetingInfoContent = "";
 		const meetingInfoPath = normalizePath(`${noteFilePath}/${folderPath} meeting-info.md`);
 		SummarDebug.log(1, `Checking for meeting info at: ${meetingInfoPath}`);
 		SummarDebug.log(1, `Calendar handler available: ${!!this.plugin.calendarHandler}`);
-		SummarDebug.log(1, `Audio files count: ${audioSortedFiles.length}`);
+		SummarDebug.log(1, `Audio files count: ${filesToSave.length}`);
 		
 		try {
 			const meetingInfoExists = await this.plugin.app.vault.adapter.exists(meetingInfoPath);
 			if (meetingInfoExists) {
 				meetingInfoContent = await this.plugin.app.vault.adapter.read(meetingInfoPath);
 				SummarDebug.log(1, `Meeting info found and loaded from: ${meetingInfoPath}`);
+				
+				// 기존 meeting-info가 있어도 다중 파일의 경우 폴더명이 캘린더 기반으로 변경되었는지 확인
+				if (filesToSave.length > 1) {
+					const audioFiles = filesToSave.map(f => f.file);
+					const event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
+					if (event) {
+						const safeMeetingTitle = event.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+						// 폴더명에 미팅 제목이 포함되어 있지 않으면 폴더명 업데이트
+						if (!originalFolderPath.includes(safeMeetingTitle)) {
+							SummarDebug.log(1, `Updating folder for existing meeting-info with calendar event: ${event.title}`);
+							const { updatedNoteFilePath, updatedFolderPath } = await this.updateFolderWithMeetingTitle(
+								meetingInfoContent,
+								audioFiles,
+								originalFolderPath,
+								noteFilePath,
+								folderPath,
+								givenFolderPath
+							);
+							noteFilePath = updatedNoteFilePath;
+							folderPath = updatedFolderPath;
+						}
+					}
+				}
 			} else {
 				SummarDebug.log(1, `No existing meeting-info.md found, attempting to generate from audio files`);
-				// meeting-info.md가 없으면 오디오 파일들의 타임스탬프를 기반으로 캘린더 이벤트 찾기
-				if (this.plugin.calendarHandler && audioSortedFiles.length > 0) {
-					SummarDebug.log(1, `Searching calendar events for ${audioSortedFiles.length} audio files`);
-					SummarDebug.log(1, `Audio file names: ${audioSortedFiles.map(f => f.name).join(', ')}`);
-					
-					const event = await this.plugin.calendarHandler.findEventFromAudioFiles(audioSortedFiles);
-					if (event) {
-						SummarDebug.log(1, `Calendar event found: ${event.title}`);
-						meetingInfoContent = this.plugin.calendarHandler.formatEventInfo(event);
-						// 찾은 미팅 정보를 파일로 저장 (다음에 재사용하기 위해)
-						try {
-							await this.plugin.app.vault.adapter.mkdir(noteFilePath);
-							await this.plugin.app.vault.adapter.write(meetingInfoPath, meetingInfoContent);
-							SummarDebug.log(1, `Meeting info generated and saved to: ${meetingInfoPath}`);
-						} catch (error) {
-							SummarDebug.log(1, `Failed to save meeting info: ${error}`);
-						}
-					} else {
-						SummarDebug.log(1, `No calendar event found for audio files`);
+				
+				// 캘린더 이벤트에서 미팅 정보 찾기
+				const audioFiles = filesToSave.map(f => f.file);
+				meetingInfoContent = await this.findMeetingInfoFromAudioFiles(audioFiles);
+				
+				if (meetingInfoContent) {
+					// 다중 파일의 경우 폴더명 업데이트
+					if (filesToSave.length > 1) {
+						const { updatedNoteFilePath, updatedFolderPath } = await this.updateFolderWithMeetingTitle(
+							meetingInfoContent,
+							audioFiles,
+							originalFolderPath,
+							noteFilePath,
+							folderPath,
+							givenFolderPath
+						);
+						noteFilePath = updatedNoteFilePath;
+						folderPath = updatedFolderPath;
 					}
-				} else {
-					SummarDebug.log(1, `Calendar handler not available or no audio files`);
+					
+					// 미팅 정보 저장
+					await this.saveMeetingInfo(meetingInfoContent, noteFilePath, folderPath);
 				}
 			}
 		} catch (error) {
 			SummarDebug.log(1, `Error loading meeting info from: ${meetingInfoPath}`, error);
 		}
+
+		// 폴더명 변경이 완료된 후 실제 파일들 저장 및 audioList 생성
+		await this.plugin.app.vault.adapter.mkdir(noteFilePath);
+		for (const fileInfo of filesToSave) {
+			const audioFilePath = normalizePath(`${noteFilePath}/${fileInfo.fileName}`);
+			SummarDebug.log(1, `audioFilePath: ${audioFilePath}`);
+
+			// Check if the file already exists
+			const fileExists = await this.plugin.app.vault.adapter.exists(audioFilePath);
+			if (!fileExists) {
+				const fileContent = await fileInfo.file.arrayBuffer();
+				const binaryContent = new Uint8Array(fileContent);
+
+				try {
+					await this.plugin.app.vault.adapter.writeBinary(audioFilePath, binaryContent);
+					SummarDebug.log(1, `File saved at: ${audioFilePath}`);
+				} catch (error) {
+					SummarDebug.error(1, `Error saving file: ${audioFilePath}`, error);
+				}
+			} else {
+				SummarDebug.log(1, `File already exists: ${audioFilePath}`);
+			}
+
+			audioList += `![[${audioFilePath}]]\n`;
+			SummarDebug.log(1, `audioList: ${audioList}`);
+		}
+
+		// 폴더명 변경이 완료된 후 baseFilePath 계산
+		const baseFilePath = normalizePath(`${noteFilePath}/${folderPath}`);
 
 		const existingFile = this.plugin.app.vault.getAbstractFileByPath(`${baseFilePath} transcript.md`);
 		let newFilePath = "";
@@ -744,14 +777,152 @@ export class AudioHandler extends SummarViewContainer {
 
 	}
 
+	/**
+	 * 오디오 파일들로부터 캘린더 이벤트를 찾고 미팅 정보를 생성합니다.
+	 */
+	private async findMeetingInfoFromAudioFiles(audioFiles: File[]): Promise<string> {
+		if (!this.plugin.calendarHandler || audioFiles.length === 0) {
+			return "";
+		}
+
+		SummarDebug.log(1, `Searching calendar events for ${audioFiles.length} audio files`);
+		SummarDebug.log(1, `Audio file names: ${audioFiles.map(f => f.name).join(', ')}`);
+		
+		const event = await this.plugin.calendarHandler.findEventFromAudioFiles(audioFiles);
+		if (event) {
+			SummarDebug.log(1, `Calendar event found: ${event.title}`);
+			return this.plugin.calendarHandler.formatEventInfo(event);
+		} else {
+			SummarDebug.log(1, `No calendar event found for audio files`);
+			return "";
+		}
+	}
+
+	/**
+	 * 다중 파일의 경우 캘린더 이벤트를 기반으로 폴더명을 업데이트합니다.
+	 */
+	private async updateFolderWithMeetingTitle(
+		meetingInfo: string,
+		audioFiles: File[],
+		originalFolderPath: string,
+		noteFilePath: string,
+		folderPath: string,
+		givenFolderPath: string
+	): Promise<{ updatedNoteFilePath: string; updatedFolderPath: string }> {
+		
+		if (!meetingInfo || audioFiles.length <= 1) {
+			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
+		}
+
+		const event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
+		if (!event) {
+			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
+		}
+
+		// 미팅 제목이 폴더명에 포함되어 있지 않으면 폴더명을 업데이트
+		const safeMeetingTitle = event.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+		if (originalFolderPath.includes(safeMeetingTitle)) {
+			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
+		}
+
+		const newFolderPath = `${originalFolderPath}_${safeMeetingTitle}`;
+		let newNoteFilePath = "";
+		
+		if (!givenFolderPath || givenFolderPath.length === 0) {
+			newNoteFilePath = normalizePath(`${this.plugin.settings.recordingDir}/${newFolderPath}`);
+		} else {
+			newNoteFilePath = givenFolderPath.replace(originalFolderPath, newFolderPath);
+		}
+		
+		SummarDebug.log(1, `Updating folder path from '${folderPath}' to '${newFolderPath}' based on calendar event`);
+
+		// 폴더 이름 변경 및 파일 이동
+		await this.moveFolderAndFiles(noteFilePath, newNoteFilePath);
+		
+		return { updatedNoteFilePath: newNoteFilePath, updatedFolderPath: newFolderPath };
+	}
+
+	/**
+	 * 기존 폴더의 파일들을 새 폴더로 이동합니다.
+	 */
+	private async moveFolderAndFiles(oldPath: string, newPath: string): Promise<void> {
+		try {
+			// 기존 폴더가 존재하면 새 폴더로 이름 변경
+			if (await this.plugin.app.vault.adapter.exists(oldPath)) {
+				// 새 폴더 생성
+				await this.plugin.app.vault.adapter.mkdir(newPath);
+				
+				// 기존 파일들을 새 폴더로 이동
+				const existingFiles = await this.plugin.app.vault.adapter.list(oldPath);
+				const movePromises: Promise<void>[] = [];
+				
+				for (const filePath of existingFiles.files) {
+					const fileName = filePath.split('/').pop();
+					if (fileName) {
+						const oldFilePath = filePath;
+						const newFilePath = normalizePath(`${newPath}/${fileName}`);
+						
+						// 안전한 파일 이동: 복사 성공 확인 후 삭제
+						movePromises.push(
+							(async () => {
+								try {
+									const fileContent = await this.plugin.app.vault.adapter.readBinary(oldFilePath);
+									await this.plugin.app.vault.adapter.writeBinary(newFilePath, fileContent);
+									
+									// 복사가 성공했는지 확인
+									const copyExists = await this.plugin.app.vault.adapter.exists(newFilePath);
+									if (copyExists) {
+										await this.plugin.app.vault.adapter.remove(oldFilePath);
+										SummarDebug.log(1, `Moved file from ${oldFilePath} to ${newFilePath}`);
+									} else {
+										SummarDebug.error(1, `Failed to copy file to ${newFilePath}, keeping original`);
+									}
+								} catch (error) {
+									SummarDebug.error(1, `Error moving file ${oldFilePath}:`, error);
+								}
+							})()
+						);
+					}
+				}
+				
+				// 모든 파일 이동이 완료될 때까지 대기
+				await Promise.all(movePromises);
+				
+				// 기존 폴더가 비어있으면 삭제
+				const remainingFiles = await this.plugin.app.vault.adapter.list(oldPath);
+				if (remainingFiles.files.length === 0 && remainingFiles.folders.length === 0) {
+					await this.plugin.app.vault.adapter.rmdir(oldPath, false);
+					SummarDebug.log(1, `Removed empty folder: ${oldPath}`);
+				}
+			}
+		} catch (error) {
+			SummarDebug.log(1, `Failed to move folder: ${error}`);
+		}
+	}
+
+	/**
+	 * 미팅 정보를 파일로 저장합니다.
+	 */
+	private async saveMeetingInfo(meetingInfo: string, noteFilePath: string, folderPath: string): Promise<void> {
+		if (!meetingInfo) return;
+
+		const meetingInfoPath = normalizePath(`${noteFilePath}/${folderPath} meeting-info.md`);
+		try {
+			await this.plugin.app.vault.adapter.mkdir(noteFilePath);
+			await this.plugin.app.vault.adapter.write(meetingInfoPath, meetingInfo);
+			SummarDebug.log(1, `Meeting info saved to: ${meetingInfoPath}`);
+		} catch (error) {
+			SummarDebug.log(1, `Failed to save meeting info: ${error}`);
+		}
+	}
+
 }
 
-// 오디오 파일 여부를 판별하는 유틸 함수 (File, TFile 모두 지원)
-function isAudioFile(file: { name: string, type?: string }): boolean {
-    const audioExtensions = ["mp3", "wav", "ogg", "m4a", "webm"];
-    if (file.type && file.type.startsWith("audio/")) return true;
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    return ext ? audioExtensions.includes(ext) : false;
+// Helper functions
+function isAudioFile(file: File): boolean {
+	const audioExtensions = ['.mp3', '.wav', '.webm', '.ogg', '.m4a'];
+	const fileName = file.name.toLowerCase();
+	return audioExtensions.some(ext => fileName.endsWith(ext)) || file.type.startsWith('audio/');
 }
 
 async function getAudioDurationFromBlob(blob: Blob, fileName: string): Promise<number> {
