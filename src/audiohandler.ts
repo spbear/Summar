@@ -354,11 +354,11 @@ export class AudioHandler extends SummarViewContainer {
 		// 미팅 정보를 포함한 transcription 내용 생성
 		let transcriptionContent = "";
 		if (meetingInfoContent) {
-			transcriptionContent = `${meetingInfoContent}\n\n---\n\n## Audio Files\n${audioList}\n## Transcription\n${transcriptedText}`;
+			transcriptionContent = `${meetingInfoContent}\n\n---\n\n## 🎵 Audio Files\n${audioList}\n## 📝 Transcription\n${transcriptedText}`;
 		} else {
 			// 미팅 정보를 찾지 못한 경우 안내 메시지 추가
-			const noMeetingInfo = `## Meeting Information\n\n⚠️ **No calendar event found for this recording time**\n\nThis transcription was created without associated calendar information. You can manually add meeting details if needed.\n\n---\n\n`;
-			transcriptionContent = `${noMeetingInfo}## Audio Files\n${audioList}\n## Transcription\n${transcriptedText}`;
+			const noMeetingInfo = `## 📋 Meeting Information\n\n⚠️ **No calendar event found for this recording time**\n\nThis transcription was created without associated calendar information. You can manually add meeting details if needed.\n\n---\n\n`;
+			transcriptionContent = `${noMeetingInfo}## 🎵 Audio Files\n${audioList}\n## 📝 Transcription\n${transcriptedText}`;
 		}
 
 		await this.plugin.app.vault.create(newFilePath, transcriptionContent);

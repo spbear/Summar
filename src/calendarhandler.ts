@@ -649,24 +649,27 @@ export class CalendarHandler {
         const startTime = event.start.toLocaleString();
         const endTime = event.end.toLocaleString();
         
-        let info = `## Meeting Information\n`;
+        let info = `## 📋 Meeting Information\n`;
         info += `- **Title**: ${event.title}\n`;
         info += `- **Time**: ${startTime} - ${endTime}\n`;
-        
-        if (event.description) {
-            info += `- **Description**: ${event.description}\n`;
-        }
         
         if (event.location) {
             info += `- **Location**: ${event.location}\n`;
         }
         
-        if (event.attendees && event.attendees.length > 0) {
-            info += `- **Attendees**: ${event.attendees.join(', ')}\n`;
-        }
-        
         if (event.zoom_link) {
             info += `- **Zoom Link**: ${event.zoom_link}\n`;
+        }
+        
+        if (event.attendees && event.attendees.length > 0) {
+            info += `\n### 👥 Attendees\n`;
+            event.attendees.forEach(attendee => {
+                info += `- ${attendee}\n`;
+            });
+        }
+        
+        if (event.description) {
+            info += `\n### 📝 Description\n> ${event.description.replace(/\n/g, '\n> ')}\n`;
         }
         
         return info;
