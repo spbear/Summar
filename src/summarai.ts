@@ -23,8 +23,11 @@ export class SummarAI extends SummarViewContainer {
 
     const model = aiModel.toLowerCase().trim();
 
-    if (model.includes('gpt') || model.includes('davinci') || model.includes('curie') ||
-      model.includes('babbage') || model.includes('ada') || model.includes('whisper')) {
+    if (model.includes('gpt') || 
+      model.includes('davinci') || model.includes('curie') ||
+      model.startsWith('o3-') || model.startsWith('o1-') ||
+      model.includes('babbage') || model.includes('ada') || 
+      model.includes('whisper')) {
       this.aiProvider = 'openai';
       this.aiKey = plugin.settings.openaiApiKey;
     } else if (model.includes('gemini') || model.includes('bison') || model.includes('palm')) {

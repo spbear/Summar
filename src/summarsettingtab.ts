@@ -134,9 +134,9 @@ export class SummarSettingsTab extends PluginSettingTab {
 
     // Create tabs
     tabs.forEach((tab) => {
-      if (this.plugin.settings.debugLevel === 0 && tab.id === 'stats-tab') {
+      // if (this.plugin.settings.debugLevel === 0 && tab.id === 'stats-tab') {
         
-      } else {  
+      // } else {  
         if ((tab.id !== 'pdf-tab' && tab.id !== 'schedule-tab') || (Platform.isMacOS && Platform.isDesktopApp)) {
           const setting = new Setting(tabsContainer);
 
@@ -174,7 +174,7 @@ export class SummarSettingsTab extends PluginSettingTab {
           }
 
         }
-      }
+      // }
     });
 
 
@@ -210,7 +210,7 @@ export class SummarSettingsTab extends PluginSettingTab {
             break;
           case 'stats-tab':
             // 통계 대시보드 탭에 SummarStatsModal의 buildStatsView 사용
-            if (this.plugin.settings.debugLevel > 0) {
+            // if (this.plugin.settings.debugLevel > 0) {
               // 1. 로딩중 표시 먼저 보여주기
               tabContent.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:320px;">
                 <span style="color:var(--text-muted);font-size:1.1em;">통계 대시보드 로딩 중...</span>
@@ -221,7 +221,7 @@ export class SummarSettingsTab extends PluginSettingTab {
                 const statsModal = new SummarStatsModal(this.plugin);
                 await statsModal.buildStatsView(tabContent);
               }, 0);
-            }
+            // }
             break;
 
           case 'schedule-tab':

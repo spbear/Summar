@@ -12,7 +12,6 @@
 		"installer:copy-plugin": "cp dist/summar.zip installer/plugin/",
 		"installer:build": "cd installer && npm run build-mac",
 		"installer:dev": "npm run build && npm run installer:copy-plugin && cd installer && npm run dev",
-		"install": "npm run build && node deploy.cjs",
 		"prebuild": "mkdir -p dist && tsc -noEmit -skipLibCheck ",
 		"compile": "node esbuild.config.mjs production",
 		"copy:pluginfiles": "cp src/manifest.json dist/manifest.json && cp src/styles.css dist/styles.css",
