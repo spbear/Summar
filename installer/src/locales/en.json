@@ -1,0 +1,105 @@
+{
+  "app": {
+    "title": "Summar",
+    "subtitle": "AI-Powered Summarizer for Obsidian",
+    "version": "v{{version}}"
+  },
+  "steps": {
+    "step1": "Select Obsidian Vault",
+    "step2": "Install Plugin",
+    "step3": "Installation Complete"
+  },
+  "vault": {
+    "title": "Select Obsidian Vault",
+    "description": "Please select the Obsidian vault where you want to install the Summar plugin.",
+    "autoDetected": "Auto-detected Vaults",
+    "manualSelection": "Manual Selection",
+    "selectFolder": "📁 Select Folder Manually",
+    "selectedVault": "Selected Vault",
+    "selectedVaults": "Selected Vaults",
+    "selectedCount": "{{count}} selected",
+    "selectAll": "Select All",
+    "clearAll": "Clear All",
+    "searching": "Fetching vault list from Obsidian settings...",
+    "openBadge": "Open",
+    "recentBadge": "Recent",
+    "noVaultsFound": "No Obsidian vaults found automatically.<br><strong>Please use \"Select Folder Manually\" below.</strong>",
+    "invalidVault": "The selected folder is not a valid Obsidian vault. (Cannot find .obsidian folder)",
+    "noFolderSelected": "No folder selected.",
+    "removeButton": "Remove",
+    "noMarkdownFiles": "No markdown files",
+    "emptyVault": "📁 Empty vault",
+    "noFilesFound": "No files found",
+    "justNow": "Just now"
+  },
+  "permission": {
+    "title": "💡 Permission Notice",
+    "description": "File access permission requests have been minimized. If vaults are not automatically detected, please use \"Select Folder Manually\".",
+    "grantButton": "Allow Full Disk Access (Optional)"
+  },
+  "install": {
+    "title": "Install Plugin",
+    "description": "Install the Summar plugin to the selected vault.",
+    "vault": "Vault",
+    "selectedVaults": "Selected Vaults",
+    "path": "Path",
+    "plugin": "Plugin",
+    "pluginName": "Summar AI-Powered Summarizer",
+    "startInstall": "Start Installation",
+    "preparing": "Preparing plugin files...",
+    "creatingFolder": "Creating plugin folder...",
+    "copyingFiles": "Copying plugin files...",
+    "updatingConfig": "Updating configuration files...",
+    "installComplete": "Installation Complete!",
+    "installError": "An error occurred during plugin installation: {{error}}",
+    "waiting": "Waiting",
+    "installing": "Installing...",
+    "complete": "Complete",
+    "failed": "Failed",
+    "error": "Error",
+    "creatingFolderStep": "Creating folder...",
+    "copyingFilesStep": "Copying files...",
+    "updatingConfigStep": "Updating configuration...",
+    "completeStep": "Complete",
+    "installingProgress": "Installing... ({{current}}/{{total}})",
+    "allComplete": "✅ Installation complete for all vaults! ({{success}}/{{total}})",
+    "partialComplete": "⚠️ Installation complete (Success: {{success}}/{{total}})"
+  },
+  "complete": {
+    "title": "Installation Complete",
+    "successIcon": "✅",
+    "successMessage": "Summar plugin has been successfully installed!",
+    "allSuccess": "🎉 Summar plugin has been successfully installed to all Vaults!",
+    "partialSuccess": "⚠️ Installation completed for some Vaults",
+    "failed": "❌ Installation failed",
+    "success": "Success",
+    "error": "Failed",
+    "total": "Total",
+    "nextSteps": "Next Steps:",
+    "steps": [
+      "Launch Obsidian",
+      "Go to Settings → Community Plugins",
+      "Enable the \"Summar\" plugin",
+      "Configure your API key and start using"
+    ]
+  },
+  "buttons": {
+    "next": "Next",
+    "previous": "Previous",
+    "install": "Install",
+    "finish": "Finish"
+  },
+  "errors": {
+    "title": "Error",
+    "vaultSearchError": "An error occurred while searching for vaults: {{error}}",
+    "folderSelectionError": "An error occurred while selecting folder: {{error}}"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "weeksAgo": "{{count}}w ago",
+    "monthsAgo": "{{count}}mo ago"
+  }
+}
