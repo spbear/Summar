@@ -901,6 +901,8 @@ async activateTab(tabId: string): Promise<void> {
       );
 
 
+    // Speech to Text Model dropdown 및 프롬프트 영역
+    let promptSettingDiv: HTMLDivElement | null = null;
     new Setting(containerEl)
       .setName("Speech to Text Model")
       .setDesc("Select the STT model to transcribe the audio")
@@ -911,20 +913,27 @@ async activateTab(tabId: string): Promise<void> {
           options['gpt-4o-mini-transcribe'] = 'gpt-4o-mini-transcribe';
           options['gpt-4o-transcribe'] = 'gpt-4o-transcribe';
           options['gemini-2.0-flash'] = 'gemini-2.0-flash';
-        }    
-
+        }
         dropdown
           .addOptions(options)
           .setValue(this.plugin.settings.sttModel)
           .onChange(async (value) => {
             this.plugin.settings.sttModel = value;
-            const promptTextArea = containerEl.querySelector(".transcription-prompt-textarea") as HTMLTextAreaElement;
-            if (promptTextArea) {
-              promptTextArea.parentElement?.toggleClass("hidden", value !== "gpt-4o-mini-transcribe" && value !== "gpt-4o-transcribe");
+            // 항상 최신 상태로 반영: 클래스를 직접 토글
+            if (promptSettingDiv) {
+              if (value === "gpt-4o-mini-transcribe" || 
+                value === "gpt-4o-transcribe") {
+                promptSettingDiv.style.display = "";
+              } else {
+                promptSettingDiv.style.display = "none";
+              }
             }
-          })
+          });
       });
-      new Setting(containerEl)
+
+    // 텍스트에어리어를 별도의 div로 감싸고, 클래스를 부여
+    promptSettingDiv = containerEl.createDiv({ cls: "transcription-prompt-setting" });
+    new Setting(promptSettingDiv)
       .setHeading()
       .addTextArea((text) => {
         text
@@ -939,15 +948,17 @@ async activateTab(tabId: string): Promise<void> {
         textAreaEl.style.width = "100%";
         textAreaEl.style.height = "150px";
         textAreaEl.style.resize = "none";
+      });
 
-        // 초기 숨김 여부 설정
-        if (this.plugin.settings.sttModel !== "gpt-4o-mini-transcribe" && 
-            this.plugin.settings.sttModel !== "gpt-4o-transcribe") {
-          textAreaEl.parentElement?.classList.add("hidden");
-        }
-      })
-      ;
-      
+    // 드롭다운 값에 따라 최초 표시/숨김 상태를 정확히 반영 (display로 직접 제어)
+    const currentSttModel = this.plugin.settings.sttModel;
+    if (currentSttModel !== "gpt-4o-mini-transcribe" 
+      && currentSttModel !== "gpt-4o-transcribe") {
+      promptSettingDiv.style.display = "none";
+    } else {
+      promptSettingDiv.style.display = "";
+    }
+    
     new Setting(containerEl)
       .setName("Prompt (for summarizing recorded content))")
       .setDesc("This prompt will guide the AI response.")
