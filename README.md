@@ -70,4 +70,17 @@ Copy the build output to your Obsidian plugins directory and enable Summar in Ob
 - **2025-05-08**: Integrate Gemini API for transcription feature
 - **2025-05-16**: Implement summary refinement feature
 - **2025-05-20**: Added a feature that automatically starts recording when Zoom is launched
-- **2025-05-21**: Add options to append custom command results to note and copy to clipboard 
+- **2025-05-21**: Add options to append custom command results to note and copy to clipboard
+- **2025-05-25**: Improved auto-update mechanism with automatic Obsidian restart after plugin update
+- **2025-05-28**: Added summary and refinement generation from transcripts with GitHub release notes integration
+- **2025-06-02**: Enhanced settings UI with prompt syncing and key structure refactoring
+- **2025-06-12**: Improved calendar integration with dynamic calendar fetching and enhanced UI
+- **2025-06-17**: Extended Gemini API support to all features and improved transcription concurrency control
+- **2025-06-20**: Added comprehensive API usage statistics and cost tracking with model pricing support
+- **2025-06-21**: Implemented duration-based cost calculation for voice models and enhanced audio handling
+- **2025-06-26**: Added selective auto-join for accepted Zoom meetings with participant status tracking
+- **2025-06-27**: Added automatic calendar integration for meeting-aware recordings and enhanced cost optimization
+- **2025-06-27**: Added API call statistics and debug level functionality for better monitoring
+- **2025-06-28**: Enhanced meeting information display with better attendees format and multiline description support
+- **2025-07-02**: Improved Zoom meeting links to be always clickable with better UI spacing consistency
+- **2025-07-03**: Added macOS installer for easy plugin installation and distribution 
