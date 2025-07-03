@@ -336,6 +336,7 @@
   font-size: 0.9em;
   font-weight: 500;
   margin-bottom: 8px;
+  margin-right: 12px;
   padding: 4px 8px;
   border-radius: 4px;
   display: inline-block;
@@ -376,10 +377,4 @@
   opacity: 0.6;
 }
 
-/* 수락하지 않은 이벤트의 줌 링크는 비활성화 */
-.status-declined .event-zoom-link,
-.status-pending .event-zoom-link {
-  opacity: 0.5;
-  pointer-events: none;
-  text-decoration: line-through;
-}
+/* 모든 줌 링크는 항상 활성화 상태로 유지 */
