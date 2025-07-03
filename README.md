@@ -18,19 +18,32 @@
 
 ## Installation & Build
 
-### 1. Install dependencies
+### Option 1: Quick Installation (Recommended)
+
+Download and install the latest version using our installer:
+
+1. **Download the installer**: [Summar Installer.dmg](https://github.com/mcgabby/Summar/releases/latest/download/Summar.Installer.dmg)
+2. **Run the installer**: Double-click the downloaded `.dmg` file and follow the installation steps
+3. **Security Warning (macOS)**: If you see a warning that the app cannot be opened because it's from an unidentified developer:
+   - Go to **System Settings** > **Privacy & Security**
+   - Find the message about "Summar Installer was blocked from use because it is not from an identified developer"
+   - Click **"Open Anyway"** to proceed with the installation
+
+### Option 2: Manual Build
+
+#### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Build
+#### 2. Build
 
 ```bash
 npm run build
 ```
 
-### 3. Copy to Obsidian plugin folder  
+#### 3. Copy to Obsidian plugin folder  
 Copy the build output to your Obsidian plugins directory and enable Summar in Obsidian.
 
 ---
