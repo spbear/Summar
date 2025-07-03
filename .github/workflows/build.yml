@@ -12,11 +12,27 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: macos-latest
+    runs-on: macos-14  # Use macOS 14 which typically has newer Xcode versions
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Select Xcode version
+        run: |
+          # List available Xcode versions
+          ls /Applications/ | grep Xcode
+          # Try to use the latest available Xcode
+          if [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            echo "Warning: Using older Xcode version that may not support project format"
+            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          fi
+          # Verify selected Xcode version
+          xcodebuild -version
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
