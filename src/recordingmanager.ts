@@ -90,11 +90,16 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 				if (this.plugin.settings.saveTranscriptAndRefineToNewNote) {
 					await this.plugin.app.vault.create(summaryNote, summary);
-					await this.plugin.app.workspace.openLinkText(
-						normalizePath(summaryNote),
-						"",
-						true
-					);
+					
+					// refined가 활성화되어 있지 않으면 summary 파일을 열기
+					// refined가 활성화되어 있으면 나중에 refined 파일이 열릴 예정이므로 summary는 열지 않음
+					if (!this.plugin.settings.refineSummary) {
+						await this.plugin.app.workspace.openLinkText(
+							normalizePath(summaryNote),
+							"",
+							true
+						);
+					}
 					
 					// Daily Notes에 요약 완료 링크 추가 (전사 파일 경로에서 날짜 추출)
 					const recordingDate = this.extractRecordingDateFromFilePath(summaryNote);
