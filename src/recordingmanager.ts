@@ -95,6 +95,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 						"",
 						true
 					);
+					
+					// Daily Notes에 요약 완료 링크 추가 (전사 파일 경로에서 날짜 추출)
+					const recordingDate = this.extractRecordingDateFromFilePath(summaryNote);
+					await this.plugin.dailyNotesHandler.addMeetingLinkToDailyNote(summaryNote, 'summary', recordingDate);
 				}
 
 				if (this.plugin.settings.refineSummary)
@@ -178,6 +182,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 						"",
 						true
 					);
+					
+					// Daily Notes에 개선 완료 링크 추가 (refinement 파일 경로에서 날짜 추출)
+					const recordingDate = this.extractRecordingDateFromFilePath(refinementNote);
+					await this.plugin.dailyNotesHandler.addMeetingLinkToDailyNote(refinementNote, 'refinement', recordingDate);
 				}
 			} else {
 				this.updateResultText("No valid response from OpenAI API.");
@@ -453,6 +461,49 @@ export class AudioRecordingManager extends SummarViewContainer {
 		if (this.zoomWatcherInterval) {
 			clearInterval(this.zoomWatcherInterval);
 			this.zoomWatcherInterval = null;
+		}
+	}
+
+	/**
+	 * 파일 경로에서 녹음 날짜를 추출합니다.
+	 */
+	private extractRecordingDateFromFilePath(filePath: string): Date | undefined {
+		try {
+			// 다양한 날짜 패턴 검색
+			const patterns = [
+				/(\d{4})-(\d{2})-(\d{2})/,  // YYYY-MM-DD
+				/(\d{4})(\d{2})(\d{2})/,    // YYYYMMDD
+				/(\d{4})\.(\d{2})\.(\d{2})/, // YYYY.MM.DD
+				/(\d{4})\/(\d{2})\/(\d{2})/, // YYYY/MM/DD
+				/(\d{2})(\d{2})(\d{2})/,    // YYMMDD
+			];
+
+			for (const pattern of patterns) {
+				const match = filePath.match(pattern);
+				if (match) {
+					let year = parseInt(match[1], 10);
+					let month = parseInt(match[2], 10) - 1; // JavaScript Date는 월이 0부터 시작
+					let day = parseInt(match[3], 10);
+					
+					// YYMMDD 패턴인 경우 (2자리 년도)
+					if (pattern.source === /(\d{2})(\d{2})(\d{2})/.source) {
+						// 2자리 년도를 4자리로 변환 (20년대는 2020년대, 그 외는 19년대로 가정)
+						year = year >= 0 && year <= 30 ? 2000 + year : 1900 + year;
+					}
+					
+					const date = new Date(year, month, day);
+					if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+						SummarDebug.log(2, `Extracted recording date from file path: ${date.toISOString().split('T')[0]}`);
+						return date;
+					}
+				}
+			}
+
+			SummarDebug.log(2, `No valid date found in file path: ${filePath}`);
+			return undefined;
+		} catch (error) {
+			SummarDebug.log(2, `Error extracting date from file path: ${filePath}`, error);
+			return undefined;
 		}
 	}
 }
