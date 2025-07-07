@@ -451,6 +451,71 @@ export class CalendarHandler {
     }
 
     /**
+     * 참여 상태별 우선순위 점수를 계산합니다 (누적 점수 방식)
+     * @param event 캘린더 이벤트
+     * @returns 우선순위 점수 (높을수록 우선순위가 높음)
+     */
+    private getEventPriority(event: CalendarEvent): number {
+        let score = 0;
+        
+        // 기본 참여 상태별 점수 (누적)
+        if (event.participant_status === "organizer") score += 100;
+        if (event.participant_status === "accepted") score += 100;
+        if (event.participant_status === "tentative") score += 50;
+        if (event.participant_status === "pending") score += 25;
+        if (event.participant_status === "unknown") score += 10;
+        if (event.participant_status === "declined") score -= 100; // 명시적 거절에 강력한 패널티
+        
+        // 보너스 점수
+        
+        // 1. 주최자인 경우 추가 보너스 +20
+        if (event.participant_status === "organizer") {
+            score += 20;
+        }
+        
+        // 패널티 점수
+        
+        // 1. 내가 주최자이지만 참석자가 나 혼자일 경우 -50
+        if (event.participant_status === "organizer" && 
+            (!event.attendees || event.attendees.length <= 1)) {
+            score -= 50;
+        }
+        
+        // 2. 시간이 4시간 이상인 경우 -50
+        if (event.start && event.end) {
+            const durationMs = event.end.getTime() - event.start.getTime();
+            const durationHours = durationMs / (1000 * 60 * 60);
+            if (durationHours >= 4) {
+                score -= 50;
+            }
+        }
+        
+        // 3. 미팅 시간이 너무 짧은 경우 (15분 이하) -10
+        if (event.start && event.end) {
+            const durationMs = event.end.getTime() - event.start.getTime();
+            const durationMinutes = durationMs / (1000 * 60);
+            if (durationMinutes <= 15) {
+                score -= 10;
+            }
+        }
+        
+        return score;
+    }
+
+    /**
+     * 우선순위에 따라 이벤트 배열을 정렬합니다
+     * @param events 정렬할 이벤트 배열
+     * @returns 우선순위 순으로 정렬된 이벤트 배열
+     */
+    private sortEventsByPriority(events: CalendarEvent[]): CalendarEvent[] {
+        return events.sort((a, b) => {
+            const priorityDiff = this.getEventPriority(b) - this.getEventPriority(a);
+            if (priorityDiff !== 0) return priorityDiff;
+            return a.start.getTime() - b.start.getTime();
+        });
+    }
+
+    /**
      * 지정된 시간에 진행 중인 캘린더 이벤트를 찾습니다
      * 현재 진행 중인 이벤트와 곧 시작할 이벤트(5분 이내)를 모두 고려합니다
      * @param timestamp 찾을 시간 (Date 객체)
@@ -493,17 +558,7 @@ export class CalendarHandler {
         );
 
         // 우선순위 계산 함수
-        const getEventPriority = (event: CalendarEvent): number => {
-            let score = 0;
-            
-            if (event.participant_status === "organizer") score += 1000;
-            else if (event.participant_status === "accepted") score += 100;
-            else if (event.participant_status === "tentative") score += 50;
-            else if (event.participant_status === "pending") score += 25;
-            else if (event.participant_status === "unknown") score += 10;
-            
-            return score;
-        };
+        const getEventPriority = this.getEventPriority.bind(this);
 
         // 로직 1: 진행 중인 이벤트가 거의 끝나가고 곧 시작할 이벤트가 있으면 곧 시작할 이벤트 우선
         if (ongoingEvents.length > 0 && upcomingEvents.length > 0) {
@@ -513,11 +568,7 @@ export class CalendarHandler {
 
             // 현재 이벤트가 5분 이내에 끝나면 다음 이벤트 우선 고려
             if (minutesToEnd <= 5) {
-                const bestUpcoming = upcomingEvents.sort((a, b) => {
-                    const priorityDiff = getEventPriority(b) - getEventPriority(a);
-                    if (priorityDiff !== 0) return priorityDiff;
-                    return a.start.getTime() - b.start.getTime();
-                })[0];
+                const bestUpcoming = this.sortEventsByPriority(upcomingEvents)[0];
 
                 SummarDebug.log(1, `Current event "${ongoingEvent.title}" ends in ${minutesToEnd.toFixed(1)} minutes, selecting upcoming event "${bestUpcoming.title}"`);
                 return bestUpcoming;
@@ -525,15 +576,7 @@ export class CalendarHandler {
         }
 
         // 로직 2: 일반적인 우선순위 적용
-        const allEventsSorted = events.sort((a, b) => {
-            const priorityDiff = getEventPriority(b) - getEventPriority(a);
-            if (priorityDiff !== 0) return priorityDiff;
-            
-            // 우선순위가 같으면 시작 시간이 빠른 순
-            return a.start.getTime() - b.start.getTime();
-        });
-
-        const selectedEvent = allEventsSorted[0];
+        const selectedEvent = this.sortEventsByPriority(events)[0];
         
         if (events.length > 1) {
             const eventTypes = events.map(e => {
@@ -554,43 +597,7 @@ export class CalendarHandler {
      * @returns 가장 적합한 CalendarEvent
      */
     private selectBestEvent(events: CalendarEvent[]): CalendarEvent {
-        // 우선순위 점수 계산
-        const getEventPriority = (event: CalendarEvent): number => {
-            let score = 0;
-            
-            // 1순위: 개최자인 경우 (가장 높은 점수)
-            if (event.participant_status === "organizer") {
-                score += 1000;
-            }
-            
-            // 2순위: 수락한 이벤트
-            else if (event.participant_status === "accepted") {
-                score += 100;
-            }
-            
-            // 3순위: 기타 상태들
-            else if (event.participant_status === "tentative") {
-                score += 50;
-            } else if (event.participant_status === "pending") {
-                score += 25;
-            } else if (event.participant_status === "unknown") {
-                score += 10;
-            }
-            // declined은 점수 0
-            
-            return score;
-        };
-
-        // 우선순위로 정렬
-        const sortedEvents = events.sort((a, b) => {
-            const priorityDiff = getEventPriority(b) - getEventPriority(a);
-            if (priorityDiff !== 0) return priorityDiff;
-            
-            // 우선순위가 같으면 시작 시간이 빠른 순
-            return a.start.getTime() - b.start.getTime();
-        });
-
-        const selectedEvent = sortedEvents[0];
+        const selectedEvent = this.sortEventsByPriority(events)[0];
         
         if (events.length > 1) {
             SummarDebug.log(1, `Multiple events found at timestamp, selected: "${selectedEvent.title}" (status: ${selectedEvent.participant_status})`);
@@ -612,24 +619,8 @@ export class CalendarHandler {
             return (event.start < endTime && event.end > startTime);
         });
 
-        // 우선순위로 정렬 (selectBestEvent의 로직과 동일)
-        return events.sort((a, b) => {
-            const getEventPriority = (event: CalendarEvent): number => {
-                let score = 0;
-                if (event.participant_status === "organizer") score += 1000;
-                else if (event.participant_status === "accepted") score += 100;
-                else if (event.participant_status === "tentative") score += 50;
-                else if (event.participant_status === "pending") score += 25;
-                else if (event.participant_status === "unknown") score += 10;
-                return score;
-            };
-
-            const priorityDiff = getEventPriority(b) - getEventPriority(a);
-            if (priorityDiff !== 0) return priorityDiff;
-            
-            // 우선순위가 같으면 시작 시간이 빠른 순
-            return a.start.getTime() - b.start.getTime();
-        });
+        // 우선순위로 정렬
+        return this.sortEventsByPriority(events);
     }
 
     /**
@@ -778,13 +769,19 @@ export class CalendarHandler {
             });
 
             // 정확한 시간에 진행 중인 이벤트 찾기
-            const exactEvent = events.find(event => 
+            const exactEvents = events.filter(event => 
                 earliestTimestamp! >= event.start && earliestTimestamp! <= event.end
             );
 
-            if (exactEvent) {
-                SummarDebug.log(1, `✅ Found exact calendar event: ${exactEvent.title} (${exactEvent.participant_status})`);
-                return exactEvent;
+            if (exactEvents.length > 0) {
+                // 여러 이벤트가 있으면 우선순위로 정렬
+                if (exactEvents.length > 1) {
+                    this.sortEventsByPriority(exactEvents);
+                }
+
+                const selectedEvent = exactEvents[0];
+                SummarDebug.log(1, `✅ Found exact calendar event: ${selectedEvent.title} (${selectedEvent.participant_status})`);
+                return selectedEvent;
             }
 
             // 시간 범위와 겹치는 이벤트 찾기
@@ -795,22 +792,7 @@ export class CalendarHandler {
 
                 if (overlappingEvents.length > 0) {
                     // 우선순위로 정렬
-                    const sortedEvents = overlappingEvents.sort((a, b) => {
-                        const getEventPriority = (event: CalendarEvent): number => {
-                            let score = 0;
-                            if (event.participant_status === "organizer") score += 1000;
-                            else if (event.participant_status === "accepted") score += 100;
-                            else if (event.participant_status === "tentative") score += 50;
-                            else if (event.participant_status === "pending") score += 25;
-                            else if (event.participant_status === "unknown") score += 10;
-                            return score;
-                        };
-
-                        const priorityDiff = getEventPriority(b) - getEventPriority(a);
-                        if (priorityDiff !== 0) return priorityDiff;
-                        
-                        return a.start.getTime() - b.start.getTime();
-                    });
+                    const sortedEvents = this.sortEventsByPriority(overlappingEvents);
 
                     const selectedEvent = sortedEvents[0];
                     SummarDebug.log(1, `✅ Found overlapping calendar event: ${selectedEvent.title} (status: ${selectedEvent.participant_status})`);

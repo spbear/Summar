@@ -829,13 +829,31 @@ export class AudioHandler extends SummarViewContainer {
 			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
 		}
 
-		// 미팅 제목이 폴더명에 포함되어 있지 않으면 폴더명을 업데이트
 		const safeMeetingTitle = event.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+		
+		// 미팅 제목이 폴더명에 포함되어 있지 않으면 폴더명을 업데이트
 		if (originalFolderPath.includes(safeMeetingTitle)) {
+			SummarDebug.log(1, `Folder already contains meeting title: ${safeMeetingTitle}`);
 			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
 		}
 
-		const newFolderPath = `${originalFolderPath}_${safeMeetingTitle}`;
+		// 기존 폴더명에서 미팅 제목 부분을 제거하고 새로운 미팅 제목으로 교체
+		// 패턴: YYMMDD-HHMMSS_기존미팅제목 -> YYMMDD-HHMMSS_새미팅제목
+		const timestampPattern = /^(\d{6}-\d{6})/;
+		const timestampMatch = originalFolderPath.match(timestampPattern);
+		
+		let newFolderPath: string;
+		if (timestampMatch) {
+			// 타임스탬프 부분만 유지하고 새로운 미팅 제목 추가
+			const timestamp = timestampMatch[1];
+			newFolderPath = `${timestamp}_${safeMeetingTitle}`;
+			SummarDebug.log(1, `Replacing folder name: ${originalFolderPath} -> ${newFolderPath} (preserving timestamp: ${timestamp})`);
+		} else {
+			// 타임스탬프가 없는 경우 기존 방식 사용
+			newFolderPath = `${originalFolderPath}_${safeMeetingTitle}`;
+			SummarDebug.log(1, `Appending to folder name: ${originalFolderPath} -> ${newFolderPath}`);
+		}
+		
 		let newNoteFilePath = "";
 		
 		if (!givenFolderPath || givenFolderPath.length === 0) {
