@@ -317,7 +317,7 @@ async activateTab(tabId: string): Promise<void> {
               forceUpdateButton.setDisabled(false);
               forceUpdateButton.setCta(); // Obsidian 스타일 강조
               
-              const response = await SummarRequestUrl(this.plugin,"https://api.github.com/repos/mcgabby/summar/releases/latest");
+              const response = await SummarRequestUrl(this.plugin,"https://api.github.com/repos/mcgabby/summar/releases/latest", false);
               const body = response.json.body;
               if (body && body.length > 0) {  
                 forceUpdateButton.setTooltip('');

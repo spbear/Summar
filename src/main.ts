@@ -147,13 +147,13 @@ export default class SummarPlugin extends Plugin {
     this.PLUGIN_MANIFEST = normalizePath(this.PLUGIN_DIR + "/manifest.json");
 
     this.PLUGIN_MODELS = normalizePath(this.PLUGIN_DIR + "/models.json");    
-    await this.loadModelsFromFile();
+    // await this.loadModelsFromFile();
 
     this.PLUGIN_PROMPTS = normalizePath(this.PLUGIN_DIR + "/prompts.json");
-    await this.loadPromptsFromFile();
+    // await this.loadPromptsFromFile();
 
     this.PLUGIN_MODELPRICING = normalizePath(this.PLUGIN_DIR + "/model-pricing.json");
-    await this.loadModelPricingFromFile();
+    // await this.loadModelPricingFromFile();
 
     this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
     this.settings = await this.loadSettingsFromFile();
@@ -667,6 +667,16 @@ export default class SummarPlugin extends Plugin {
 
 
   async loadSettingsFromFile(): Promise<PluginSettings> {
+    // 필수 파일들을 먼저 로딩 (의존성 순서 보장)
+    try {
+      await this.loadModelsFromFile();
+      await this.loadPromptsFromFile();
+      await this.loadModelPricingFromFile();
+    } catch (error) {
+      SummarDebug.error(1, "Error loading essential files:", error);
+      // 필수 파일 로딩 실패 시에도 기본 설정으로 계속 진행
+    }
+
     let defaultSettings = this.settings;
 
     if (await this.app.vault.adapter.exists(this.PLUGIN_SETTINGS)) {
