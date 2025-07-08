@@ -688,17 +688,57 @@ export default class SummarPlugin extends Plugin {
       SummarDebug.log(1, "Reading settings from data.json");
       try {
         const rawData = await this.app.vault.adapter.read(this.PLUGIN_SETTINGS);
+        SummarDebug.log(2, `Raw settings data length: ${rawData.length} characters`);
+        
         const settings = Object.assign({}, defaultSettings, JSON.parse(rawData)) as PluginSettings;
+        SummarDebug.log(2, `Loaded settingsSchemaVersion: "${settings.settingsSchemaVersion}"`);
+        
         const domain = extractDomain(settings.confluenceDomain);
         if (domain) {
           settings.confluenceDomain = domain;
         } else {
           settings.confluenceDomain = "";
         }
-        // if (settings.settingsSchemaVersion !== this.PLUGIN_SETTINGS_SCHEMA_VERSION) {
-        if (settings.settingsSchemaVersion === '' ||
-            semver.gt(this.PLUGIN_SETTINGS_SCHEMA_VERSION, settings.settingsSchemaVersion)) {
-          if (settings.settingsSchemaVersion === '') {
+        
+        // 스키마 버전 비교 - 더 안전한 방식으로 개선
+        const currentSchemaVersion = this.PLUGIN_SETTINGS_SCHEMA_VERSION;
+        const savedSchemaVersion = settings.settingsSchemaVersion || '';
+        
+        SummarDebug.log(1, `Schema version comparison: current="${currentSchemaVersion}", saved="${savedSchemaVersion}"`);
+        
+        let needsMigration = false;
+        
+        // 1. 빈 문자열인 경우 (1.0.0 이전 버전)
+        if (savedSchemaVersion === '') {
+          SummarDebug.log(1, "Empty schema version detected - migration needed");
+          needsMigration = true;
+        }
+        // 2. semver 비교 전 유효성 검사
+        else {
+          try {
+            // semver.valid()로 유효한 버전인지 먼저 확인
+            if (!semver.valid(savedSchemaVersion)) {
+              SummarDebug.log(1, `Invalid saved schema version: "${savedSchemaVersion}" - treating as migration needed`);
+              needsMigration = true;
+            } else if (!semver.valid(currentSchemaVersion)) {
+              SummarDebug.error(1, `Invalid current schema version: "${currentSchemaVersion}" - skipping migration`);
+              needsMigration = false;
+            } else {
+              // 둘 다 유효한 버전인 경우에만 비교
+              needsMigration = semver.gt(currentSchemaVersion, savedSchemaVersion);
+              SummarDebug.log(1, `Schema version comparison result: needsMigration=${needsMigration}`);
+            }
+          } catch (semverError) {
+            SummarDebug.error(1, `Semver comparison error: ${semverError}. Saved: "${savedSchemaVersion}", Current: "${currentSchemaVersion}"`);
+            // semver 에러 발생 시 안전하게 문자열 비교로 fallback
+            needsMigration = savedSchemaVersion !== currentSchemaVersion;
+          }
+        }
+        
+        if (needsMigration) {
+          SummarDebug.log(1, `Performing settings migration from "${savedSchemaVersion}" to "${currentSchemaVersion}"`);
+          
+          if (savedSchemaVersion === '') {
           // 1.0.0 이전 버전의 설정 파일을 읽는 경우, 필요한 변환 작업을 수행합니다.
             settings.saveTranscriptAndRefineToNewNote = settings.recordingResultNewNote;
             settings.sttModel = settings.transcriptSTT;
@@ -707,6 +747,8 @@ export default class SummarPlugin extends Plugin {
             settings.transcriptSummaryPrompt = settings.recordingPrompt;
             settings.refineSummaryPrompt = settings.refiningPrompt;
           }
+          
+          // 이전 버전의 설정들을 정리
           settings.recordingResultNewNote = false; // 이전 버전의 설정을 제거합니다.
           settings.transcriptSTT = ""; // 이전 버전의 설정을 제거합니다.
           settings.transcribingPrompt = ""; // 이전 버전의 설정을 제거합니다.
@@ -721,8 +763,12 @@ export default class SummarPlugin extends Plugin {
           settings.transcriptEndpoint = ""; // 이전 버전의 설정을 제거합니다.
           settings.calendar_zoom_only = false; // 이전 버전의 설정을 제거합니다.
   
-          settings.settingsSchemaVersion = this.PLUGIN_SETTINGS_SCHEMA_VERSION;
-          this.saveSettingsToFile();
+          settings.settingsSchemaVersion = currentSchemaVersion;
+          
+          SummarDebug.log(1, `Settings migration completed. New schema version: ${settings.settingsSchemaVersion}`);
+          await this.saveSettingsToFile();
+        } else {
+          SummarDebug.log(1, "No settings migration needed - versions match");
         } 
         return settings;
       } catch (error) {

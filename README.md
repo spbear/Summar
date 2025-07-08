@@ -83,4 +83,7 @@ Copy the build output to your Obsidian plugins directory and enable Summar in Ob
 - **2025-06-27**: Added API call statistics and debug level functionality for better monitoring
 - **2025-06-28**: Enhanced meeting information display with better attendees format and multiline description support
 - **2025-07-02**: Improved Zoom meeting links to be always clickable with better UI spacing consistency
-- **2025-07-03**: Added macOS installer for easy plugin installation and distribution 
+- **2025-07-03**: Added macOS installer for easy plugin installation and distribution
+- **2025-07-05**: Added Daily Notes integration for automatic meeting note linking and optimized transcription workflow
+- **2025-07-06**: Updated app icon design and improved UI consistency across all platforms
+- **2025-07-07**: Enhanced calendar event prioritization with improved scoring system and refactored file loading for better error handling 
