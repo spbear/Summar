@@ -1424,12 +1424,13 @@ async activateTab(tabId: string): Promise<void> {
             SummarDebug.Notice(0, 'You can only add up to 5 calendars.');
           }
         }));
-    // 캘린더 목록을 한 번만 fetch
-    const calendars = await this.plugin.calendarHandler.getAvailableCalendars();
+
+    // 기존 캘린더 필드들을 먼저 빠르게 렌더링 (캘린더 목록 없이)
     const calendarContainer = containerEl.createDiv();
     for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
-      await this.createCalendarField(containerEl, i, calendars ?? undefined);
+      this.createCalendarField(containerEl, i); // await 제거하고 캘린더 목록 없이 먼저 렌더링
     }
+
     new Setting(containerEl)
       .setName('Automatically launches Zoom meetings for calendar events.')
       .setDesc('If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events')
@@ -1471,7 +1472,78 @@ async activateTab(tabId: string): Promise<void> {
     if (!this.plugin.settings.autoLaunchZoomOnSchedule) {
       onlyAcceptedSetting.settingEl.addClass('disabled');
     }
-    await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, containerEl.createDiv());
+
+    // 이벤트 표시용 컨테이너 생성 (로딩 표시기와 함께)
+    const eventsContainer = containerEl.createDiv();
+    const loadingEl = eventsContainer.createEl('p', { 
+      text: 'Loading calendar data...', 
+      cls: 'calendar-loading' 
+    });
+
+    // 백그라운드에서 캘린더 목록과 이벤트를 비동기로 로드
+    this.loadCalendarDataInBackground(eventsContainer, loadingEl);
+  }
+
+  // 백그라운드에서 캘린더 데이터를 로드하는 비동기 함수
+  private async loadCalendarDataInBackground(eventsContainer: HTMLElement, loadingEl: HTMLElement): Promise<void> {
+    try {
+      // 캘린더 목록 로드
+      const calendarsPromise = this.plugin.calendarHandler.getAvailableCalendars();
+      
+      // 이벤트 표시 (별도로 처리)
+      const eventsPromise = (async () => {
+        try {
+          await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, eventsContainer);
+          loadingEl.remove(); // 이벤트 로딩 완료 후 로딩 텍스트 제거
+        } catch (error: any) {
+          loadingEl.textContent = 'Failed to load calendar events';
+          console.error('Calendar events loading error:', error);
+        }
+      })();
+
+      // 캘린더 목록 처리
+      const calendars = await calendarsPromise;
+      if (calendars) {
+        this.updateCalendarDropdowns(calendars);
+      }
+
+      // 이벤트 로딩 대기 (에러 처리는 위에서 이미 됨)
+      await eventsPromise;
+
+    } catch (error: any) {
+      loadingEl.textContent = 'Failed to load calendar data';
+      console.error('Calendar data loading error:', error);
+    }
+  }
+
+  // 모든 캘린더 드롭다운을 업데이트하는 헬퍼 함수
+  private updateCalendarDropdowns(calendars: string[]): void {
+    // 모든 캘린더 드롭다운을 찾아서 업데이트
+    const dropdowns = document.querySelectorAll('[data-calendar-dropdown]');
+    dropdowns.forEach((dropdown) => {
+      const selectEl = dropdown as HTMLSelectElement;
+      const currentValue = selectEl.value;
+      
+      // 기존 옵션 제거
+      while (selectEl.options.length > 0) selectEl.remove(0);
+      
+      // 새 옵션 추가
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Select calendar';
+      selectEl.appendChild(defaultOption);
+      
+      calendars.forEach((calendar) => {
+        const option = document.createElement('option');
+        option.value = calendar;
+        option.textContent = calendar;
+        selectEl.appendChild(option);
+      });
+      
+      // 기존 값 복원
+      selectEl.value = currentValue;
+      selectEl.disabled = false;
+    });
   }
 
   async createCalendarField(containerEl: HTMLElement, index: number, calendars?: string[]): Promise<void> {
@@ -1483,12 +1555,17 @@ async activateTab(tabId: string): Promise<void> {
     let dropdownComponent: any = null;
     setting.addDropdown((dropdown) => {
       dropdownComponent = dropdown;
+      const selectEl = (dropdown as any).selectEl as HTMLSelectElement;
+      
+      // 캘린더 드롭다운임을 표시하는 데이터 속성 추가
+      selectEl.setAttribute('data-calendar-dropdown', 'true');
+      
       dropdown.addOption('', 'Select calendar');
       if (currentValue) {
         dropdown.addOption(currentValue, currentValue);
       }
       dropdown.setValue(currentValue);
-      (dropdown as any).selectEl.disabled = true; // 최초엔 disable
+      selectEl.disabled = true; // 최초엔 disable
       dropdown.onChange(async (value: string) => {
         this.plugin.settings[`calendar_${index}`] = value;
         await this.plugin.saveSettingsToFile();
@@ -1497,27 +1574,9 @@ async activateTab(tabId: string): Promise<void> {
       });
     });
 
-    // 캘린더 목록이 있으면 바로 사용, 없으면 fetch
-    const updateDropdownWithCalendars = (calendarsList: string[] | null) => {
-      if (dropdownComponent) {
-        const selectEl = (dropdownComponent as any).selectEl as HTMLSelectElement;
-        selectEl.disabled = false;
-        // 기존 옵션 모두 제거
-        while (selectEl.options.length > 0) selectEl.remove(0);
-        dropdownComponent.addOption('', 'Select calendar');
-        if (calendarsList && calendarsList.length > 0) {
-          calendarsList.forEach((item: string) => {
-            dropdownComponent.addOption(item, item);
-          });
-        }
-        dropdownComponent.setValue(currentValue);
-      }
-    };
-
+    // 캘린더 목록이 제공되면 즉시 업데이트
     if (calendars !== undefined) {
-      updateDropdownWithCalendars(calendars);
-    } else {
-      this.plugin.calendarHandler.getAvailableCalendars().then(updateDropdownWithCalendars);
+      this.updateSingleCalendarDropdown(dropdownComponent, calendars, currentValue);
     }
 
     // 삭제 버튼은 기존대로 유지
@@ -1536,6 +1595,23 @@ async activateTab(tabId: string): Promise<void> {
         await this.plugin.calendarHandler.displayEvents();
       })
     );
+  }
+
+  // 단일 캘린더 드롭다운 업데이트 헬퍼 함수
+  private updateSingleCalendarDropdown(dropdownComponent: any, calendars: string[], currentValue: string): void {
+    if (dropdownComponent) {
+      const selectEl = (dropdownComponent as any).selectEl as HTMLSelectElement;
+      selectEl.disabled = false;
+      // 기존 옵션 모두 제거
+      while (selectEl.options.length > 0) selectEl.remove(0);
+      dropdownComponent.addOption('', 'Select calendar');
+      if (calendars && calendars.length > 0) {
+        calendars.forEach((item: string) => {
+          dropdownComponent.addOption(item, item);
+        });
+      }
+      dropdownComponent.setValue(currentValue);
+    }
   }
 }
 

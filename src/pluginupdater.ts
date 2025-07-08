@@ -120,12 +120,15 @@ export class PluginUpdater {
       if (response.status !== 200) {
         throw new Error(`Failed to fetch remote manifest. Status code: ${response.status}`);
       }
-      const data = (await response.json) as Manifest;
-      return data.version || null;
 
+      const manifest: Manifest = JSON.parse(response.text);
+      const version = manifest.version || null;
+
+      SummarDebug.log(1, 'Summar Remote version:', version);
+      return version;
     } catch (error) {
-      SummarDebug.error(1, `Error fetching remote manifest: ${(error as Error).message}`);
-      throw error;
+      SummarDebug.error(1, 'Error fetching remote version:', error);
+      return null;
     }
   }
 
