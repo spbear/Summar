@@ -164,6 +164,14 @@
     transition: border-color 0.2s ease, background 0.2s ease;
 }
 
+/* 🔹 결과 텍스트 영역 스크롤 설정 */
+.summarview-result {
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
 /* 🔹 다크 테마에서 자연스러운 테두리 색상 적용 */
 .theme-dark .summarview-input,
 .theme-dark .summarview-button,
@@ -381,36 +389,32 @@
 
 /* Recording Confirmation Modal Styles */
 .summar-recording-confirm-modal {
-    width: 420px;
+    width: 320px;
     max-width: 90vw;
-    min-width: 320px;
+    min-width: 250px;
     text-align: center;
-    padding: 0;
+    padding: 16px;
     margin: 0;
     box-sizing: border-box;
-}
-
-.summar-recording-confirm-modal .modal-content {
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    text-align: center;
-    padding: 24px;
-    width: 100%;
-    box-sizing: border-box;
 }
 
 .summar-modal-title {
     color: var(--text-warning);
-    margin-bottom: 1.5rem;
-    font-size: 1.3em;
+    margin-bottom: 0.8rem;
+    font-size: 1.1em;
     font-weight: 600;
     text-align: center;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .summar-modal-message {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -419,58 +423,67 @@
 }
 
 .summar-modal-icon {
-    font-size: 3.5em;
-    margin-bottom: 1.5rem;
+    font-size: 2.5em;
+    margin-bottom: 0.8rem;
     line-height: 1;
 }
 
 .summar-modal-text {
-    font-size: 1.1em;
-    line-height: 1.5;
-    margin-bottom: 1.5rem;
+    font-size: 0.9em;
+    line-height: 1.3;
+    margin-bottom: 0.8rem;
     color: var(--text-normal);
     text-align: center;
     max-width: 100%;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-line;
 }
 
 .summar-modal-countdown {
-    font-size: 1em;
+    font-size: 0.85em;
     color: var(--text-warning);
     font-weight: 600;
-    margin-bottom: 1.5rem;
-    padding: 12px 16px;
+    margin-bottom: 0.8rem;
+    padding: 6px 10px;
     background-color: var(--background-secondary);
-    border-radius: 6px;
+    border-radius: 4px;
     border: 1px solid var(--color-border);
     text-align: center;
     width: 100%;
-    max-width: 250px;
+    max-width: 180px;
     box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .summar-modal-buttons {
     display: flex;
-    gap: 16px;
+    gap: 8px;
     justify-content: center;
-    margin-top: 1rem;
+    margin-top: 0.8rem;
+    margin-bottom: 0;
     width: 100%;
     flex-wrap: wrap;
 }
 
 .summar-modal-button-continue,
 .summar-modal-button-stop {
-    padding: 12px 24px;
+    padding: 6px 8px;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     transition: background-color 0.2s ease;
-    min-width: 120px;
+    min-width: 70px;
     flex: 1;
-    max-width: 150px;
+    max-width: 120px;
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
 }
 
 .summar-modal-button-continue {
@@ -497,30 +510,42 @@
     outline-offset: 2px;
 }
 
-/* Ensure modal is centered */
-.modal.summar-recording-confirm-modal {
+/* Ensure modal container is properly centered */
+.modal-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 1000;
 }
 
-/* Ensure modal container is properly centered and sized */
-.modal.summar-recording-confirm-modal .modal-container {
-    width: 420px;
-    max-width: 90vw;
-    min-width: 320px;
-    margin: 0 auto;
-    position: relative;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-/* Prevent horizontal scrollbar */
-.modal.summar-recording-confirm-modal {
-    overflow-x: hidden;
-}
-
-.modal.summar-recording-confirm-modal .modal-content {
-    overflow-x: hidden;
+/* Ensure modal is properly centered */
+.modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
     box-sizing: border-box;
+}
+
+/* Modal container centered */
+.modal .modal-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* Recording modal specific sizing and centering */
+.modal .modal-content.summar-recording-confirm-modal {
+    width: 320px;
+    max-width: 90vw;
+    min-width: 250px;
+    margin: 0;
+    position: relative;
 }
