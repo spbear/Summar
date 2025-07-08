@@ -139,65 +139,183 @@ export default class SummarPlugin extends Plugin {
 
   dbManager: IndexedDBManager;
   modelPricing: any = {};
+  
+  private _needsSave: boolean = false; // 마이그레이션 후 저장 필요 여부
+
+  // 로딩 표시기 표시
+  private showLoadingNotice(message: string): any {
+    const notice = document.createElement('div');
+    notice.className = 'notice summar-loading-notice';
+    notice.textContent = message;
+    
+    notice.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--background-primary);
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: var(--text-normal);
+      z-index: 1000;
+      box-shadow: var(--shadow-s);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 300px;
+    `;
+
+    // 스피너 추가
+    const spinner = document.createElement('div');
+    spinner.style.cssText = `
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--background-modifier-border);
+      border-top: 2px solid var(--text-accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    `;
+
+    // 스피너 애니메이션 CSS 추가
+    if (!document.getElementById('summar-spinner-style')) {
+      const style = document.createElement('style');
+      style.id = 'summar-spinner-style';
+      style.textContent = `
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const messageEl = document.createElement('span');
+    messageEl.textContent = message;
+    
+    notice.appendChild(spinner);
+    notice.appendChild(messageEl);
+    document.body.appendChild(notice);
+
+    return {
+      element: notice,
+      setMessage: (newMessage: string) => {
+        messageEl.textContent = newMessage;
+      }
+    };
+  }
+
+  // 로딩 표시기 숨기기
+  private hideLoadingNotice(notice: any): void {
+    if (notice && notice.element && notice.element.parentNode) {
+      notice.element.parentNode.removeChild(notice.element);
+    }
+  }
 
   async onload() {
-    this.OBSIDIAN_PLUGIN_DIR = normalizePath("/.obsidian/plugins");
-    this.PLUGIN_ID = this.manifest.id;
-    this.PLUGIN_DIR = normalizePath(this.OBSIDIAN_PLUGIN_DIR + "/" + this.PLUGIN_ID);
-    this.PLUGIN_MANIFEST = normalizePath(this.PLUGIN_DIR + "/manifest.json");
-
-    this.PLUGIN_MODELS = normalizePath(this.PLUGIN_DIR + "/models.json");    
-    // await this.loadModelsFromFile();
-
-    this.PLUGIN_PROMPTS = normalizePath(this.PLUGIN_DIR + "/prompts.json");
-    // await this.loadPromptsFromFile();
-
-    this.PLUGIN_MODELPRICING = normalizePath(this.PLUGIN_DIR + "/model-pricing.json");
-    // await this.loadModelPricingFromFile();
-
-    this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
-    this.settings = await this.loadSettingsFromFile();
-    SummarDebug.initialize(this.settings.debugLevel);
-
-
-    SummarDebug.log(1, `OBSIDIAN_PLUGIN_DIR: ${this.OBSIDIAN_PLUGIN_DIR}`);
-    SummarDebug.log(1, `PLUGIN_ID: ${this.PLUGIN_ID}`);
-    SummarDebug.log(1, `PLUGIN_DIR: ${this.PLUGIN_DIR}`);
-    SummarDebug.log(1, `PLUGIN_MANIFEST: ${this.PLUGIN_MANIFEST}`);
-    SummarDebug.log(1, `PLUGIN_SETTINGS: ${this.PLUGIN_SETTINGS}`);
-
+    // 플러그인 로딩 시작 즉시 로딩 표시기 표시 (가능한 가장 빠른 시점)
+    const loadingNotice = this.showLoadingNotice("Initializing Summar plugin...");
     
-    // 로딩 후 1분 뒤에 업데이트 확인
-    setTimeout(async () => {
-      try {
-        SummarDebug.log(1, "Checking for plugin updates...");
-        const pluginUpdater = new PluginUpdater(this);
-        await pluginUpdater.updatePluginIfNeeded();
-      } catch (error) {
-        SummarDebug.error(1, "Error during plugin update:", error);
+    try {
+      this.OBSIDIAN_PLUGIN_DIR = normalizePath("/.obsidian/plugins");
+      this.PLUGIN_ID = this.manifest.id;
+      this.PLUGIN_DIR = normalizePath(this.OBSIDIAN_PLUGIN_DIR + "/" + this.PLUGIN_ID);
+      this.PLUGIN_MANIFEST = normalizePath(this.PLUGIN_DIR + "/manifest.json");
+
+      this.PLUGIN_MODELS = normalizePath(this.PLUGIN_DIR + "/models.json");    
+      // await this.loadModelsFromFile();
+
+      this.PLUGIN_PROMPTS = normalizePath(this.PLUGIN_DIR + "/prompts.json");
+      // await this.loadPromptsFromFile();
+
+      this.PLUGIN_MODELPRICING = normalizePath(this.PLUGIN_DIR + "/model-pricing.json");
+      // await this.loadModelPricingFromFile();
+
+      this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
+      
+      // 설정 로딩 상태 업데이트
+      loadingNotice.setMessage("Loading plugin settings...");
+      await new Promise(resolve => setTimeout(resolve, 0)); // UI thread 양보
+      
+      this.settings = await this.loadSettingsFromFile();
+      SummarDebug.initialize(this.settings.debugLevel);
+
+      SummarDebug.log(1, `OBSIDIAN_PLUGIN_DIR: ${this.OBSIDIAN_PLUGIN_DIR}`);
+      SummarDebug.log(1, `PLUGIN_ID: ${this.PLUGIN_ID}`);
+      SummarDebug.log(1, `PLUGIN_DIR: ${this.PLUGIN_DIR}`);
+      SummarDebug.log(1, `PLUGIN_MANIFEST: ${this.PLUGIN_MANIFEST}`);
+      SummarDebug.log(1, `PLUGIN_SETTINGS: ${this.PLUGIN_SETTINGS}`);
+
+      
+      // 로딩 후 1분 뒤에 업데이트 확인
+      setTimeout(async () => {
+        try {
+          SummarDebug.log(1, "Checking for plugin updates...");
+          const pluginUpdater = new PluginUpdater(this);
+          await pluginUpdater.updatePluginIfNeeded();
+        } catch (error) {
+          SummarDebug.error(1, "Error during plugin update:", error);
+        }
+      }, 1000 * 6); // 6s    
+
+      SummarDebug.log(1, "Summar Plugin loaded");
+
+      // UI 컴포넌트 초기화
+      loadingNotice.setMessage("Setting up UI components...");
+      await new Promise(resolve => setTimeout(resolve, 0)); // UI thread 양보
+
+      this.summarSettingTab = new SummarSettingsTab(this);
+      this.addSettingTab(this.summarSettingTab);
+      // this.addSettingTab(new SummarSettingsTab(this));
+      this.addRibbonIcon("scroll-text", "Open Summar View", this.activateView.bind(this));
+      this.registerView(SummarView.VIEW_TYPE, (leaf) => new SummarView(leaf, this));
+
+      // 핸들러 초기화
+      loadingNotice.setMessage("Initializing handlers...");
+      await new Promise(resolve => setTimeout(resolve, 0)); // UI thread 양보
+
+      this.confluenceHandler = new ConfluenceHandler(this);
+      this.pdfHandler = new PdfHandler(this);
+      this.audioHandler = new AudioHandler(this);
+      this.recordingManager = new AudioRecordingManager(this);
+      this.commandHandler = new CustomCommandHandler(this);
+      this.recordingStatus = new StatusBar(this);
+      this.reservedStatus = new StatusBar(this,true);
+      this.calendarHandler = new CalendarHandler(this);
+      this.dailyNotesHandler = new DailyNotesHandler(this);
+
+      // 데이터베이스 초기화
+      loadingNotice.setMessage("Initializing database...");
+      await new Promise(resolve => setTimeout(resolve, 0)); // UI thread 양보
+
+      this.dbManager = new IndexedDBManager();
+      await this.dbManager.init(this);
+
+      const trackapi = new TrackedAPIClient(this);
+      const updated = await trackapi.fixDB();
+
+      // 완료 메시지 표시 후 로딩 표시기 숨기기
+      loadingNotice.setMessage("Summar plugin loaded successfully!");
+      
+      // 마이그레이션이 필요했다면 설정 저장
+      if (this._needsSave) {
+        await this.saveSettingsToFile();
+        this._needsSave = false;
+        SummarDebug.log(1, "Settings saved after migration");
       }
-    }, 1000 * 6); // 6s    
+      
+      setTimeout(() => {
+        this.hideLoadingNotice(loadingNotice);
+      }, 1000);
 
-    SummarDebug.log(1, "Summar Plugin loaded");
-
-    this.summarSettingTab = new SummarSettingsTab(this);
-    this.addSettingTab(this.summarSettingTab);
-    // this.addSettingTab(new SummarSettingsTab(this));
-    this.addRibbonIcon("scroll-text", "Open Summar View", this.activateView.bind(this));
-    this.registerView(SummarView.VIEW_TYPE, (leaf) => new SummarView(leaf, this));
-
-    this.confluenceHandler = new ConfluenceHandler(this);
-    this.pdfHandler = new PdfHandler(this);
-    this.audioHandler = new AudioHandler(this);
-    this.recordingManager = new AudioRecordingManager(this);
-    this.commandHandler = new CustomCommandHandler(this);
-    this.recordingStatus = new StatusBar(this);
-    this.reservedStatus = new StatusBar(this,true);
-    this.calendarHandler = new CalendarHandler(this);
-    this.dailyNotesHandler = new DailyNotesHandler(this);
-
-    this.dbManager = new IndexedDBManager();
-    await this.dbManager.init(this);
+    } catch (error) {
+      SummarDebug.error(1, "Error during plugin initialization:", error);
+      loadingNotice.setMessage("Failed to load Summar plugin");
+      setTimeout(() => {
+        this.hideLoadingNotice(loadingNotice);
+      }, 3000);
+      throw error;
+    }
 
     const trackapi = new TrackedAPIClient(this);
     const updated = await trackapi.fixDB();
@@ -766,7 +884,8 @@ export default class SummarPlugin extends Plugin {
           settings.settingsSchemaVersion = currentSchemaVersion;
           
           SummarDebug.log(1, `Settings migration completed. New schema version: ${settings.settingsSchemaVersion}`);
-          await this.saveSettingsToFile();
+          // 마이그레이션 완료 후 저장은 onload가 완료된 후에 수행하도록 플래그 설정
+          this._needsSave = true;
         } else {
           SummarDebug.log(1, "No settings migration needed - versions match");
         } 
@@ -791,49 +910,56 @@ export default class SummarPlugin extends Plugin {
 
   async loadModelsFromFile(): Promise<void> {
     if (await this.app.vault.adapter.exists(this.PLUGIN_MODELS)) {
-      SummarDebug.log(1, "Settings file exists:", this.PLUGIN_MODELS);
+      SummarDebug.log(1, "Models file exists:", this.PLUGIN_MODELS);
     } else {
-      SummarDebug.log(1, "Settings file does not exist:", this.PLUGIN_MODELS);
+      SummarDebug.log(1, "Models file does not exist:", this.PLUGIN_MODELS);
+      return; // 파일이 없으면 기본값 사용
     }
 
-    if (await this.app.vault.adapter.exists(this.PLUGIN_MODELS)) {
-      SummarDebug.log(1, "Reading settings from data.json");
-      try {
-        const modelDataJson = await this.app.vault.adapter.read(this.PLUGIN_MODELS);
-        this.modelsJson = modelDataJson;
-        const modelData = this.modelsJson= JSON.parse(modelDataJson) as ModelData;
-        SummarDebug.log(3, `loadModelsFromFile()\n${JSON.stringify(this.modelsJson)}`);
+    try {
+      SummarDebug.log(1, "Reading models from models.json");
+      const modelDataJson = await this.app.vault.adapter.read(this.PLUGIN_MODELS);
+      const modelData = JSON.parse(modelDataJson) as ModelData;
+      this.modelsJson = modelData; // 파싱된 객체를 저장
+      SummarDebug.log(3, `loadModelsFromFile()\n${JSON.stringify(this.modelsJson)}`);
 
-        if (modelData.model_list) {
-          const categories: ModelCategory[] = ['webModel', 'pdfModel', 'sttModel', 'transcriptSummaryModel', 'customModel'];
+      if (modelData.model_list) {
+        const categories: ModelCategory[] = ['webModel', 'pdfModel', 'sttModel', 'transcriptSummaryModel', 'customModel'];
 
-          for (const category of categories) {
-            if (modelData.model_list[category]) {
-
-              const modelsList = modelData.model_list[category].models;
-              if (modelsList && typeof modelsList === 'object') {
-                  this.modelsByCategory[category] = modelsList as ModelInfo;
-              }              
-              if (modelData.model_list[category].default) {
-                this.defaultModelsByCategory[category] = modelData.model_list[category].default;
-              }
-              SummarDebug.log(1, `${category} loaded:`, Object.keys(this.modelsByCategory[category]).length, `(default: ${this.defaultModelsByCategory[category]})`);
+        for (const category of categories) {
+          if (modelData.model_list[category]) {
+            const modelsList = modelData.model_list[category].models;
+            if (modelsList && typeof modelsList === 'object') {
+              this.modelsByCategory[category] = modelsList as ModelInfo;
+            }              
+            if (modelData.model_list[category].default) {
+              this.defaultModelsByCategory[category] = modelData.model_list[category].default;
             }
+            SummarDebug.log(1, `${category} loaded:`, Object.keys(this.modelsByCategory[category]).length, `(default: ${this.defaultModelsByCategory[category]})`);
           }
+        }
 
+        // 기본 모델은 settings가 비어있을 때만 설정 (사용자 설정 덮어쓰기 방지)
+        if (!this.settings.webModel) {
           this.settings.webModel = this.getDefaultModel('webModel');
+        }
+        if (!this.settings.pdfModel) {
           this.settings.pdfModel = this.getDefaultModel('pdfModel');
+        }
+        if (!this.settings.sttModel) {
           this.settings.sttModel = this.getDefaultModel('sttModel');
+        }
+        if (!this.settings.transcriptSummaryModel) {
           this.settings.transcriptSummaryModel = this.getDefaultModel('transcriptSummaryModel');
+        }
+        if (!this.settings.customModel) {
           this.settings.customModel = this.getDefaultModel('customModel');
         }
-        // return { models: defaultModels, defaults: defaultValues };
-      } catch (error) {
-        SummarDebug.log(1, "Error reading settings file:", error);
-        // return { models: defaultModels, defaults: defaultValues };
       }
-   }
-  //  return { models: defaultModels, defaults: defaultValues };
+    } catch (error) {
+      SummarDebug.error(1, "Error reading models file:", error);
+      // 에러 시에도 기본값은 사용 가능하도록 유지
+    }
   }
 
   getDefaultModel(category: ModelCategory): string {
@@ -860,54 +986,63 @@ export default class SummarPlugin extends Plugin {
 
   async loadPromptsFromFile(): Promise<void> {
     if (await this.app.vault.adapter.exists(this.PLUGIN_PROMPTS)) {
-      SummarDebug.log(1, "Settings file exists:", this.PLUGIN_PROMPTS);
+      SummarDebug.log(1, "Prompts file exists:", this.PLUGIN_PROMPTS);
     } else {
-      SummarDebug.log(1, "Settings file does not exist:", this.PLUGIN_PROMPTS);
+      SummarDebug.log(1, "Prompts file does not exist:", this.PLUGIN_PROMPTS);
+      return; // 파일이 없으면 기본값 사용
     }
 
-    if (await this.app.vault.adapter.exists(this.PLUGIN_PROMPTS)) {
-      SummarDebug.log(1, "Reading settings from data.json");
-      try {
-        const promptDataJson = await this.app.vault.adapter.read(this.PLUGIN_PROMPTS);
-        const promptData = JSON.parse(promptDataJson) as PromptData;
-        if (promptData.default_prompts) {
-          this.settings.webPrompt = this.defaultPrompts.webPrompt = promptData.default_prompts.ko.webPrompt.join("\n");
-          this.settings.pdfPrompt = this.defaultPrompts.pdfPrompt = promptData.default_prompts.ko.pdfPrompt.join("\n");
-          this.settings.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt = promptData.default_prompts.ko.transcriptSummaryPrompt.join("\n");
-          this.settings.refineSummaryPrompt = this.defaultPrompts.refineSummaryPrompt = promptData.default_prompts.ko.refineSummaryPrompt.join("\n");
-          // console.log(`setting.webPrompt: \n${this.settings.webPrompt}`);
-          // console.log(`setting.pdfPrompt: \n${this.settings.pdfPrompt}`);
-          // console.log(`setting.transcriptSummaryPrompt: \n${this.settings.transcriptSummaryPrompt}`);
-          // console.log(`setting.refineSummaryPrompt: \n${this.settings.refineSummaryPrompt}`);
-        }
-        else {
-          console.log("=======\ndefault_prompts not found");
-        }
+    try {
+      SummarDebug.log(1, "Reading prompts from prompts.json");
+      const promptDataJson = await this.app.vault.adapter.read(this.PLUGIN_PROMPTS);
+      const promptData = JSON.parse(promptDataJson) as PromptData;
+      
+      if (promptData.default_prompts && promptData.default_prompts.ko) {
+        // defaultPrompts에 저장 (참조용)
+        this.defaultPrompts.webPrompt = promptData.default_prompts.ko.webPrompt.join("\n");
+        this.defaultPrompts.pdfPrompt = promptData.default_prompts.ko.pdfPrompt.join("\n");
+        this.defaultPrompts.transcriptSummaryPrompt = promptData.default_prompts.ko.transcriptSummaryPrompt.join("\n");
+        this.defaultPrompts.refineSummaryPrompt = promptData.default_prompts.ko.refineSummaryPrompt.join("\n");
 
+        // settings는 비어있을 때만 설정 (사용자 설정 덮어쓰기 방지)
+        if (!this.settings.webPrompt) {
+          this.settings.webPrompt = this.defaultPrompts.webPrompt;
+        }
+        if (!this.settings.pdfPrompt) {
+          this.settings.pdfPrompt = this.defaultPrompts.pdfPrompt;
+        }
+        if (!this.settings.transcriptSummaryPrompt) {
+          this.settings.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt;
+        }
+        if (!this.settings.refineSummaryPrompt) {
+          this.settings.refineSummaryPrompt = this.defaultPrompts.refineSummaryPrompt;
+        }
+        
         SummarDebug.log(1, "Prompts loaded successfully");
-      } catch (error) {
-        SummarDebug.log(1, "Error reading settings file:", error);
+      } else {
+        SummarDebug.error(1, "default_prompts or ko language not found in prompts.json");
       }
+    } catch (error) {
+      SummarDebug.error(1, "Error reading prompts file:", error);
     }
   }
 
   async loadModelPricingFromFile(): Promise<void> {
     if (await this.app.vault.adapter.exists(this.PLUGIN_MODELPRICING)) {
-      SummarDebug.log(1, "Settings file exists:", this.PLUGIN_MODELPRICING);
+      SummarDebug.log(1, "Model pricing file exists:", this.PLUGIN_MODELPRICING);
     } else {
-      SummarDebug.log(1, "Settings file does not exist:", this.PLUGIN_MODELPRICING);
+      SummarDebug.log(1, "Model pricing file does not exist:", this.PLUGIN_MODELPRICING);
+      return; // 파일이 없으면 빈 객체 사용
     }
 
-    if (await this.app.vault.adapter.exists(this.PLUGIN_MODELPRICING)) {
-      SummarDebug.log(1, "Reading settings from model-pricing.json");
-      try {
-        const modelPricingJson = await this.app.vault.adapter.read(this.PLUGIN_MODELPRICING);
-        this.modelPricing = JSON.parse(modelPricingJson);
-        SummarDebug.log(1, "Prompts loaded successfully");
-      } catch (error) {
-        SummarDebug.log(1, "Error reading model pricing:", error);
-        this.modelPricing = {};
-      }
+    try {
+      SummarDebug.log(1, "Reading model pricing from model-pricing.json");
+      const modelPricingJson = await this.app.vault.adapter.read(this.PLUGIN_MODELPRICING);
+      this.modelPricing = JSON.parse(modelPricingJson);
+      SummarDebug.log(1, "Model pricing loaded successfully");
+    } catch (error) {
+      SummarDebug.error(1, "Error reading model pricing file:", error);
+      this.modelPricing = {};
     }
   }
 
