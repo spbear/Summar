@@ -304,7 +304,9 @@ export class SummarView extends View {
     resultContainer.style.padding = "10px";
     resultContainer.style.margin = "5px"; // 위로 붙임
     resultContainer.style.whiteSpace = "pre-wrap";
+    resultContainer.style.wordWrap = "break-word";
     resultContainer.style.overflowY = "auto";
+    resultContainer.style.overflowX = "hidden";
     resultContainer.style.resize = "none";
     resultContainer.readOnly = true;
     resultContainer.style.color = "var(--text-normal)"; // Obsidian의 기본 텍스트 색상 변수 사용

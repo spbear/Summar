@@ -22,8 +22,9 @@ export class RecordingConfirmModal extends Modal {
         contentEl.classList.add("summar-recording-confirm-modal");
         
         // Set modal dimensions
-        this.modalEl.style.width = "450px";
+        this.modalEl.style.width = "320px";
         this.modalEl.style.maxWidth = "90vw";
+        this.modalEl.style.overflowX = "hidden";
         
         // Title
         const title = contentEl.createEl("h2", { 
@@ -39,7 +40,7 @@ export class RecordingConfirmModal extends Modal {
         });
         
         const message = messageContainer.createEl("p", {
-            text: "You have been recording for over 2 hours. Do you want to continue recording?",
+            text: "You have been recording for over 2 hours.\nDo you want to continue recording?",
             cls: "summar-modal-text"
         });
         
@@ -54,7 +55,7 @@ export class RecordingConfirmModal extends Modal {
         
         // Continue button
         const continueButton = buttonContainer.createEl("button", {
-            text: "Continue Recording",
+            text: "Continue",
             cls: "mod-cta summar-modal-button-continue"
         });
         continueButton.addEventListener("click", () => {
@@ -63,7 +64,7 @@ export class RecordingConfirmModal extends Modal {
         
         // Stop button
         const stopButton = buttonContainer.createEl("button", {
-            text: "Stop Recording",
+            text: "Stop",
             cls: "mod-warning summar-modal-button-stop"
         });
         stopButton.addEventListener("click", () => {
