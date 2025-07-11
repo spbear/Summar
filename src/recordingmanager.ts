@@ -45,15 +45,15 @@ export class AudioRecordingManager extends SummarViewContainer {
 		// SummarDebug.log(2, "Fetched page content:", page_content);
 		SummarDebug.log(1, `newFilePath: ${newFilePath}`);
 
-		const transcriptSummaryPrompt = this.plugin.settings.transcriptSummaryPrompt;
+		const transcriptSummaryPrompt = this.plugin.settingsv2.recording.transcriptSummaryPrompt;
 
 		let summary = "";
 
 		try {
-			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel, 'stt-summary');
+			const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.recording.transcriptSummaryModel, 'stt-summary');
 			if (!summarai.hasKey(true)) return '';
 
-			this.updateResultText( `Generating summary using [${this.plugin.settings.transcriptSummaryModel}]...` );
+			this.updateResultText( `Generating summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...` );
 
 			this.enableNewNote(false);
 			this.timer.start();
@@ -88,12 +88,12 @@ export class AudioRecordingManager extends SummarViewContainer {
 				
 				SummarDebug.log(1,`newFilePath = ${newFilePath}`);
 
-				if (this.plugin.settings.saveTranscriptAndRefineToNewNote) {
+				if (this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote) {
 					await this.plugin.app.vault.create(summaryNote, summary);
 					
 					// refined가 활성화되어 있지 않으면 summary 파일을 열기
 					// refined가 활성화되어 있으면 나중에 refined 파일이 열릴 예정이므로 summary는 열지 않음
-					if (!this.plugin.settings.refineSummary) {
+					if (!this.plugin.settingsv2.recording.refineSummary) {
 						await this.plugin.app.workspace.openLinkText(
 							normalizePath(summaryNote),
 							"",
@@ -106,7 +106,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 					await this.plugin.dailyNotesHandler.addMeetingLinkToDailyNote(summaryNote, 'summary', recordingDate);
 				}
 
-				if (this.plugin.settings.refineSummary)
+				if (this.plugin.settingsv2.recording.refineSummary)
 				{
 					this.timer.stop();
 					await this.refine(transcripted, summary, summaryNote);
@@ -135,10 +135,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 		this.updateResultText("Improving the summary…");
 		this.enableNewNote(false);
 
-		const refineSummaryPrompt = this.plugin.settings.refineSummaryPrompt;
+		const refineSummaryPrompt = this.plugin.settingsv2.recording.refineSummaryPrompt;
 
 		try {
-			const summarai = new SummarAI(this.plugin, this.plugin.settings.transcriptSummaryModel, 'stt-refine');
+			const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.recording.transcriptSummaryModel, 'stt-refine');
 			if (!summarai.hasKey(true)) return '';
 			const messages: string[] = [];
 			messages.push(refineSummaryPrompt);
@@ -147,7 +147,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			SummarDebug.log(1, `messages1\n${messages[0]}`);
 			SummarDebug.log(1, `messages2\n${messages[1]}`);
 			
-			this.updateResultText(`Refining summary using [${this.plugin.settings.transcriptSummaryModel}]...`);
+			this.updateResultText(`Refining summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...`);
 			this.enableNewNote(false);
 			this.timer.start();
 
@@ -180,7 +180,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				this.updateResultText(refined);
 				this.enableNewNote(true, refinementNote);
 
-				if (this.plugin.settings.saveTranscriptAndRefineToNewNote) {
+				if (this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote) {
 					await this.plugin.app.vault.create(refinementNote, refined);
 					await this.plugin.app.workspace.openLinkText(
 						normalizePath(refinementNote),
@@ -222,7 +222,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			}
 
 			// const deviceId = await getDeviceId(this.plugin);
-			const selectedDeviceLabel = this.plugin.settings[this.deviceId] as string;
+			const selectedDeviceLabel = this.plugin.settingsv2.recording.selectedDeviceId[this.deviceId] || "";
 			if (!selectedDeviceLabel) {
 				this.recordingTimer.stop();
 				SummarDebug.Notice(0, "No audio device selected.", 0);
@@ -252,8 +252,8 @@ export class AudioRecordingManager extends SummarViewContainer {
 			}
 		}
 
-		SummarDebug.log(1, `recordingDir: ${this.plugin.settings.recordingDir}`);
-		this.recordingPath = normalizePath(this.plugin.settings.recordingDir + "/" + this.timeStamp + folderSuffix);
+		SummarDebug.log(1, `recordingDir: ${this.plugin.settingsv2.recording.recordingDir}`);
+		this.recordingPath = normalizePath(this.plugin.settingsv2.recording.recordingDir + "/" + this.timeStamp + folderSuffix);
 		await this.plugin.app.vault.adapter.mkdir(this.recordingPath);
 		SummarDebug.log(1,`recordingPath: ${this.recordingPath}`);
 
@@ -436,7 +436,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 	startZoomAutoRecordWatcher() {
 		if (!(Platform.isMacOS && Platform.isDesktopApp)) return;
-		if (!this.plugin.settings.autoRecordOnZoomMeeting) return;
+		if (!this.plugin.settingsv2.recording.autoRecordOnZoomMeeting) return;
 		if (this.zoomWatcherInterval) return;
 		this.zoomWatcherInterval = setInterval(() => {
 			// macOS: Zoom 미팅 중에만 존재하는 프로세스(CptHost) 감지
@@ -444,7 +444,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				const isMeetingRunning = !!stdout.trim();
 				if (isMeetingRunning && !this.wasZoomRunning) {
 					// Zoom 미팅 시작됨
-					this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
+					this.plugin.recordingManager.startRecording(this.plugin.settingsv2.recording.recordingUnit);
 				} else if (!isMeetingRunning && this.wasZoomRunning && this.plugin.recordingManager.getRecorderState() === "recording") {
 					this.plugin.toggleRecording();
 					// Zoom 미팅 종료됨

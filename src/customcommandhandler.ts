@@ -29,11 +29,17 @@ export class CustomCommandHandler extends SummarViewContainer {
 			return;
 		}
 
-		const settings = this.plugin.settings;
-		const cmdModel = settings[`cmd_model_${cmdIndex}`] || 'gpt-4o';
-		const cmdPrompt = settings[`cmd_prompt_${cmdIndex}`] || '';
-		const appendToNote = !!settings[`cmd_append_to_note_${cmdIndex}`];
-		const copyToClipboard = !!settings[`cmd_copy_to_clipboard_${cmdIndex}`];
+		// V2 설정에서 커맨드 정보 가져오기
+		const command = this.plugin.settingsv2.custom.command[cmdIndex - 1]; // 0-based index
+		if (!command) {
+			SummarDebug.error(1, `Command not found at index: ${cmdIndex - 1}`);
+			return;
+		}
+
+		const cmdModel = command.model || 'gpt-4o';
+		const cmdPrompt = command.prompt || '';
+		const appendToNote = command.appendToNote;
+		const copyToClipboard = command.copyToClipboard;
 
 		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 

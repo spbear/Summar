@@ -34,7 +34,7 @@ export class PdfHandler extends SummarViewContainer {
 	}
 
 	async convertToMarkdownFromPdf(file: any): Promise<void> {
-		const summarai = new SummarAI(this.plugin, this.plugin.settings.pdfModel, 'pdf');
+		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.pdf.pdfModel, 'pdf');
 		if (!summarai.hasKey(true)) return;
 
 		const pdftopng = new PdfToPng(this.plugin);
@@ -46,8 +46,8 @@ export class PdfHandler extends SummarViewContainer {
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 			}
 
-			const pdfPrompt = this.plugin.settings.pdfPrompt;
-			const modelName = this.plugin.settings.pdfModel;
+			const pdfPrompt = this.plugin.settingsv2.pdf.pdfPrompt;
+			const modelName = this.plugin.settingsv2.pdf.pdfModel;
 			SummarDebug.Notice(1, file.name);
 
 			this.timer.start();

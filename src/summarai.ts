@@ -29,10 +29,10 @@ export class SummarAI extends SummarViewContainer {
       model.includes('babbage') || model.includes('ada') || 
       model.includes('whisper')) {
       this.aiProvider = 'openai';
-      this.aiKey = plugin.settings.openaiApiKey;
+      this.aiKey = plugin.settingsv2.common.openaiApiKey;
     } else if (model.includes('gemini') || model.includes('bison') || model.includes('palm')) {
       this.aiProvider = 'gemini';
-      this.aiKey = plugin.settings.googleApiKey;
+      this.aiKey = plugin.settingsv2.common.googleApiKey;
     } else if (model.includes('claude')) {
       this.aiProvider = 'anthropic';
       this.aiKey = '';
@@ -221,7 +221,7 @@ export class SummarAI extends SummarViewContainer {
         if (this.aiProvider === 'openai') {
           SummarDebug.log(1, `SummarAI.audioTranscription() - Using OpenAI audio/transcription with model: ${this.aiModel}, feature: ${this.feature}`);
 
-          const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+          const endpoint = this.plugin.settingsv2.common.openaiApiEndpoint?.trim() || "https://api.openai.com";
           const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
 
           const response = await SummarRequestUrl(this.plugin, {
@@ -326,7 +326,7 @@ export class SummarAI extends SummarViewContainer {
       if (apiUrl && apiUrl.trim().length > 0) {
         url = apiUrl.trim();
       } else {
-        const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
+        const endpoint = this.plugin.settingsv2.common.openaiApiEndpoint?.trim() || "https://api.openai.com";
         url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
       }
       SummarDebug.log(1, `SummarAI.chatOpenai() with model: ${this.aiModel}, feature: ${this.feature}`);

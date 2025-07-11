@@ -31,7 +31,7 @@ export class SummarSettingsTab extends PluginSettingTab {
     // SummarDebug.log(1, "SummarSettingsTab: Displaying settings tab");
     const { containerEl } = this;
 
-    if (!containerEl || !this.plugin.settings) {
+    if (!containerEl || !this.plugin.settingsv2) {
       SummarDebug.error(1, "Settings or containerEl not initialized correctly.");
       return;
     }
@@ -192,6 +192,8 @@ export class SummarSettingsTab extends PluginSettingTab {
 
         switch (tab.id) {
           case 'common-tab':
+            tabContent.style.width = "100%";
+            tabContent.style.maxWidth = "none";
             await this.buildCommonSettings(tabContent);
             break;
           case 'webpage-tab':
@@ -203,9 +205,13 @@ export class SummarSettingsTab extends PluginSettingTab {
             }
             break;
           case 'recording-tab':
+            tabContent.style.width = "100%";
+            tabContent.style.maxWidth = "none";
             await this.buildRecordingSettings(tabContent);
             break;
           case 'custom-tab':
+            tabContent.style.width = "100%";
+            tabContent.style.maxWidth = "none";
             await this.buildCustomCommandSettings(tabContent);
             break;
           case 'stats-tab':
@@ -226,6 +232,8 @@ export class SummarSettingsTab extends PluginSettingTab {
 
           case 'schedule-tab':
             if (Platform.isMacOS && Platform.isDesktopApp) {
+              tabContent.style.width = "100%";
+              tabContent.style.maxWidth = "none";
               await this.buildCalendarSettings(tabContent);
             }
             break;
@@ -349,9 +357,10 @@ async activateTab(tabId: string): Promise<void> {
       .addText((text) => {
         text
           .setPlaceholder("Enter OpenAI API Key")
-          .setValue(this.plugin.settings.openaiApiKey || "")
+          .setValue(this.plugin.settingsv2.common.openaiApiKey || "")
           .onChange(async (value) => {
-            this.plugin.settings.openaiApiKey = value;
+            this.plugin.settingsv2.common.openaiApiKey = value;
+            await this.plugin.settingsv2.saveSettings();
           });
         const textAreaEl = text.inputEl;
         textAreaEl.style.width = "100%";
@@ -364,9 +373,10 @@ async activateTab(tabId: string): Promise<void> {
       .addText((text) => {
         text
           .setPlaceholder("https://api.openai.com")
-          .setValue(this.plugin.settings.openaiApiEndpoint || "")
+          .setValue(this.plugin.settingsv2.common.openaiApiEndpoint || "")
           .onChange(async (value) => {
-            this.plugin.settings.openaiApiEndpoint = value;
+            this.plugin.settingsv2.common.openaiApiEndpoint = value;
+            await this.plugin.settingsv2.saveSettings();
           });
         const textAreaEl = text.inputEl;
         textAreaEl.style.width = "100%";
@@ -378,9 +388,10 @@ async activateTab(tabId: string): Promise<void> {
       .addText((text) => {
         text
           .setPlaceholder("Enter Gemini API Key")
-          .setValue(this.plugin.settings.googleApiKey || "")
+          .setValue(this.plugin.settingsv2.common.googleApiKey || "")
           .onChange(async (value) => {
-            this.plugin.settings.googleApiKey = value;
+            this.plugin.settingsv2.common.googleApiKey = value;
+            await this.plugin.settingsv2.saveSettings();
           });
 
         const textAreaEl = text.inputEl;
@@ -395,9 +406,10 @@ async activateTab(tabId: string): Promise<void> {
       .addText((text) => {
         text
           .setPlaceholder("Enter Confluence API Token")
-          .setValue(this.plugin.settings.confluenceApiToken || "")
+          .setValue(this.plugin.settingsv2.common.confluenceApiToken || "")
           .onChange(async (value) => {
-            this.plugin.settings.confluenceApiToken = value;
+            this.plugin.settingsv2.common.confluenceApiToken = value;
+            await this.plugin.settingsv2.saveSettings();
           });
 
         const textAreaEl = text.inputEl;
@@ -407,8 +419,9 @@ async activateTab(tabId: string): Promise<void> {
     // Confluence Base URL with a checkbox in the same line
     new Setting(containerEl)
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.useConfluenceAPI).onChange(async (value) => {
-          this.plugin.settings.useConfluenceAPI = value;
+        toggle.setValue(this.plugin.settingsv2.common.useConfluenceAPI).onChange(async (value) => {
+          this.plugin.settingsv2.common.useConfluenceAPI = value;
+          await this.plugin.settingsv2.saveSettings();
 
           // Dynamically enable/disable the input field
           const inputField = containerEl.querySelector<HTMLInputElement>(".confluence-url-input");
@@ -419,10 +432,10 @@ async activateTab(tabId: string): Promise<void> {
       )
       .addText((text) => {
         text.setPlaceholder("Enter your Confluence Domain")
-          .setValue(this.plugin.settings.confluenceDomain || "wiki.workers-hub.com")
+          .setValue(this.plugin.settingsv2.common.confluenceDomain || "wiki.workers-hub.com")
           .onChange(async (value) => {
-            this.plugin.settings.confluenceDomain = value;
-            // await this.plugin.saveSettingsToFile(this.plugin.settings);
+            this.plugin.settingsv2.common.confluenceDomain = value;
+            await this.plugin.settingsv2.saveSettings();
           });
 
         const textAreaEl = text.inputEl;
@@ -432,7 +445,7 @@ async activateTab(tabId: string): Promise<void> {
         text.inputEl.classList.add("confluence-url-input");
 
         // Disable the text field if "useConfluenceAPI" is false on initialization
-        text.inputEl.disabled = !this.plugin.settings.useConfluenceAPI;
+        text.inputEl.disabled = !this.plugin.settingsv2.common.useConfluenceAPI;
       })
       .setName("Confluence Domain")
       .setDesc("If you want to use the Confluence Open API, toggle it on; if not, toggle it off.");
@@ -448,7 +461,7 @@ async activateTab(tabId: string): Promise<void> {
         .addText((text) => {
           text
             .setPlaceholder("Enter Confluence page URL")
-            .setValue(this.plugin.settings.confluenceParentPageUrl || "")
+            .setValue(this.plugin.settingsv2.common.confluenceParentPageUrl || "")
             .onChange(async (value) => {
               // URL이 변경될 때마다 저장
               checkButton.setDisabled(!value.trim()); // ButtonComponent의 메서드로 상태 변경 
@@ -490,17 +503,17 @@ async activateTab(tabId: string): Promise<void> {
                   
                   if (result.pageId) {
                     pageIdInput.setValue(result.pageId);
-                    this.plugin.settings.confluenceParentPageId = result.pageId;
+                    this.plugin.settingsv2.common.confluenceParentPageId = result.pageId;
                     const spaceKey = await conflueceapi.getSpaceKey(result.pageId);
                     if (spaceKey) {
                       spaceKeyInput.setValue(spaceKey);
-                      this.plugin.settings.confluenceParentPageSpaceKey = spaceKey;
-                      this.plugin.settings.confluenceParentPageUrl = url;
+                      this.plugin.settingsv2.common.confluenceParentPageSpaceKey = spaceKey;
+                      this.plugin.settingsv2.common.confluenceParentPageUrl = url;
                     }
                   }
 
                   // 설정 저장
-                  await this.plugin.saveData(this.plugin.settings);
+                  await this.plugin.settingsv2.saveSettings();
                 } catch (error) {
                   console.error("Error fetching page info:", error);
                 }
@@ -520,16 +533,11 @@ async activateTab(tabId: string): Promise<void> {
           spaceKeyInput = text;
           text
             .setPlaceholder("Space Key")
-            .setValue(this.plugin.settings.confluenceParentPageSpaceKey || "")
+            .setValue(this.plugin.settingsv2.common.confluenceParentPageSpaceKey || "")
             .setDisabled(true);
           const textEl = text.inputEl;
           textEl.style.width = "100%";
         });
-
-
-      // 🎨 Desc 스타일 좁게 조정 (너비 제한)
-      const descEl = urlContainer.descEl;
-      descEl.style.maxWidth = "450px"; // 필요시 400~600px 사이로 조정 가능
 
       // Parent Page ID 입력 필드 (읽기 전용)
       let pageIdInput: any;
@@ -540,7 +548,7 @@ async activateTab(tabId: string): Promise<void> {
           pageIdInput = text;
           text
             .setPlaceholder("Parent Page ID")
-            .setValue(this.plugin.settings.confluenceParentPageId || "")
+            .setValue(this.plugin.settingsv2.common.confluenceParentPageId || "")
             .setDisabled(true);
           const textEl = text.inputEl;
           textEl.style.width = "100%";
@@ -550,6 +558,10 @@ async activateTab(tabId: string): Promise<void> {
 
   async buildWebpageSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "Webpage Summary" });
+    
+    // 컨테이너 너비 명시적 설정
+    containerEl.style.width = "100%";
+    containerEl.style.maxWidth = "none";
 
     new Setting(containerEl)
       .setName("Prompt (for Web page summary)")
@@ -564,9 +576,10 @@ async activateTab(tabId: string): Promise<void> {
         }            
         dropdown
           .addOptions(options)
-          .setValue(this.plugin.settings.webModel)
+          .setValue(this.plugin.settingsv2.web.webModel)
           .onChange(async (value) => {
-            this.plugin.settings.webModel = value;
+            this.plugin.settingsv2.web.webModel = value;
+            await this.plugin.settingsv2.saveSettings();
           })
       });
 
@@ -585,10 +598,11 @@ async activateTab(tabId: string): Promise<void> {
       button.setButtonText("set default prompt")
         .setDisabled(true)
         .setClass("set-default-btn");
-      button.onClick(() => {
+      button.onClick(async () => {
         if (setDefaultButton && !setDefaultButton.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          this.plugin.settings.webPrompt = promptTextAreaEl.value = this.plugin.defaultPrompts.webPrompt;
+          this.plugin.settingsv2.web.webPrompt = promptTextAreaEl.value = this.plugin.defaultPrompts.webPrompt;
+          await this.plugin.settingsv2.saveSettings();
           setDefaultButton.setDisabled(true);
           if (revertButton) {
             if (promptTextAreaEl.value !== initialPrompt) {
@@ -608,7 +622,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialPrompt !== null) {
-          this.plugin.settings.webPrompt = promptTextAreaEl.value = initialPrompt;
+          this.plugin.settingsv2.web.webPrompt = promptTextAreaEl.value = initialPrompt;
           if (revertButton) revertButton.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultButton) {
@@ -628,13 +642,14 @@ async activateTab(tabId: string): Promise<void> {
 
     // 텍스트에어리어 추가
     promptTextArea.addTextArea((text) => {
-      const value = this.plugin.settings.webPrompt || "";
+      const value = this.plugin.settingsv2.web.webPrompt || "";
       initialPrompt = value; // 탭 활성화 시의 초기값 저장
       text
         .setPlaceholder("Enter prompt")
         .setValue(value)
         .onChange(async (newValue) => {
-          this.plugin.settings.webPrompt = newValue;
+          this.plugin.settingsv2.web.webPrompt = newValue;
+          await this.plugin.settingsv2.saveSettings();
           // set default 버튼 상태
           if (setDefaultButton) {
             if (newValue !== this.plugin.defaultPrompts.webPrompt) {
@@ -672,6 +687,10 @@ async activateTab(tabId: string): Promise<void> {
 
   async buildPdfSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "PDF Summary" });
+    
+    // 컨테이너 너비 명시적 설정  
+    containerEl.style.width = "100%";
+    containerEl.style.maxWidth = "none";
 
     // PDF 모델 선택 드롭다운 및 프롬프트 입력 UI를 Webpage와 동일하게 구성
     new Setting(containerEl)
@@ -686,9 +705,10 @@ async activateTab(tabId: string): Promise<void> {
         }
         dropdown
           .addOptions(options)
-          .setValue(String(this.plugin.settings.pdfModel))
+          .setValue(String(this.plugin.settingsv2.pdf.pdfModel))
           .onChange(async (value) => {
-            this.plugin.settings.pdfModel = value;
+            this.plugin.settingsv2.pdf.pdfModel = value;
+            await this.plugin.settingsv2.saveSettings();
           });
       });      
 
@@ -710,7 +730,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultButton && !setDefaultButton.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          this.plugin.settings.pdfPrompt = promptTextAreaEl.value = this.plugin.defaultPrompts.pdfPrompt;
+          this.plugin.settingsv2.pdf.pdfPrompt = promptTextAreaEl.value = this.plugin.defaultPrompts.pdfPrompt;
           setDefaultButton.setDisabled(true);
           if (revertButton) {
             if (promptTextAreaEl.value !== initialPrompt) {
@@ -730,7 +750,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialPrompt !== null) {
-          this.plugin.settings.pdfPrompt = promptTextAreaEl.value = initialPrompt;
+          this.plugin.settingsv2.pdf.pdfPrompt = promptTextAreaEl.value = initialPrompt;
           if (revertButton) revertButton.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultButton) {
@@ -750,13 +770,13 @@ async activateTab(tabId: string): Promise<void> {
 
     // 텍스트에어리어 추가
     promptTextArea.addTextArea((text) => {
-      const value = this.plugin.settings.pdfPrompt || "";
+      const value = this.plugin.settingsv2.pdf.pdfPrompt || "";
       initialPrompt = value; // 탭 활성화 시의 초기값 저장
       text
         .setPlaceholder("Enter prompt")
         .setValue(value)
         .onChange(async (newValue) => {
-          this.plugin.settings.pdfPrompt = newValue;
+          this.plugin.settingsv2.pdf.pdfPrompt = newValue;
           // set default 버튼 상태
           if (setDefaultButton) {
             if (newValue !== this.plugin.defaultPrompts.pdfPrompt) {
@@ -800,8 +820,9 @@ async activateTab(tabId: string): Promise<void> {
         .setName("Auto record on Zoom meeting")
         .setDesc("Automatically start recording when a Zoom meeting starts, and stop when it ends.")
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.autoRecordOnZoomMeeting).onChange(async (value) => {
-            this.plugin.settings.autoRecordOnZoomMeeting = value;
+          toggle.setValue(this.plugin.settingsv2.recording.autoRecordOnZoomMeeting).onChange(async (value) => {
+            this.plugin.settingsv2.recording.autoRecordOnZoomMeeting = value;
+            await this.plugin.settingsv2.saveSettings();
             await this.plugin.saveSettingsToFile();
             this.plugin.updateZoomAutoRecordWatcher(); // 토글 변경 시 감시 상태 갱신
           })
@@ -835,11 +856,12 @@ async activateTab(tabId: string): Promise<void> {
         }
 
         // 이전에 선택한 장치 라벨 불러오기
-        const savedDeviceLabel = this.plugin.settings[this.deviceId] as string || "";
+        const savedDeviceLabel = this.plugin.settingsv2.recording.selectedDeviceId[this.deviceId] || "";
         dropdown.setValue(savedDeviceLabel);
 
         dropdown.onChange(async (value) => {
-          this.plugin.settings[this.deviceId] = value;
+          this.plugin.settingsv2.recording.selectedDeviceId[this.deviceId] = value;
+          await this.plugin.settingsv2.saveSettings();
         });
       });
 
@@ -849,9 +871,10 @@ async activateTab(tabId: string): Promise<void> {
       .addText((text) => {
         text
           .setPlaceholder("Specify temporary folder")
-          .setValue(this.plugin.settings.recordingDir || "")
+          .setValue(this.plugin.settingsv2.recording.recordingDir || "")
           .onChange(async (value) => {
-            this.plugin.settings.recordingDir = value;
+            this.plugin.settingsv2.recording.recordingDir = value;
+            await this.plugin.settingsv2.saveSettings();
           });
 
         const textAreaEl = text.inputEl;
@@ -862,8 +885,9 @@ async activateTab(tabId: string): Promise<void> {
       .setName("Save to a New Note")
       .setDesc("Enable this toggle button to save the summary results to a new note.")
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.saveTranscriptAndRefineToNewNote).onChange(async (value) => {
-          this.plugin.settings.saveTranscriptAndRefineToNewNote = value;
+        toggle.setValue(this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote).onChange(async (value) => {
+          this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote = value;
+          await this.plugin.settingsv2.saveSettings();
         }));
 
     // Daily Notes 연동 설정 추가
@@ -877,10 +901,11 @@ async activateTab(tabId: string): Promise<void> {
       )
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.addLinkToDailyNotes)
+          .setValue(this.plugin.settingsv2.recording.addLinkToDailyNotes)
           .setDisabled(!dailyNotesAvailable)
           .onChange(async (value) => {
-            this.plugin.settings.addLinkToDailyNotes = value;
+            this.plugin.settingsv2.recording.addLinkToDailyNotes = value;
+            await this.plugin.settingsv2.saveSettings();
             await this.plugin.saveSettingsToFile();
           });
       });
@@ -892,10 +917,11 @@ async activateTab(tabId: string): Promise<void> {
       .addSlider((slider) => {
         slider
           .setLimits(1, 20, 1)
-          .setValue(this.plugin.settings.recordingUnit)
+          .setValue(this.plugin.settingsv2.recording.recordingUnit)
           .setDynamicTooltip()
           .onChange(async (value) => {
-            this.plugin.settings.recordingUnit = value;
+            this.plugin.settingsv2.recording.recordingUnit = value;
+            await this.plugin.settingsv2.saveSettings();
           });
       });
 
@@ -913,9 +939,10 @@ async activateTab(tabId: string): Promise<void> {
             "th-TH": "ภาษาไทย (th)",
             "vi-VN": "Tiếng Việt (vi)"
           })
-          .setValue(this.plugin.settings.recordingLanguage || "")
+          .setValue(this.plugin.settingsv2.recording.recordingLanguage || "")
           .onChange(async (value) => {
-            this.plugin.settings.recordingLanguage = value;
+            this.plugin.settingsv2.recording.recordingLanguage = value;
+            await this.plugin.settingsv2.saveSettings();
           })
       );
 
@@ -935,9 +962,10 @@ async activateTab(tabId: string): Promise<void> {
         }
         dropdown
           .addOptions(options)
-          .setValue(this.plugin.settings.sttModel)
+          .setValue(this.plugin.settingsv2.recording.sttModel)
           .onChange(async (value) => {
-            this.plugin.settings.sttModel = value;
+            this.plugin.settingsv2.recording.sttModel = value;
+            await this.plugin.settingsv2.saveSettings();
             // 항상 최신 상태로 반영: 클래스를 직접 토글
             if (promptSettingDiv) {
               if (value === "gpt-4o-mini-transcribe" || 
@@ -957,9 +985,10 @@ async activateTab(tabId: string): Promise<void> {
       .addTextArea((text) => {
         text
           .setPlaceholder("Enter prompt for transcribing")
-          .setValue(this.plugin.settings.sttPrompt || "")
+          .setValue(this.plugin.settingsv2.recording.sttPrompt || "")
           .onChange(async (value) => {
-            this.plugin.settings.sttPrompt = value;
+            this.plugin.settingsv2.recording.sttPrompt = value;
+            await this.plugin.settingsv2.saveSettings();
           });
 
         const textAreaEl = text.inputEl;
@@ -970,7 +999,7 @@ async activateTab(tabId: string): Promise<void> {
       });
 
     // 드롭다운 값에 따라 최초 표시/숨김 상태를 정확히 반영 (display로 직접 제어)
-    const currentSttModel = this.plugin.settings.sttModel;
+    const currentSttModel = this.plugin.settingsv2.recording.sttModel;
     if (currentSttModel !== "gpt-4o-mini-transcribe" 
       && currentSttModel !== "gpt-4o-transcribe") {
       promptSettingDiv.style.display = "none";
@@ -992,9 +1021,10 @@ async activateTab(tabId: string): Promise<void> {
 
         dropdown
           .addOptions(options)
-          .setValue(this.plugin.settings.transcriptSummaryModel)
+          .setValue(this.plugin.settingsv2.recording.transcriptSummaryModel)
           .onChange(async (value) => {
-            this.plugin.settings.transcriptSummaryModel = value;
+            this.plugin.settingsv2.recording.transcriptSummaryModel = value;
+            await this.plugin.settingsv2.saveSettings();
           })
       });
 
@@ -1014,7 +1044,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultButtonForSummary && !setDefaultButtonForSummary.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          this.plugin.settings.transcriptSummaryPrompt = promptTextAreaElForSummary.value = this.plugin.defaultPrompts.transcriptSummaryPrompt;
+          this.plugin.settingsv2.recording.transcriptSummaryPrompt = promptTextAreaElForSummary.value = this.plugin.defaultPrompts.transcriptSummaryPrompt;
           setDefaultButtonForSummary.setDisabled(true);
           if (revertButtonForSummary) {
             if (promptTextAreaElForSummary.value !== initialPromptForSummary) {
@@ -1034,7 +1064,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialPromptForSummary !== null) {
-          this.plugin.settings.transcriptSummaryPrompt = promptTextAreaElForSummary.value = initialPromptForSummary;
+          this.plugin.settingsv2.recording.transcriptSummaryPrompt = promptTextAreaElForSummary.value = initialPromptForSummary;
           if (revertButtonForSummary) revertButtonForSummary.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultButtonForSummary) {
@@ -1052,13 +1082,14 @@ async activateTab(tabId: string): Promise<void> {
       .setHeading();
     // 텍스트에어리어 추가
     promptTextAreaForSummary.addTextArea((text) => {
-      const value = this.plugin.settings.transcriptSummaryPrompt || "";
+      const value = this.plugin.settingsv2.recording.transcriptSummaryPrompt || "";
       initialPromptForSummary = value; // 탭 활성화 시의 초기값 저장
       text
         .setPlaceholder("Enter prompt")
         .setValue(value)
         .onChange(async (newValue) => {
-          this.plugin.settings.transcriptSummaryPrompt = newValue;
+          this.plugin.settingsv2.recording.transcriptSummaryPrompt = newValue;
+          await this.plugin.settingsv2.saveSettings();
           // set default 버튼 상태
           if (setDefaultButtonForSummary) {
             if (newValue !== this.plugin.defaultPrompts.transcriptSummaryPrompt) {
@@ -1100,11 +1131,12 @@ async activateTab(tabId: string): Promise<void> {
         .setName("Refine summary based on transcription")
         .setDesc("Use this prompt to refine the summary by comparing it with the recorded transcription.")
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.refineSummary).onChange(async (value) => {
-            this.plugin.settings.refineSummary = value;
+          toggle.setValue(this.plugin.settingsv2.recording.refineSummary).onChange(async (value) => {
+            this.plugin.settingsv2.recording.refineSummary = value;
+            await this.plugin.settingsv2.saveSettings();
             const promptTextArea = containerEl.querySelector(".refining-prompt-textarea") as HTMLTextAreaElement;
             if (promptTextArea) {
-              promptTextArea.parentElement?.toggleClass("hidden", !this.plugin.settings.refineSummary);
+              promptTextArea.parentElement?.toggleClass("hidden", !this.plugin.settingsv2.recording.refineSummary);
             }
       }));
 
@@ -1124,7 +1156,7 @@ async activateTab(tabId: string): Promise<void> {
       button.onClick(() => {
         if (setDefaultRefineButton && !setDefaultRefineButton.buttonEl.hasAttribute('disabled')) {
           // set default 클릭 시에도 revert 버튼은 활성화
-          this.plugin.settings.refineSummaryPrompt = refinePromptTextAreaEl.value = this.plugin.defaultPrompts.refineSummaryPrompt;
+          this.plugin.settingsv2.recording.refineSummaryPrompt = refinePromptTextAreaEl.value = this.plugin.defaultPrompts.refineSummaryPrompt;
           setDefaultRefineButton.setDisabled(true);
           if (revertRefineButton) {
             if (refinePromptTextAreaEl.value !== initialRefinePrompt) {
@@ -1144,7 +1176,7 @@ async activateTab(tabId: string): Promise<void> {
         .setClass("revert-btn");
       button.onClick(() => {
         if (initialRefinePrompt !== null) {
-          this.plugin.settings.refineSummaryPrompt = refinePromptTextAreaEl.value = initialRefinePrompt;
+          this.plugin.settingsv2.recording.refineSummaryPrompt = refinePromptTextAreaEl.value = initialRefinePrompt;
           if (revertRefineButton) revertRefineButton.setDisabled(true);
           // setDefaultButton 상태 재조정
           if (setDefaultRefineButton) {
@@ -1162,13 +1194,14 @@ async activateTab(tabId: string): Promise<void> {
       .setHeading();
     // 텍스트에어리어 추가
     refinePromptTextArea.addTextArea((text) => {
-      const value = this.plugin.settings.refineSummaryPrompt || "";
+      const value = this.plugin.settingsv2.recording.refineSummaryPrompt || "";
       initialRefinePrompt = value; // 탭 활성화 시의 초기값 저장
       text
         .setPlaceholder("Enter prompt")
         .setValue(value)
         .onChange(async (newValue) => {
-          this.plugin.settings.refineSummaryPrompt = newValue;
+          this.plugin.settingsv2.recording.refineSummaryPrompt = newValue;
+          await this.plugin.settingsv2.saveSettings();
           // set default 버튼 상태
           if (setDefaultRefineButton) {
             if (newValue !== this.plugin.defaultPrompts.refineSummaryPrompt) {
@@ -1213,34 +1246,44 @@ async activateTab(tabId: string): Promise<void> {
       .setDesc("The menu name you enter here will appear in the context menu or command palette when you select highlighted text in your note. \nRunning this menu will trigger the prompt you set here.");
 
 
-    for (let i = 1; i <= this.plugin.settings.cmd_count; i++) {
+    for (let i = 1; i <= this.plugin.settingsv2.custom.command.length; i++) {
       this.createCustomCommandSetting(containerEl, i);
     }
     new Setting(containerEl)
       .addButton(button => button
         .setButtonText('Add Command')
         .onClick(async () => {
-          if (this.plugin.settings.cmd_count < this.plugin.settings.cmd_max) {  
-            this.plugin.settings.cmd_count += 1;
-            this.plugin.settings[`cmd_text_${this.plugin.settings.cmd_count}`] = '';
-            this.plugin.settings[`cmd_prompt_${this.plugin.settings.cmd_count}`] = '';
-            this.plugin.settings[`cmd_hotkey_${this.plugin.settings.cmd_count}`] = '';
-            this.plugin.settings[`cmd_model_${this.plugin.settings.cmd_count}`] = 'gpt-4o';
+          if (this.plugin.settingsv2.custom.command.length < this.plugin.settingsv2.custom.max) {  
+            this.plugin.settingsv2.custom.command.push({
+              text: '',
+              prompt: '',
+              hotkey: '',
+              model: 'gpt-4o',
+              appendToNote: false,
+              copyToClipboard: false
+            });
+            await this.plugin.settingsv2.saveSettings();
             this.display();
           } else {
-            SummarDebug.Notice(0, `You can only add up to ${this.plugin.settings.cmd_max} commands.`);
+            SummarDebug.Notice(0, `You can only add up to ${this.plugin.settingsv2.custom.max} commands.`);
           }
         }));
   }
 
   createCustomCommandSetting(containerEl: HTMLElement, index: number): void {
-    if (this.plugin.settings[`cmd_model_${index}`] === undefined ||
-        (this.plugin.settings[`cmd_model_${index}`] as string).length === 0) {
-      this.plugin.settings[`cmd_model_${index}`] = 'gpt-4o';
-      SummarDebug.log(1,`[set gpt-4o] cmd_model_${index}: ` + this.plugin.settings[`cmd_model_${index}`]);
+    const commandIndex = index - 1; // 0-based index for array
+    const command = this.plugin.settingsv2.custom.command[commandIndex];
+    
+    if (!command) {
+      return;
+    }
+    
+    if (!command.model || command.model.length === 0) {
+      command.model = 'gpt-4o';
+      SummarDebug.log(1,`[set gpt-4o] cmd_model_${index}: ` + command.model);
     }
     else {
-      SummarDebug.log(1,`cmd_model_${index}: ` + this.plugin.settings[`cmd_model_${index}`]);
+      SummarDebug.log(1,`cmd_model_${index}: ` + command.model);
     }
 
     new Setting(containerEl)
@@ -1248,9 +1291,10 @@ async activateTab(tabId: string): Promise<void> {
       .addText((text) => {
         text
           .setPlaceholder('Menu Name')
-          .setValue(this.plugin.settings[`cmd_text_${index}`] as string)
+          .setValue(command.text)
           .onChange(async (value) => {
-            this.plugin.settings[`cmd_text_${index}`] = value;
+            command.text = value;
+            await this.plugin.settingsv2.saveSettings();
           });
         const textEl = text.inputEl;
         textEl.style.width = "100%";
@@ -1267,18 +1311,20 @@ async activateTab(tabId: string): Promise<void> {
 
         dropdown
           .addOptions(options)
-          .setValue(this.plugin.settings[`cmd_model_${index}`] as string)
+          .setValue(command.model)
           .onChange(async (value) => {
-            this.plugin.settings[`cmd_model_${index}`] = value;
+            command.model = value;
+            await this.plugin.settingsv2.saveSettings();
           })
       })
   
       .addText((hotkeyInput) => {
         hotkeyInput
           .setPlaceholder('Press a hotkey...')
-          .setValue(this.plugin.settings[`cmd_hotkey_${index}`] as string)
+          .setValue(command.hotkey)
           .onChange(async (value) => {
-            this.plugin.settings[`cmd_hotkey_${index}`] = value;
+            command.hotkey = value;
+            await this.plugin.settingsv2.saveSettings();
           });
         const hotkeyEl = hotkeyInput.inputEl;
         hotkeyEl.style.width = "150px";
@@ -1304,7 +1350,8 @@ async activateTab(tabId: string): Promise<void> {
               hotkeyEl.value = "";
             else
               hotkeyEl.value = hotkey;
-            this.plugin.settings[`cmd_hotkey_${index}`] = hotkeyEl.value;
+            command.hotkey = hotkeyEl.value;
+            await this.plugin.settingsv2.saveSettings();
           }
         });
       })
@@ -1312,17 +1359,8 @@ async activateTab(tabId: string): Promise<void> {
         .setIcon('trash-2')
         .setTooltip('Remove Command')
         .onClick(async () => {
-          for (let i = index; i < this.plugin.settings.cmd_count; i++) {
-            this.plugin.settings[`cmd_text_${i}`] = this.plugin.settings[`cmd_text_${i + 1}`];
-            this.plugin.settings[`cmd_prompt_${i}`] = this.plugin.settings[`cmd_prompt_${i + 1}`];
-            this.plugin.settings[`cmd_hotkey_${i}`] = this.plugin.settings[`cmd_hotkey_${i + 1}`];
-            this.plugin.settings[`cmd_model_${i}`] = this.plugin.settings[`cmd_model_${i + 1}`];
-          }
-          delete this.plugin.settings[`cmd_text_${this.plugin.settings.cmd_count}`];
-          delete this.plugin.settings[`cmd_prompt_${this.plugin.settings.cmd_count}`];
-          delete this.plugin.settings[`cmd_hotkey_${this.plugin.settings.cmd_count}`];
-          delete this.plugin.settings[`cmd_model_${this.plugin.settings.cmd_count}`];
-          this.plugin.settings.cmd_count -= 1;
+          this.plugin.settingsv2.custom.command.splice(commandIndex, 1);
+          await this.plugin.settingsv2.saveSettings();
           this.display();
         }));
 
@@ -1349,9 +1387,10 @@ async activateTab(tabId: string): Promise<void> {
       .addTextArea((textarea) => {
         textarea
           .setPlaceholder('Run OpenAI’s API using the text you selected in the note. Type the prompt you want to use here.')
-          .setValue(this.plugin.settings[`cmd_prompt_${index}`] as string)
+          .setValue(command.prompt)
           .onChange(async (value) => {
-            this.plugin.settings[`cmd_prompt_${index}`] = value;
+            command.prompt = value;
+            await this.plugin.settingsv2.saveSettings();
           })
         const textAreaEl = textarea.inputEl;
         textAreaEl.style.width = "100%";
@@ -1377,9 +1416,10 @@ async activateTab(tabId: string): Promise<void> {
     appendLabel.style.cursor = 'pointer';
     const appendToggle = document.createElement('input');
     appendToggle.type = 'checkbox';
-    appendToggle.checked = !!this.plugin.settings[`cmd_append_to_note_${index}`];
-    appendToggle.addEventListener('change', () => {
-      this.plugin.settings[`cmd_append_to_note_${index}`] = appendToggle.checked;
+    appendToggle.checked = command.appendToNote;
+    appendToggle.addEventListener('change', async () => {
+      command.appendToNote = appendToggle.checked;
+      await this.plugin.settingsv2.saveSettings();
     });
     appendLabel.appendChild(appendToggle);
     appendLabel.appendChild(document.createTextNode('Append Results to Note'));
@@ -1394,9 +1434,10 @@ async activateTab(tabId: string): Promise<void> {
     copyLabel.style.cursor = 'pointer';
     const copyToggle = document.createElement('input');
     copyToggle.type = 'checkbox';
-    copyToggle.checked = !!this.plugin.settings[`cmd_copy_to_clipboard_${index}`];
-    copyToggle.addEventListener('change', () => {
-      this.plugin.settings[`cmd_copy_to_clipboard_${index}`] = copyToggle.checked;
+    copyToggle.checked = command.copyToClipboard;
+    copyToggle.addEventListener('change', async () => {
+      command.copyToClipboard = copyToggle.checked;
+      await this.plugin.settingsv2.saveSettings();
     });
     copyLabel.appendChild(copyToggle);
     copyLabel.appendChild(document.createTextNode('Copy Results to Clipboard'));
@@ -1416,9 +1457,9 @@ async activateTab(tabId: string): Promise<void> {
       .addButton(button => button
         .setButtonText('Add Calendar')
         .onClick(async () => {
-          if (this.plugin.settings.calendar_count < 5) {
-            this.plugin.settings.calendar_count += 1;
-            this.plugin.settings[`calendar_${this.plugin.settings.calendar_count}`] = '';
+          if (this.plugin.settingsv2.schedule.calendarName.length < 5) {
+            this.plugin.settingsv2.schedule.calendarName.push('');
+            await this.plugin.settingsv2.saveSettings();
             this.display();
           } else {
             SummarDebug.Notice(0, 'You can only add up to 5 calendars.');
@@ -1427,7 +1468,7 @@ async activateTab(tabId: string): Promise<void> {
 
     // 기존 캘린더 필드들을 먼저 빠르게 렌더링 (캘린더 목록 없이)
     const calendarContainer = containerEl.createDiv();
-    for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
+    for (let i = 1; i <= this.plugin.settingsv2.schedule.calendarName.length; i++) {
       this.createCalendarField(containerEl, i); // await 제거하고 캘린더 목록 없이 먼저 렌더링
     }
 
@@ -1435,8 +1476,9 @@ async activateTab(tabId: string): Promise<void> {
       .setName('Automatically launches Zoom meetings for calendar events.')
       .setDesc('If the toggle switch is turned on, Zoom meetings will automatically launch at the scheduled time of events')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoLaunchZoomOnSchedule).onChange(async (value) => {
-          this.plugin.settings.autoLaunchZoomOnSchedule = value;
+        toggle.setValue(this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule).onChange(async (value) => {
+          this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule = value;
+          await this.plugin.settingsv2.saveSettings();
           await this.plugin.calendarHandler.displayEvents(value);
           if (value) {
             this.plugin.reservedStatus.setStatusbarIcon('calendar-clock', 'red');
@@ -1458,18 +1500,19 @@ async activateTab(tabId: string): Promise<void> {
       .setName('Only join Zoom meetings that I have accepted')
       .setDesc('When enabled, auto-launch will only work for calendar events where I have accepted the invitation. Disabled means all events with Zoom links will auto-launch.')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoLaunchZoomOnlyAccepted).onChange(async (value) => {
-          this.plugin.settings.autoLaunchZoomOnlyAccepted = value;
+        toggle.setValue(this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted).onChange(async (value) => {
+          this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted = value;
+          await this.plugin.settingsv2.saveSettings();
           await this.plugin.saveSettingsToFile();
           // 설정 변경 시 이벤트 리스트 다시 렌더링
-          await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule);
+          await this.plugin.calendarHandler.displayEvents(this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule);
         }));
     
     // 클래스 추가하여 CSS로 제어할 수 있도록 함
     onlyAcceptedSetting.settingEl.addClass('only-accepted-setting');
     
     // 초기 상태 설정
-    if (!this.plugin.settings.autoLaunchZoomOnSchedule) {
+    if (!this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule) {
       onlyAcceptedSetting.settingEl.addClass('disabled');
     }
 
@@ -1493,7 +1536,7 @@ async activateTab(tabId: string): Promise<void> {
       // 이벤트 표시 (별도로 처리)
       const eventsPromise = (async () => {
         try {
-          await this.plugin.calendarHandler.displayEvents(this.plugin.settings.autoLaunchZoomOnSchedule, eventsContainer);
+          await this.plugin.calendarHandler.displayEvents(this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule, eventsContainer);
           loadingEl.remove(); // 이벤트 로딩 완료 후 로딩 텍스트 제거
         } catch (error: any) {
           loadingEl.textContent = 'Failed to load calendar events';
@@ -1550,8 +1593,8 @@ async activateTab(tabId: string): Promise<void> {
     const setting = new Setting(containerEl)
       .setHeading();
 
-    // 1. 기존 선택된 값 표시, 드롭다운은 disable 상태로 먼저 렌더링
-    const currentValue = String(this.plugin.settings[`calendar_${index}`] || '');
+    // 1. V2 설정에서 현재 값 가져오기
+    const currentValue = this.plugin.settingsv2.schedule.calendarName[index - 1] || '';
     let dropdownComponent: any = null;
     setting.addDropdown((dropdown) => {
       dropdownComponent = dropdown;
@@ -1567,8 +1610,8 @@ async activateTab(tabId: string): Promise<void> {
       dropdown.setValue(currentValue);
       selectEl.disabled = true; // 최초엔 disable
       dropdown.onChange(async (value: string) => {
-        this.plugin.settings[`calendar_${index}`] = value;
-        await this.plugin.saveSettingsToFile();
+        this.plugin.settingsv2.schedule.calendarName[index - 1] = value;
+        await this.plugin.settingsv2.saveSettings();
         await this.plugin.calendarHandler.updateScheduledMeetings();
         await this.plugin.calendarHandler.displayEvents();
       });
@@ -1584,13 +1627,9 @@ async activateTab(tabId: string): Promise<void> {
       .setIcon('trash-2')
       .setTooltip('Remove Calendar')
       .onClick(async () => {
-        for (let i = index; i < this.plugin.settings.calendar_count; i++) {
-          this.plugin.settings[`calendar_${i}`] = this.plugin.settings[`calendar_${i + 1}`];
-        }
-        delete this.plugin.settings[`calendar_${this.plugin.settings.calendar_count}`];
-        this.plugin.settings.calendar_count -= 1;
+        this.plugin.settingsv2.schedule.calendarName.splice(index - 1, 1);
+        await this.plugin.settingsv2.saveSettings();
         this.display();
-        await this.plugin.saveSettingsToFile();
         await this.plugin.calendarHandler.updateScheduledMeetings();
         await this.plugin.calendarHandler.displayEvents();
       })

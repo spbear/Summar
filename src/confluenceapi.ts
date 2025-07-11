@@ -30,7 +30,7 @@ export class ConfluenceAPI {
 
     SummarDebug.log(1, `Entered getPageId`);
 
-    const { confluenceApiToken, confluenceDomain } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain } = this.plugin.settingsv2.common;
 
     if (!confluenceApiToken || !confluenceDomain) {
       SummarDebug.log(0, "Please configure confluence API keys in the plugin settings.", 0);
@@ -83,7 +83,7 @@ export class ConfluenceAPI {
   }
 
   async getPageContent(pageId: any): Promise<{ title: string; content: string }> {
-    const { confluenceApiToken, confluenceDomain } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain } = this.plugin.settingsv2.common;
 
     const headers = {
       Authorization: `Bearer ${confluenceApiToken}`,
@@ -121,7 +121,7 @@ export class ConfluenceAPI {
     spaceKey: string,
     title: string
   ): Promise<string> {
-    const { confluenceApiToken, confluenceDomain } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain } = this.plugin.settingsv2.common;
     const headers = {
       Authorization: `Bearer ${confluenceApiToken}`,
       "Content-Type": "application/json",
@@ -165,7 +165,7 @@ export class ConfluenceAPI {
   }
 
   async getSpaceKey(pageId: string): Promise<string> {
-    const { confluenceApiToken, confluenceDomain } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain } = this.plugin.settingsv2.common;
     const headers = {
       Authorization: `Bearer ${confluenceApiToken}`,
       "Content-Type": "application/json",
@@ -197,7 +197,7 @@ export class ConfluenceAPI {
 
   // 페이지 생성
   async createPage(title: string, content: string): Promise<{ updated: boolean, statusCode: number; message: string, reason?: string }> {
-    const { confluenceApiToken, confluenceDomain, confluenceParentPageSpaceKey, confluenceParentPageId } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain, confluenceParentPageSpaceKey, confluenceParentPageId } = this.plugin.settingsv2.common;
 
     const existingPageId = await this.findExistingPage(title);
     if (existingPageId) {
@@ -276,7 +276,7 @@ export class ConfluenceAPI {
   }
 
   async findExistingPage(title: string): Promise<string | null> {
-    const { confluenceApiToken, confluenceDomain, confluenceParentPageSpaceKey, confluenceParentPageId } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain, confluenceParentPageSpaceKey, confluenceParentPageId } = this.plugin.settingsv2.common;
   
     const searchUrl = `https://${confluenceDomain}/rest/api/content?title=${encodeURIComponent(title)}&spaceKey=${confluenceParentPageSpaceKey}&expand=ancestors`;
   
@@ -304,7 +304,7 @@ export class ConfluenceAPI {
   }
 
   async updatePage(pageId: string, title: string, content: string): Promise<{ updated: boolean, statusCode: number; message: string; reason?: string }> {
-    const { confluenceApiToken, confluenceDomain } = this.plugin.settings;
+    const { confluenceApiToken, confluenceDomain } = this.plugin.settingsv2.common;
   
     // 현재 버전 조회
     const pageInfoRes: RequestUrlResponse = await SummarRequestUrl(this.plugin, {

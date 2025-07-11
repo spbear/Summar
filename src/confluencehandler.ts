@@ -20,9 +20,12 @@ export class ConfluenceHandler extends SummarViewContainer {
 	 * @param plugin 플러그인 인스턴스
 	 */
 	async fetchAndSummarize(url: string) {
-		const { confluenceApiToken, confluenceDomain, useConfluenceAPI, webPrompt } = this.plugin.settings;
+		const confluenceApiToken = this.plugin.settingsv2.common.confluenceApiToken;
+		const confluenceDomain = this.plugin.settingsv2.common.confluenceDomain;
+		const useConfluenceAPI = this.plugin.settingsv2.common.useConfluenceAPI;
+		const webPrompt = this.plugin.settingsv2.web.webPrompt;
 
-		const summarai = new SummarAI(this.plugin, this.plugin.settings.webModel, 'web');
+		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.web.webModel, 'web');
 		if (!summarai.hasKey(true)) return;
 
 		if (!confluenceApiToken) {
@@ -36,13 +39,13 @@ export class ConfluenceHandler extends SummarViewContainer {
 			this.timer.start();
 
 			// extractConfluenceInfo 함수 호출
-			const { confluenceApiToken } = this.plugin.settings;
+			const { confluenceApiToken } = this.plugin.settingsv2.common;
 
 			const conflueceapi = new ConfluenceAPI(this.plugin);
 			let pageId = "";
 			let page_content: string = "";
 
-			if (confluenceApiToken && confluenceDomain && containsDomain(url, this.plugin.settings.confluenceDomain)) {
+			if (confluenceApiToken && confluenceDomain && containsDomain(url, this.plugin.settingsv2.common.confluenceDomain)) {
 				const result = await conflueceapi.getPageId(url);
 
 				SummarDebug.log(1, "Extracted Confluence Info:");
@@ -83,7 +86,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 			SummarDebug.log(2, "Fetched page content:", page_content);
 
 
-			this.updateResultText( `Generating summary using [${this.plugin.settings.webModel}]...` );
+			this.updateResultText( `Generating summary using [${this.plugin.settingsv2.web.webModel}]...` );
 			this.enableNewNote(false);
 
 			const message = `${webPrompt}\n\n${page_content}`;

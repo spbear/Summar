@@ -60,7 +60,7 @@ export class SummarView extends View {
     inputField.style.borderRadius = "5px";
     inputField.style.boxSizing = "border-box";
     inputField.style.margin = "5px";
-    inputField.value = this.plugin.settings.testUrl || "";
+    inputField.value = this.plugin.settingsv2.system.testUrl || "";
   
     // Store input field for later use
     this.plugin.inputField = inputField;
@@ -98,9 +98,9 @@ export class SummarView extends View {
     uploadNoteToWikiButton.addEventListener("click", async() => {
       const viewType = await this.getCurrentMainPaneTabType();
       if (viewType === "markdown") {
-        if (this.plugin.settings.confluenceParentPageUrl.length == 0 || 
-          this.plugin.settings.confluenceParentPageSpaceKey.length == 0 || 
-          this.plugin.settings.confluenceParentPageId.length == 0 ) {
+        if (this.plugin.settingsv2.common.confluenceParentPageUrl.length == 0 || 
+          this.plugin.settingsv2.common.confluenceParentPageSpaceKey.length == 0 || 
+          this.plugin.settingsv2.common.confluenceParentPageId.length == 0 ) {
             const fragment = document.createDocumentFragment();
             const message1 = document.createElement("span");
             message1.textContent = "To publish your notes to Confluence, " +

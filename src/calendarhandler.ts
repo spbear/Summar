@@ -46,7 +46,7 @@ export class CalendarHandler {
             if (Platform.isMacOS && Platform.isDesktopApp) {
                 // 초기 실행
                 await this.updateScheduledMeetings();
-                if (this.plugin.settings.autoLaunchZoomOnSchedule) {
+                if (this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule) {
                     this.plugin.reservedStatus.setStatusbarIcon("calendar-clock", "red");
                 } else {
                     this.plugin.reservedStatus.setStatusbarIcon("calendar-x", "var(--text-muted)");
@@ -56,7 +56,7 @@ export class CalendarHandler {
                 // 10분마다 업데이트 실행
                 this.intervalId = setInterval(() => {
                     this.updateScheduledMeetings();
-                }, this.plugin.settings.calendar_polling_interval); // 10분 (600,000ms)
+                }, this.plugin.settingsv2.schedule.calendar_polling_interval); // 10분 (600,000ms)
             }
         } catch (error) {
             SummarDebug.error(1, "Error initializing CalendarHandler:", error);
@@ -96,7 +96,7 @@ export class CalendarHandler {
 
         return new Promise((resolve, reject) => {
             // calendar_count가 없거나 0이면 실행하지 않음
-            if (!this.plugin.settings.calendar_count || this.plugin.settings.calendar_count === 0) {
+            if (!this.plugin.settingsv2.schedule.calendarName.length || this.plugin.settingsv2.schedule.calendarName.length === 0) {
                 SummarDebug.log(1, "캘린더가 설정되지 않아 fetchZoomMeetings를 실행하지 않습니다.");
                 resolve([]);
                 return;
@@ -104,15 +104,14 @@ export class CalendarHandler {
 
             // Build argument list for Swift
             const args: string[] = [];
-            if (this.plugin.settings.calendar_fetchdays && Number.isInteger(this.plugin.settings.calendar_fetchdays)) {
-                args.push(`--fetch-days=${this.plugin.settings.calendar_fetchdays}`);
+            if (this.plugin.settingsv2.schedule.calendar_fetchdays && Number.isInteger(this.plugin.settingsv2.schedule.calendar_fetchdays)) {
+                args.push(`--fetch-days=${this.plugin.settingsv2.schedule.calendar_fetchdays}`);
             }
             // 캘린더가 하나도 없으면 실행하지 않음
             let calendarList: string[] = [];
-            for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
-                const cal = this.plugin.settings[`calendar_${i}`];
-                if (cal && typeof cal === 'string' && cal.trim().length > 0) {
-                    calendarList.push(cal.trim());
+            for (const calendarName of this.plugin.settingsv2.schedule.calendarName) {
+                if (calendarName && calendarName.trim().length > 0) {
+                    calendarList.push(calendarName.trim());
                 }
             }
             if (calendarList.length === 0) {
@@ -195,7 +194,7 @@ export class CalendarHandler {
             this.timers.clear();
 
 
-            const MAX_DELAY = this.plugin.settings.calendar_polling_interval * 3;
+            const MAX_DELAY = this.plugin.settingsv2.schedule.calendar_polling_interval * 3;
 
             // Loop를 돌면서 콘솔 출력
             // events.forEach((event, index) => {
@@ -213,11 +212,11 @@ export class CalendarHandler {
                 const delayMs = event.start.getTime() - now.getTime();
 
                 // 자동 줌 미팅 참석 조건 확인
-                const shouldAutoLaunch = this.plugin.settings.autoLaunchZoomOnSchedule &&
+                const shouldAutoLaunch = this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule &&
                     delayMs > 0 && delayMs < MAX_DELAY &&
                     !this.timers.has(event.start.getTime()) &&
                     event.zoom_link && event.zoom_link.length > 0 &&
-                    (!this.plugin.settings.autoLaunchZoomOnlyAccepted || 
+                    (!this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted || 
                      event.participant_status === "accepted" || 
                      event.participant_status === "organizer" ||
                      event.participant_status === "unknown"); // tentative 제거
@@ -225,7 +224,7 @@ export class CalendarHandler {
                 if (shouldAutoLaunch) {
                     const timer = setTimeout(async () => {
                         // if (this.plugin.recordingManager.getRecorderState() !== "recording") {
-                        //     await this.plugin.recordingManager.startRecording(this.plugin.settings.recordingUnit);
+                        //     await this.plugin.recordingManager.startRecording(this.plugin.settingsv2.recording.recordingUnit);
                         // }
                         this.launchZoomMeeting(event.zoom_link as string);
                         clearTimeout(timer);
@@ -233,18 +232,18 @@ export class CalendarHandler {
                     SummarDebug.log(1, `   🚀 Zoom meeting reserved: ${event.start} (Status: ${event.participant_status || "unknown"})`);
                     // this.timers.push({ title: event.title, start: event.start, timeoutId: timer });
                     this.timers.set(event.start.getTime(), timer);
-                } else if (this.plugin.settings.autoLaunchZoomOnSchedule && 
-                          this.plugin.settings.autoLaunchZoomOnlyAccepted &&
+                } else if (this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule && 
+                          this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted &&
                           event.zoom_link && event.zoom_link.length > 0 &&
                           event.participant_status === "declined") {
                     SummarDebug.log(1, `   ❌ Zoom meeting skipped (declined): ${event.start}`);
-                } else if (this.plugin.settings.autoLaunchZoomOnSchedule && 
-                          this.plugin.settings.autoLaunchZoomOnlyAccepted &&
+                } else if (this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule && 
+                          this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted &&
                           event.zoom_link && event.zoom_link.length > 0 &&
                           event.participant_status === "pending") {
                     SummarDebug.log(1, `   ⏸️ Zoom meeting skipped (pending response): ${event.start}`);
-                } else if (this.plugin.settings.autoLaunchZoomOnSchedule && 
-                          this.plugin.settings.autoLaunchZoomOnlyAccepted &&
+                } else if (this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule && 
+                          this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted &&
                           event.zoom_link && event.zoom_link.length > 0 &&
                           event.participant_status === "tentative") {
                     SummarDebug.log(1, `   ❓ Zoom meeting skipped (tentative): ${event.start}`);
@@ -279,7 +278,7 @@ export class CalendarHandler {
                 // 그리고 새로운 설정에 따라 참석 상태도 확인
                 const shouldAutoLaunch = this.autoRecord && 
                     event.zoom_link && event.zoom_link.length > 0 &&
-                    (!this.plugin.settings.autoLaunchZoomOnlyAccepted || 
+                    (!this.plugin.settingsv2.schedule.autoLaunchZoomOnlyAccepted || 
                      event.participant_status === "accepted" || 
                      event.participant_status === "organizer" ||
                      event.participant_status === "unknown");
@@ -829,7 +828,7 @@ export class CalendarHandler {
 
         return new Promise((resolve, reject) => {
             // calendar_count가 없거나 0이면 실행하지 않음
-            if (!this.plugin.settings.calendar_count || this.plugin.settings.calendar_count === 0) {
+            if (!this.plugin.settingsv2.schedule.calendarName.length || this.plugin.settingsv2.schedule.calendarName.length === 0) {
                 SummarDebug.log(1, "캘린더가 설정되지 않아 fetchEventsForDate를 실행하지 않습니다.");
                 resolve([]);
                 return;
@@ -849,10 +848,9 @@ export class CalendarHandler {
             
             // 캘린더가 하나도 없으면 실행하지 않음
             let calendarList: string[] = [];
-            for (let i = 1; i <= this.plugin.settings.calendar_count; i++) {
-                const cal = this.plugin.settings[`calendar_${i}`];
-                if (cal && typeof cal === 'string' && cal.trim().length > 0) {
-                    calendarList.push(cal.trim());
+            for (const calendarName of this.plugin.settingsv2.schedule.calendarName) {
+                if (calendarName && calendarName.trim().length > 0) {
+                    calendarList.push(calendarName.trim());
                 }
             }
             if (calendarList.length === 0) {

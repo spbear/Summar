@@ -295,3 +295,125 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - 모든 JSON 파일은 플러그인 로딩 시 동적으로 읽어와 사용됩니다
 - `data.json`만 사용자 설정을 저장하며, 나머지는 읽기 전용입니다
 - 설정 변경 시 `data.json`에만 저장되고, 다른 JSON 파일은 플러그인 업데이트 시에만 변경됩니다
+
+---
+
+## data-v2.json (V2 설정 파일)
+
+새로운 통합 설정 구조 - `PluginSettingsV2` 클래스로 관리되는 차세대 설정 시스템
+
+### 스키마 정보
+- `schemaVersion`: 설정 스키마 버전 (string, 현재: "2.0.0")
+
+### 섹션별 설정 구조
+
+#### 1. Common 섹션 (`common`)
+**핵심 API 설정**
+- `openaiApiKey`: OpenAI API 키 (string, 기본: "")
+- `openaiApiEndpoint`: OpenAI API 엔드포인트 (string, 기본: "")
+- `googleApiKey`: Google Gemini API 키 (string, 기본: "")
+
+**Confluence 연동 설정**
+- `useConfluenceAPI`: Confluence API 사용 여부 (boolean, 기본: true)
+- `confluenceApiToken`: Confluence API 토큰 (string, 기본: "")
+- `confluenceDomain`: Confluence 도메인 (string, 기본: "")
+- `confluenceParentPageUrl`: 부모 페이지 URL (string, 기본: "")
+- `confluenceParentPageSpaceKey`: Space 키 (string, 기본: "")
+- `confluenceParentPageId`: 부모 페이지 ID (string, 기본: "")
+
+#### 2. Web 섹션 (`web`)
+**웹페이지 요약 설정**
+- `webModel`: 웹페이지 요약 모델 (string, 기본: "" → `models.json`의 `webModel.default`에서 자동 설정)
+- `webPrompt`: 웹페이지 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.webPrompt`에서 자동 설정)
+
+#### 3. PDF 섹션 (`pdf`)
+**PDF 요약 설정** *macOS 데스크탑 전용*
+- `pdfModel`: PDF 요약 모델 (string, 기본: "" → `models.json`의 `pdfModel.default`에서 자동 설정)
+- `pdfPrompt`: PDF 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.pdfPrompt`에서 자동 설정)
+
+#### 4. Recording 섹션 (`recording`)
+**녹음 기본 설정**
+- `autoRecordOnZoomMeeting`: Zoom 미팅 자동 녹음 여부 (boolean, 기본: false)
+- `selectedDeviceId`: 디바이스별 오디오 장치 매핑 (object, 기본: {})
+  - 키: 디바이스 식별자 (string)
+  - 값: 선택된 오디오 장치명 (string)
+- `recordingDir`: 녹음 파일 저장 디렉토리 (string, 기본: "")
+- `saveTranscriptAndRefineToNewNote`: 녹취 결과를 새 노트로 저장 여부 (boolean, 기본: true)
+- `addLinkToDailyNotes`: Daily Notes에 회의록 링크 추가 여부 (boolean, 기본: true)
+- `recordingUnit`: 녹음 단위 초 (number, 기본: 15)
+- `recordingLanguage`: 녹취 언어 코드 (string, 기본: "ko-KR")
+
+**음성 인식 및 요약 설정**
+- `sttModel`: 음성 인식 모델 (string, 기본: "" → `models.json`의 `sttModel.default`에서 자동 설정)
+- `sttPrompt`: 음성 인식 프롬프트 (string, 기본: "")
+- `transcriptSummaryModel`: 녹취 요약 모델 (string, 기본: "" → `models.json`의 `transcriptSummaryModel.default`에서 자동 설정)
+- `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.transcriptSummaryPrompt`에서 자동 설정)
+- `refineSummary`: 요약 정제 사용 여부 (boolean, 기본: true)
+- `refineSummaryPrompt`: 요약 정제 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.refineSummaryPrompt`에서 자동 설정)
+
+#### 5. Custom 섹션 (`custom`)
+**커스텀 명령어 설정**
+- `max`: 커스텀 명령어 최대 개수 (number, 기본: 10)
+- `command`: 커스텀 명령어 배열 (CustomCommand[], 기본: [])
+  - 각 명령어 객체 구조:
+    - `text`: 명령어 표시명 (string)
+    - `prompt`: 명령어 프롬프트 (string)
+    - `model`: 사용할 AI 모델 (string)
+    - `hotkey`: 단축키 (string)
+    - `appendToNote`: 결과를 노트에 추가 여부 (boolean)
+    - `copyToClipboard`: 결과를 클립보드에 복사 여부 (boolean)
+
+#### 6. Schedule 섹션 (`schedule`)
+**캘린더 연동 설정** *macOS 데스크탑 전용*
+- `calendar_fetchdays`: 캘린더 이벤트 조회 기간 일 (number, 기본: 1)
+- `calendar_polling_interval`: 캘린더 자동 갱신 주기 ms (number, 기본: 600000)
+- `autoLaunchZoomOnSchedule`: 일정 기반 Zoom 자동 실행 여부 (boolean, 기본: false)
+- `autoLaunchZoomOnlyAccepted`: 수락한 일정만 Zoom 자동 실행 여부 (boolean, 기본: true)
+- `calendarName`: 연동된 캘린더 이름 배열 (string[], 기본: [], 최대: 5개)
+
+#### 7. System 섹션 (`system`)
+**시스템 설정**
+- `debugLevel`: 디버그 레벨 0-3 (number, 기본: 0)
+- `testUrl`: 테스트용 URL (string, 기본: "")
+
+### V1→V2 마이그레이션
+
+#### 자동 변환 규칙
+**동적 키를 배열로 변환:**
+- `cmd_text_N`, `cmd_prompt_N` 등 → `custom.command` 배열
+- `calendar_N` → `schedule.calendarName` 배열
+- `selectedDeviceId_*` → `recording.selectedDeviceId` 객체
+
+**섹션별 재구성:**
+- 기존 flat 구조를 7개 섹션으로 분류
+- 모든 설정값의 타입 검증 및 기본값 적용
+- 더 이상 사용하지 않는 설정 필드 자동 제거
+
+#### 호환성 보장
+- V1 `data.json` 존재 시 자동 마이그레이션 실행
+- 마이그레이션 후 V2 `data-v2.json` 생성
+- 기존 V1 파일은 백업으로 유지
+
+### 파일 위치 및 관리
+
+#### V2 설정 파일 위치
+- `data-v2.json`: `/.obsidian/plugins/summar/data-v2.json` (V2 사용자 설정 저장)
+
+#### 로딩 및 저장
+- `PluginSettingsV2` 클래스로 통합 관리
+- 메모리 상에서 실시간 동기화
+- 설정 변경 시 즉시 `data-v2.json`에 저장
+- 순환 참조 방지를 위한 안전한 JSON 직렬화
+
+#### 검증 및 무결성
+- 스키마 버전 확인
+- 배열 타입 및 범위 검증
+- 설정 동기화 상태 확인
+- 로딩 실패 시 기본값으로 fallback
+
+**V2 시스템 장점:**
+- 섹션별 구조화된 설정 관리
+- 배열 기반의 직관적인 데이터 구조
+- 타입 안전성 보장
+- 자동 마이그레이션으로 원활한 업그레이드
+- 통합된 설정 클래스로 일관된 데이터 접근

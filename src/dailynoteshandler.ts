@@ -146,7 +146,7 @@ export class DailyNotesHandler {
      */
     async addMeetingLinkToDailyNote(meetingFilePath: string, meetingType: 'transcript' | 'summary' | 'refinement' = 'summary', recordingDate?: Date): Promise<boolean> {
         try {
-            if (!this.plugin.settings.addLinkToDailyNotes) {
+            if (!this.plugin.settingsv2.recording.addLinkToDailyNotes) {
                 SummarDebug.log(2, "Daily Notes linking is disabled in settings");
                 return false;
             }

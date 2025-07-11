@@ -25,14 +25,14 @@ export class AudioHandler extends SummarViewContainer {
 			file.name.toLowerCase().endsWith(".webm")
 		);
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
-		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settings.sttModel}] ...`);
+		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
 		this.enableNewNote(false);
 
 		let audioList = "";
 		let transcriptedText = "";
 
 		// Check if the API key is set
-		if (!this.plugin.settings.openaiApiKey) {
+		if (!this.plugin.settingsv2.common.openaiApiKey) {
 			SummarDebug.Notice(0,
 				"API key is missing. Please add your API key in the settings."
 			);
@@ -58,13 +58,13 @@ export class AudioHandler extends SummarViewContainer {
 			if (sortedFiles.length === 1) {
 				folderPath  = sortedFiles[0].name.substring(0,sortedFiles[0].name.lastIndexOf('.')) || sortedFiles[0].name;
 				originalFolderPath = folderPath;
-				noteFilePath = normalizePath(`${this.plugin.settings.recordingDir}`);
+				noteFilePath = normalizePath(`${this.plugin.settingsv2.recording.recordingDir}`);
 				SummarDebug.log(1, `sendAudioData - only one file`)
 			} else {
 				folderPath = getCommonFolderPath(sortedFiles);
 				originalFolderPath = folderPath;
 				SummarDebug.log(1, `sendAudioData - Detected folder path: ${folderPath}`); // Debug log
-				noteFilePath = normalizePath(`${this.plugin.settings.recordingDir}/${folderPath}`);
+				noteFilePath = normalizePath(`${this.plugin.settingsv2.recording.recordingDir}/${folderPath}`);
 			}
 		} else {
 			noteFilePath = givenFolderPath;
@@ -134,7 +134,7 @@ export class AudioHandler extends SummarViewContainer {
 				for (let attempt = 1; attempt <= 3; attempt++) {
 					try {
 						// if (this.plugin.settings.sttModel === "gemini-2.0-flash") {
-						if (this.plugin.settings.sttModel.toLowerCase().includes("gemini")) {
+						if (this.plugin.settingsv2.recording.sttModel.toLowerCase().includes("gemini")) {
 							const { base64, mimeType } = await this.readFileAsBase64(audioFilePath);
 							const blob = file.slice(0, file.size, file.type);
 							const duration = await getAudioDurationFromBlob(blob, fileName);
@@ -144,7 +144,7 @@ export class AudioHandler extends SummarViewContainer {
 							SummarDebug.log(1, 'seconds: ', seconds);
 							const strContent = this.adjustSrtTimestamps(transcript, seconds);
 							return strContent;
-						} else if (this.plugin.settings.sttModel && this.plugin.settings.sttModel.toLowerCase().includes("google")) {
+						} else if (this.plugin.settingsv2.recording.sttModel && this.plugin.settingsv2.recording.sttModel.toLowerCase().includes("google")) {
 							const ext = fileName.split(".").pop()?.toLowerCase();
 							const encoding = this.getEncodingFromExtension(ext);
 							const { base64: audioBase64 } = await this.readFileAsBase64(audioFilePath);
@@ -365,7 +365,7 @@ export class AudioHandler extends SummarViewContainer {
 		
 		// summary가 활성화되어 있지 않으면 transcript 파일을 열기
 		// summary가 활성화되어 있으면 나중에 summary나 refined 파일이 열릴 예정이므로 transcript는 열지 않음
-		if (!this.plugin.settings.saveTranscriptAndRefineToNewNote) {
+		if (!this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote) {
 			await this.plugin.app.workspace.openLinkText(
 				normalizePath(newFilePath),
 				"",
@@ -508,17 +508,17 @@ export class AudioHandler extends SummarViewContainer {
 
 		addFileField("file", fileName, fileType, binaryContent);
 		// addField("model", this.plugin.settings.sttModel || "whisper-1");
-		addField("model", this.plugin.settings.sttModel || this.plugin.getDefaultModel("sttModel"));
+		addField("model", this.plugin.settingsv2.recording.sttModel || this.plugin.getDefaultModel("sttModel"));
 
-		if (this.plugin.settings.recordingLanguage) {
-			addField("language", this.mapLanguageToWhisperCode(this.plugin.settings.recordingLanguage));
+		if (this.plugin.settingsv2.recording.recordingLanguage) {
+			addField("language", this.mapLanguageToWhisperCode(this.plugin.settingsv2.recording.recordingLanguage));
 		}
 
-		addField("response_format", this.plugin.settings.sttModel === "whisper-1" ? "verbose_json" : "json");
+		addField("response_format", this.plugin.settingsv2.recording.sttModel === "whisper-1" ? "verbose_json" : "json");
 
-		if ((this.plugin.settings.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settings.sttModel === "gpt-4o-transcribe")
-			&& this.plugin.settings.sttPrompt) {
-			addField("prompt", this.plugin.settings.sttPrompt);
+		if ((this.plugin.settingsv2.recording.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settingsv2.recording.sttModel === "gpt-4o-transcribe")
+			&& this.plugin.settingsv2.recording.sttPrompt) {
+			addField("prompt", this.plugin.settingsv2.recording.sttPrompt);
 		}
 
 		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
@@ -530,7 +530,7 @@ export class AudioHandler extends SummarViewContainer {
 	}
 
 	async callWhisperTranscription(requestbody: Blob, contentType: string, duration: number): Promise<any> {
-		const sttModel = this.plugin.settings.sttModel;
+		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
 		if (!summarai.hasKey(true)) return '';
 		
@@ -619,7 +619,7 @@ export class AudioHandler extends SummarViewContainer {
 	}
 
 	async callGoogleTranscription(audioBase64: string, encoding: string): Promise<string | null> {
-		const apiKey = this.plugin.settings.googleApiKey;
+		const apiKey = this.plugin.settingsv2.common.googleApiKey;
 		if (!apiKey || apiKey.length === 0) {
 		  SummarDebug.Notice(1, "Google API key is missing. Please add your API key in the settings.");
 		  this.GoogleApiKeyAlert();
@@ -627,7 +627,7 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	
 		const request: RequestUrlParam = {	
-		  url: `https://speech.googleapis.com/v1/speech:recognize?key=${this.plugin.settings.googleApiKey}`,
+		  url: `https://speech.googleapis.com/v1/speech:recognize?key=${this.plugin.settingsv2.common.googleApiKey}`,
 		  method: "POST",
 		  headers: {
 			"Content-Type": "application/json",
@@ -667,13 +667,13 @@ export class AudioHandler extends SummarViewContainer {
 	}
 	
 	async callGeminiTranscription(base64: string, mimeType: string, duration: number): Promise<string | null> {
-		const sttModel = this.plugin.settings.sttModel;
+		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
 		if (!summarai.hasKey(true)) return '';
 
 		let systemInstruction = `You are an expert in audio-to-text transcription.\n\n1. Accurately transcribe the provided audio content into text.\n2. You MUST output the transcription in SRT (SubRip Text) format only.\n3. Split each subtitle entry into segments of 2-3 seconds.\n4. Follow this strict SRT format for every output:\n   - ommit Sequential number\n   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)\n   - Text content\n   - Blank line (to separate from next entry)\n\n5. Include appropriate punctuation and paragraphing according to the language's grammar and context.\n6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.\n7. If multiple speakers are present, clearly indicate speaker changes (e.g., "Speaker 1: Hello").\n\nYour response must contain ONLY the SRT format transcript with no additional explanation or text.`;
-		if (this.plugin.settings.recordingLanguage) {
-			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settings.recordingLanguage)}.`;
+		if (this.plugin.settingsv2.recording.recordingLanguage) {
+			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settingsv2.recording.recordingLanguage)}.`;
 		}
 		try {
 			const bodyContent = JSON.stringify({
@@ -857,7 +857,7 @@ export class AudioHandler extends SummarViewContainer {
 		let newNoteFilePath = "";
 		
 		if (!givenFolderPath || givenFolderPath.length === 0) {
-			newNoteFilePath = normalizePath(`${this.plugin.settings.recordingDir}/${newFolderPath}`);
+			newNoteFilePath = normalizePath(`${this.plugin.settingsv2.recording.recordingDir}/${newFolderPath}`);
 		} else {
 			newNoteFilePath = givenFolderPath.replace(originalFolderPath, newFolderPath);
 		}

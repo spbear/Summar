@@ -232,7 +232,7 @@ export class SummarStatsModal {
       actions.style.display = 'flex';
       actions.style.gap = '12px';
       actions.style.marginTop = '12px';
-      if (this.plugin.settings.debugLevel > 0) {
+      if (this.plugin.settingsv2.system.debugLevel > 0) {
           actions.innerHTML = `
           <button id="ai-export-csv">Export CSV</button>
           <button id="ai-recalc-cost">Recalculate Cost</button>

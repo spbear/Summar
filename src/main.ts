@@ -1,6 +1,7 @@
 import { App, Plugin, Setting, Platform, Menu, TFile, TFolder, Modal, normalizePath, MarkdownView, Stat } from "obsidian";
 import { PluginSettings, ModelCategory, ModelInfo, ModelData, PromptData, LangPromptData, DefaultPrompts } from "./types";  
 import { SummarDebug, extractDomain, parseHotkey } from "./globals";
+import { PluginSettingsV2 } from "./pluginsettingsv2";
 import { PluginUpdater } from "./pluginupdater";
 import { SummarView } from "./summarview"
 import { SummarSettingsTab } from "./summarsettingtab";
@@ -77,6 +78,9 @@ export default class SummarPlugin extends Plugin {
     recordingPrompt: "",
     refiningPrompt: "",
   };
+
+  // V2 설정 시스템 (통합된 클래스)
+  settingsv2: PluginSettingsV2;
 
   resultContainer: HTMLTextAreaElement;
   // uploadNoteToWikiButton: HTMLButtonElement;
@@ -233,12 +237,16 @@ export default class SummarPlugin extends Plugin {
 
       this.PLUGIN_SETTINGS = normalizePath(this.PLUGIN_DIR + "/data.json");
       
+      // Settings V2 Manager 초기화
+      this.settingsv2 = new PluginSettingsV2(this.app, this.PLUGIN_ID);
+      
       // 설정 로딩 상태 업데이트
       loadingNotice.setMessage("Loading plugin settings...");
       await new Promise(resolve => setTimeout(resolve, 0)); // UI thread 양보
       
-      this.settings = await this.loadSettingsFromFile();
-      SummarDebug.initialize(this.settings.debugLevel);
+      SummarDebug.initialize(3);
+      await this.loadSettingsFromFile();
+      SummarDebug.initialize(this.settingsv2.system.debugLevel);
 
       SummarDebug.log(1, `OBSIDIAN_PLUGIN_DIR: ${this.OBSIDIAN_PLUGIN_DIR}`);
       SummarDebug.log(1, `PLUGIN_ID: ${this.PLUGIN_ID}`);
@@ -587,7 +595,7 @@ export default class SummarPlugin extends Plugin {
     this.registerCustomCommandAndMenus();
 
     // 플러그인 로딩 시 Zoom 자동녹음 watcher 시작
-    if (this.settings.autoRecordOnZoomMeeting) {
+    if (this.settingsv2.recording.autoRecordOnZoomMeeting) {
       this.recordingManager.startZoomAutoRecordWatcher();
     }
   }
@@ -595,13 +603,16 @@ export default class SummarPlugin extends Plugin {
   registerCustomCommandAndMenus() {
     this.unregisterCustomCommandAndMenus();
 
-
-    for (let i = 1; i <= this.settings.cmd_count; i++) {
-      const cmdId = `custom-command-${i}`;
-      const cmdText = this.settings[`cmd_text_${i}`] as string;
-      const cmdModel = this.settings[`cmd_model_${i}`] as string || 'gpt-4o';
-      const cmdPrompt = this.settings[`cmd_prompt_${i}`] as string;
-      const cmdHotkey = this.settings[`cmd_hotkey_${i}`] as string;
+    const activeCommands = this.settingsv2.custom.command;
+    for (let i = 0; i < activeCommands.length; i++) {
+      const cmd = activeCommands[i];
+      if (!cmd.text || cmd.text.trim() === "") continue;
+      
+      const cmdId = `custom-command-${i + 1}`;
+      const cmdText = cmd.text;
+      const cmdModel = cmd.model || 'gpt-4o';
+      const cmdPrompt = cmd.prompt;
+      const cmdHotkey = cmd.hotkey;
 
       const hotKey = parseHotkey(cmdHotkey);
       if (hotKey) {
@@ -662,11 +673,15 @@ export default class SummarPlugin extends Plugin {
     }
 
     this.customCommandMenu = this.app.workspace.on('editor-menu', (menu, editor) => {
-      for (let i = 1; i <= this.settings.cmd_count; i++) {
-        const cmdId = `custom-command-${i}`; // cmdId 정의 변경
-        const cmdText = this.settings[`cmd_text_${i}`] as string;
-        const cmdModel = this.settings[`cmd_model_${i}`] as string || 'gpt-4o';
-        const cmdPrompt = this.settings[`cmd_prompt_${i}`] as string;
+      const activeCommands = this.settingsv2.custom.command;
+      for (let i = 0; i < activeCommands.length; i++) {
+        const cmd = activeCommands[i];
+        if (!cmd.text || cmd.text.trim() === "") continue;
+        
+        const cmdId = `custom-command-${i + 1}`;
+        const cmdText = cmd.text;
+        const cmdModel = cmd.model || 'gpt-4o';
+        const cmdPrompt = cmd.prompt;
 
         if (cmdText && cmdText.length > 0) {
           menu.addItem((item) => {
@@ -699,7 +714,7 @@ export default class SummarPlugin extends Plugin {
 
   async toggleRecording(): Promise<void> {
     if (this.recordingManager.getRecorderState() !== "recording") {
-      await this.recordingManager.startRecording(this.settings.recordingUnit);
+      await this.recordingManager.startRecording(this.settingsv2.recording.recordingUnit);
     } else {
       const recordingPath = await this.recordingManager.stopRecording();
       SummarDebug.log(1, `main.ts - recordingPath: ${recordingPath}`);
@@ -749,7 +764,7 @@ export default class SummarPlugin extends Plugin {
   }
 
   public updateZoomAutoRecordWatcher() {
-    if (this.settings.autoRecordOnZoomMeeting) {
+    if (this.settingsv2.recording.autoRecordOnZoomMeeting) {
       this.recordingManager.startZoomAutoRecordWatcher();
     } else {
       this.recordingManager.stopZoomAutoRecordWatcher();
@@ -784,7 +799,7 @@ export default class SummarPlugin extends Plugin {
 
 
 
-  async loadSettingsFromFile(): Promise<PluginSettings> {
+  async loadSettingsFromFile(): Promise<void> {
     // 필수 파일들을 먼저 로딩 (의존성 순서 보장)
     try {
       await this.loadModelsFromFile();
@@ -797,13 +812,10 @@ export default class SummarPlugin extends Plugin {
 
     let defaultSettings = this.settings;
 
+    // V1 설정 파일 존재 여부 확인 및 V2로 마이그레이션
     if (await this.app.vault.adapter.exists(this.PLUGIN_SETTINGS)) {
-      SummarDebug.log(1, "Settings file exists:", this.PLUGIN_SETTINGS);
-    } else {
-      SummarDebug.log(1, "Settings file does not exist:", this.PLUGIN_SETTINGS);
-    }
-    if (await this.app.vault.adapter.exists(this.PLUGIN_SETTINGS)) {
-      SummarDebug.log(1, "Reading settings from data.json");
+      SummarDebug.log(1, "V1 Settings file exists, starting migration process:", this.PLUGIN_SETTINGS);
+      
       try {
         const rawData = await this.app.vault.adapter.read(this.PLUGIN_SETTINGS);
         SummarDebug.log(2, `Raw settings data length: ${rawData.length} characters`);
@@ -854,10 +866,10 @@ export default class SummarPlugin extends Plugin {
         }
         
         if (needsMigration) {
-          SummarDebug.log(1, `Performing settings migration from "${savedSchemaVersion}" to "${currentSchemaVersion}"`);
+          SummarDebug.log(1, `Performing V1 settings migration from "${savedSchemaVersion}" to "${currentSchemaVersion}"`);
           
           if (savedSchemaVersion === '') {
-          // 1.0.0 이전 버전의 설정 파일을 읽는 경우, 필요한 변환 작업을 수행합니다.
+            // 1.0.0 이전 버전의 설정 파일을 읽는 경우, 필요한 변환 작업을 수행합니다.
             settings.saveTranscriptAndRefineToNewNote = settings.recordingResultNewNote;
             settings.sttModel = settings.transcriptSTT;
             settings.sttPrompt = settings.transcribingPrompt;
@@ -883,29 +895,56 @@ export default class SummarPlugin extends Plugin {
   
           settings.settingsSchemaVersion = currentSchemaVersion;
           
-          SummarDebug.log(1, `Settings migration completed. New schema version: ${settings.settingsSchemaVersion}`);
+          SummarDebug.log(1, `V1 settings migration completed. New schema version: ${settings.settingsSchemaVersion}`);
           // 마이그레이션 완료 후 저장은 onload가 완료된 후에 수행하도록 플래그 설정
           this._needsSave = true;
         } else {
-          SummarDebug.log(1, "No settings migration needed - versions match");
-        } 
-        return settings;
+          SummarDebug.log(1, "No V1 settings migration needed - versions match");
+        }
+        
+        // V1 설정 마이그레이션 완료 후 V2로 마이그레이션
+        SummarDebug.log(1, "Starting migration from V1 to V2");
+        await this.settingsv2.migrateFromV1(settings);
+        
+        // 마이그레이션된 V2 설정 저장
+        await this.settingsv2.saveSettings();
+        // settingsv2는 이미 Manager의 내부 설정 객체 참조
+        
+        // V2 마이그레이션 성공 후 V1 설정 파일을 백업 파일로 이름 변경
+        try {
+          const oldSettingsPath = normalizePath(this.PLUGIN_DIR + "/data-v1.json");
+          await this.app.vault.adapter.rename(this.PLUGIN_SETTINGS, oldSettingsPath);
+          SummarDebug.log(1, `V1 settings file renamed from data.json to data-v1.json`);
+        } catch (renameError) {
+          SummarDebug.error(1, "Failed to rename V1 settings file to data-v1.json:", renameError);
+          // 파일 이름 변경 실패는 치명적이지 않으므로 계속 진행
+        }
+        
+        SummarDebug.log(1, "Migration from V1 to V2 completed and saved");
+        
+        // return settings;
+        return;
       } catch (error) {
-        SummarDebug.log(1, "Error reading settings file:", error);
-        return defaultSettings;
+        SummarDebug.error(1, "Error reading V1 settings file or during migration:", error);
+        // 에러 발생 시 V2 설정 기본값 로드
+        await this.settingsv2.loadSettings(); // 기본값으로 초기화
+        // return defaultSettings;
+        return;
       }
+    } else {
+      // V1 설정 파일이 없으면 V2 설정 로드 시도
+      SummarDebug.log(1, "V1 Settings file does not exist, loading V2 settings");
+      await this.settingsv2.loadSettings(); // V2 설정 로드
+      
+      // 설정 동기화 상태 검증
+      this.settingsv2.validateSync();
     }
-    return defaultSettings;
+    
+    // return defaultSettings;
   }
 
   async saveSettingsToFile(): Promise<void> {
-    try {
-      await this.app.vault.adapter.mkdir(this.PLUGIN_DIR);
-      await this.app.vault.adapter.write(this.PLUGIN_SETTINGS, JSON.stringify(this.settings, null, 2));
-      SummarDebug.log(1, "Settings saved to data.json");
-    } catch (error) {
-      SummarDebug.error(1, "Error saving settings file:", error);
-    }
+    await this.settingsv2.saveSettings();
   }
 
   async loadModelsFromFile(): Promise<void> {
@@ -955,6 +994,20 @@ export default class SummarPlugin extends Plugin {
         if (!this.settings.customModel) {
           this.settings.customModel = this.getDefaultModel('customModel');
         }
+
+        // V2 설정에도 기본 모델 설정 (비어있을 때만)
+        if (!this.settingsv2.web.webModel) {
+          this.settingsv2.web.webModel = this.getDefaultModel('webModel');
+        }
+        if (!this.settingsv2.pdf.pdfModel) {
+          this.settingsv2.pdf.pdfModel = this.getDefaultModel('pdfModel');
+        }
+        if (!this.settingsv2.recording.sttModel) {
+          this.settingsv2.recording.sttModel = this.getDefaultModel('sttModel');
+        }
+        if (!this.settingsv2.recording.transcriptSummaryModel) {
+          this.settingsv2.recording.transcriptSummaryModel = this.getDefaultModel('transcriptSummaryModel');
+        }
       }
     } catch (error) {
       SummarDebug.error(1, "Error reading models file:", error);
@@ -1001,6 +1054,7 @@ export default class SummarPlugin extends Plugin {
         // defaultPrompts에 저장 (참조용)
         this.defaultPrompts.webPrompt = promptData.default_prompts.ko.webPrompt.join("\n");
         this.defaultPrompts.pdfPrompt = promptData.default_prompts.ko.pdfPrompt.join("\n");
+        this.defaultPrompts.sttPrompt = promptData.default_prompts.ko.sttPrompt.join("\n");
         this.defaultPrompts.transcriptSummaryPrompt = promptData.default_prompts.ko.transcriptSummaryPrompt.join("\n");
         this.defaultPrompts.refineSummaryPrompt = promptData.default_prompts.ko.refineSummaryPrompt.join("\n");
 
@@ -1011,11 +1065,31 @@ export default class SummarPlugin extends Plugin {
         if (!this.settings.pdfPrompt) {
           this.settings.pdfPrompt = this.defaultPrompts.pdfPrompt;
         }
+        if (!this.settings.sttPrompt) {
+          this.settings.sttPrompt = this.defaultPrompts.sttPrompt;
+        }
         if (!this.settings.transcriptSummaryPrompt) {
           this.settings.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt;
         }
         if (!this.settings.refineSummaryPrompt) {
           this.settings.refineSummaryPrompt = this.defaultPrompts.refineSummaryPrompt;
+        }
+
+        // V2 설정에도 기본 프롬프트 설정 (비어있을 때만)
+        if (!this.settingsv2.web.webPrompt) {
+          this.settingsv2.web.webPrompt = this.defaultPrompts.webPrompt;
+        }
+        if (!this.settingsv2.pdf.pdfPrompt) {
+          this.settingsv2.pdf.pdfPrompt = this.defaultPrompts.pdfPrompt;
+        }
+        if (!this.settingsv2.recording.sttPrompt) {
+          this.settingsv2.recording.sttPrompt = this.defaultPrompts.sttPrompt;
+        }
+        if (!this.settingsv2.recording.transcriptSummaryPrompt) {
+          this.settingsv2.recording.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt;
+        }
+        if (!this.settingsv2.recording.refineSummaryPrompt) {
+          this.settingsv2.recording.refineSummaryPrompt = this.defaultPrompts.refineSummaryPrompt;
         }
         
         SummarDebug.log(1, "Prompts loaded successfully");
