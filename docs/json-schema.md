@@ -167,12 +167,12 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `confluenceParentPageId`: 부모 페이지 ID (string, 기본: "")
 
 ### 2. Webpage Tab (`webpage-tab`)
-- `webModel`: 웹페이지 요약 모델 (string, 기본: "")
-- `webPrompt`: 웹페이지 요약 프롬프트 (string, 기본: "")
+- `webModel`: 웹페이지 요약 모델 (string, 기본: "" → `models.json`의 `webModel.default`에서 자동 설정)
+- `webPrompt`: 웹페이지 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.webPrompt`에서 자동 설정)
 
 ### 3. PDF Tab (`pdf-tab`) *macOS 데스크탑 전용*
-- `pdfModel`: PDF 요약 모델 (string, 기본: "")
-- `pdfPrompt`: PDF 요약 프롬프트 (string, 기본: "")
+- `pdfModel`: PDF 요약 모델 (string, 기본: "" → `models.json`의 `pdfModel.default`에서 자동 설정)
+- `pdfPrompt`: PDF 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.pdfPrompt`에서 자동 설정)
 
 ### 4. Recording Tab (`recording-tab`)
 **녹음 기본 설정**
@@ -185,19 +185,19 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `recordingLanguage`: 녹취 언어 코드 (string, 기본: "ko-KR")
 
 **음성 인식 및 요약 설정**
-- `sttModel`: 음성 인식 모델 (string, 기본: "")
+- `sttModel`: 음성 인식 모델 (string, 기본: "" → `models.json`의 `sttModel.default`에서 자동 설정)
 - `sttPrompt`: 음성 인식 프롬프트 (string, 기본: "")
-- `transcriptSummaryModel`: 녹취 요약 모델 (string, 기본: "")
-- `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (string, 기본: "")
+- `transcriptSummaryModel`: 녹취 요약 모델 (string, 기본: "" → `models.json`의 `transcriptSummaryModel.default`에서 자동 설정)
+- `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.transcriptSummaryPrompt`에서 자동 설정)
 - `refineSummary`: 요약 정제 사용 여부 (boolean, 기본: true)
-- `refineSummaryPrompt`: 요약 정제 프롬프트 (string, 기본: "")
+- `refineSummaryPrompt`: 요약 정제 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.refineSummaryPrompt`에서 자동 설정)
 
 ### 5. Custom Command Tab (`custom-tab`)
 - `cmd_max`: 커스텀 명령어 최대 개수 (number, 기본: 10)
 - `cmd_count`: 현재 커스텀 명령어 개수 (number, 기본: 0)
 - `cmd_text_N`: N번째 커스텀 명령어 표시명 (string, 동적 키 1~cmd_max)
 - `cmd_prompt_N`: N번째 커스텀 명령어 프롬프트 (string, 동적 키 1~cmd_max)
-- `cmd_model_N`: N번째 커스텀 명령어 모델 (string, 동적 키 1~cmd_max)
+- `cmd_model_N`: N번째 커스텀 명령어 모델 (string, 동적 키 1~cmd_max, 코드 내 기본값: "gpt-4o")
 - `cmd_hotkey_N`: N번째 커스텀 명령어 단축키 (string, 동적 키 1~cmd_max)
 - `cmd_append_to_note_N`: N번째 명령어 결과 노트 추가 여부 (boolean, 동적 키 1~cmd_max)
 - `cmd_copy_to_clipboard_N`: N번째 명령어 결과 클립보드 복사 여부 (boolean, 동적 키 1~cmd_max)
