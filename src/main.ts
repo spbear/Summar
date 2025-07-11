@@ -1082,8 +1082,9 @@ export default class SummarPlugin extends Plugin {
         if (!this.settingsv2.pdf.pdfPrompt) {
           this.settingsv2.pdf.pdfPrompt = this.defaultPrompts.pdfPrompt;
         }
-        if (!this.settingsv2.recording.sttPrompt) {
-          this.settingsv2.recording.sttPrompt = this.defaultPrompts.sttPrompt;
+        if (!this.settingsv2.recording.sttPrompt["gpt-4o-transcribe"] && !this.settingsv2.recording.sttPrompt["gpt-4o-mini-transcribe"]) {
+          this.settingsv2.recording.sttPrompt["gpt-4o-transcribe"] = this.defaultPrompts.sttPrompt;
+          this.settingsv2.recording.sttPrompt["gpt-4o-mini-transcribe"] = "";
         }
         if (!this.settingsv2.recording.transcriptSummaryPrompt) {
           this.settingsv2.recording.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt;

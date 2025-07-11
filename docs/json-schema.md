@@ -348,7 +348,9 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 
 **음성 인식 및 요약 설정**
 - `sttModel`: 음성 인식 모델 (string, 기본: "" → `models.json`의 `sttModel.default`에서 자동 설정)
-- `sttPrompt`: 음성 인식 프롬프트 (string, 기본: "")
+- `sttPrompt`: 모델별 음성 인식 프롬프트 (object, 기본: {})
+  - `"gpt-4o-transcribe"`: gpt-4o-transcribe 모델용 프롬프트 (string, V1에서 마이그레이션된 값)
+  - `"gpt-4o-mini-transcribe"`: gpt-4o-mini-transcribe 모델용 프롬프트 (string, 기본: "")
 - `transcriptSummaryModel`: 녹취 요약 모델 (string, 기본: "" → `models.json`의 `transcriptSummaryModel.default`에서 자동 설정)
 - `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.transcriptSummaryPrompt`에서 자동 설정)
 - `refineSummary`: 요약 정제 사용 여부 (boolean, 기본: true)
@@ -386,6 +388,11 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `cmd_text_N`, `cmd_prompt_N` 등 → `custom.command` 배열
 - `calendar_N` → `schedule.calendarName` 배열
 - `selectedDeviceId_*` → `recording.selectedDeviceId` 객체
+
+**단일 값을 객체로 변환:**
+- `sttPrompt` → `recording.sttPrompt` 객체
+  - V1의 `sttPrompt` 값은 `recording.sttPrompt["gpt-4o-transcribe"]`로 마이그레이션
+  - `recording.sttPrompt["gpt-4o-mini-transcribe"]`는 빈 문자열로 초기화
 
 **섹션별 재구성:**
 - 기존 flat 구조를 7개 섹션으로 분류

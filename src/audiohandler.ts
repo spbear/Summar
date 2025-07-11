@@ -517,8 +517,8 @@ export class AudioHandler extends SummarViewContainer {
 		addField("response_format", this.plugin.settingsv2.recording.sttModel === "whisper-1" ? "verbose_json" : "json");
 
 		if ((this.plugin.settingsv2.recording.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settingsv2.recording.sttModel === "gpt-4o-transcribe")
-			&& this.plugin.settingsv2.recording.sttPrompt) {
-			addField("prompt", this.plugin.settingsv2.recording.sttPrompt);
+			&& this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]) {
+			addField("prompt", this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
 		}
 
 		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));

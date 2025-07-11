@@ -197,10 +197,14 @@ export class SummarSettingsTab extends PluginSettingTab {
             await this.buildCommonSettings(tabContent);
             break;
           case 'webpage-tab':
+            tabContent.style.width = "100%";
+            tabContent.style.maxWidth = "none";
             await this.buildWebpageSettings(tabContent);
             break;
           case 'pdf-tab':
             if (Platform.isMacOS && Platform.isDesktopApp) {
+              tabContent.style.width = "100%";
+              tabContent.style.maxWidth = "none";
               await this.buildPdfSettings(tabContent);
             }
             break;
@@ -558,10 +562,6 @@ async activateTab(tabId: string): Promise<void> {
 
   async buildWebpageSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "Webpage Summary" });
-    
-    // 컨테이너 너비 명시적 설정
-    containerEl.style.width = "100%";
-    containerEl.style.maxWidth = "none";
 
     new Setting(containerEl)
       .setName("Prompt (for Web page summary)")
@@ -687,10 +687,6 @@ async activateTab(tabId: string): Promise<void> {
 
   async buildPdfSettings(containerEl: HTMLElement): Promise<void> {
     containerEl.createEl("h2", { text: "PDF Summary" });
-    
-    // 컨테이너 너비 명시적 설정  
-    containerEl.style.width = "100%";
-    containerEl.style.maxWidth = "none";
 
     // PDF 모델 선택 드롭다운 및 프롬프트 입력 UI를 Webpage와 동일하게 구성
     new Setting(containerEl)
@@ -949,6 +945,8 @@ async activateTab(tabId: string): Promise<void> {
 
     // Speech to Text Model dropdown 및 프롬프트 영역
     let promptSettingDiv: HTMLDivElement | null = null;
+    let promptTextArea: HTMLTextAreaElement | null = null;
+    
     new Setting(containerEl)
       .setName("Speech to Text Model")
       .setDesc("Select the STT model to transcribe the audio")
@@ -966,11 +964,16 @@ async activateTab(tabId: string): Promise<void> {
           .onChange(async (value) => {
             this.plugin.settingsv2.recording.sttModel = value;
             await this.plugin.settingsv2.saveSettings();
-            // 항상 최신 상태로 반영: 클래스를 직접 토글
+            
+            // 프롬프트 영역 표시/숨김 처리
             if (promptSettingDiv) {
               if (value === "gpt-4o-mini-transcribe" || 
                 value === "gpt-4o-transcribe") {
                 promptSettingDiv.style.display = "";
+                // 해당 모델의 프롬프트 값으로 텍스트 영역 업데이트
+                if (promptTextArea) {
+                  promptTextArea.value = this.plugin.settingsv2.recording.sttPrompt[value] || "";
+                }
               } else {
                 promptSettingDiv.style.display = "none";
               }
@@ -983,19 +986,25 @@ async activateTab(tabId: string): Promise<void> {
     new Setting(promptSettingDiv)
       .setHeading()
       .addTextArea((text) => {
+        const currentModel = this.plugin.settingsv2.recording.sttModel;
+        const currentPrompt = this.plugin.settingsv2.recording.sttPrompt[currentModel] || "";
+        
         text
           .setPlaceholder("Enter prompt for transcribing")
-          .setValue(this.plugin.settingsv2.recording.sttPrompt || "")
+          .setValue(currentPrompt)
           .onChange(async (value) => {
-            this.plugin.settingsv2.recording.sttPrompt = value;
-            await this.plugin.settingsv2.saveSettings();
+            const selectedModel = this.plugin.settingsv2.recording.sttModel;
+            if (selectedModel === "gpt-4o-mini-transcribe" || selectedModel === "gpt-4o-transcribe") {
+              this.plugin.settingsv2.recording.sttPrompt[selectedModel] = value;
+              await this.plugin.settingsv2.saveSettings();
+            }
           });
 
-        const textAreaEl = text.inputEl;
-        textAreaEl.classList.add("transcription-prompt-textarea");
-        textAreaEl.style.width = "100%";
-        textAreaEl.style.height = "150px";
-        textAreaEl.style.resize = "none";
+        promptTextArea = text.inputEl;
+        promptTextArea.classList.add("transcription-prompt-textarea");
+        promptTextArea.style.width = "100%";
+        promptTextArea.style.height = "150px";
+        promptTextArea.style.resize = "none";
       });
 
     // 드롭다운 값에 따라 최초 표시/숨김 상태를 정확히 반영 (display로 직접 제어)

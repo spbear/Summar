@@ -66,7 +66,7 @@ export class PluginSettingsV2 {
     recordingUnit: number;
     recordingLanguage: string;
     sttModel: string;
-    sttPrompt: string;
+    sttPrompt: { [modelKey: string]: string };
     transcriptSummaryModel: string;
     transcriptSummaryPrompt: string;
     refineSummary: boolean;
@@ -80,7 +80,10 @@ export class PluginSettingsV2 {
     recordingUnit: 15,
     recordingLanguage: "ko-KR",
     sttModel: "",
-    sttPrompt: "",
+    sttPrompt: {
+      "gpt-4o-transcribe": "",
+      "gpt-4o-mini-transcribe": ""
+    },
     transcriptSummaryModel: "",
     transcriptSummaryPrompt: "",
     refineSummary: true,
@@ -438,7 +441,13 @@ export class PluginSettingsV2 {
       if (v1Settings.recordingUnit !== undefined) this.recording.recordingUnit = v1Settings.recordingUnit;
       if (v1Settings.recordingLanguage !== undefined) this.recording.recordingLanguage = v1Settings.recordingLanguage;
       if (v1Settings.sttModel !== undefined) this.recording.sttModel = v1Settings.sttModel;
-      if (v1Settings.sttPrompt !== undefined) this.recording.sttPrompt = v1Settings.sttPrompt;
+      
+      // sttPrompt를 객체 형태로 마이그레이션
+      this.recording.sttPrompt = {
+        "gpt-4o-transcribe": v1Settings.sttPrompt || "",
+        "gpt-4o-mini-transcribe": ""
+      };
+      
       if (v1Settings.transcriptSummaryModel !== undefined) this.recording.transcriptSummaryModel = v1Settings.transcriptSummaryModel;
       if (v1Settings.transcriptSummaryPrompt !== undefined) this.recording.transcriptSummaryPrompt = v1Settings.transcriptSummaryPrompt;
       if (v1Settings.refineSummary !== undefined) this.recording.refineSummary = v1Settings.refineSummary;
