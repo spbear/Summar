@@ -17,9 +17,10 @@
 3. **`model-pricing.json`** → `SummarPlugin.modelPricing` (모델 가격 정보)
    - 로딩 함수: `loadModelPricingFromFile()`
 
-4. **`data.json`** → `SummarPlugin.settings` (사용자 설정)
+4. **`data-v2.json`** → `SummarPlugin.settingsv2` (사용자 설정, V2 구조)
    - 로딩 함수: `loadSettingsFromFile()`
    - 위 3개 파일의 데이터를 참조하여 기본값 설정
+   - 기존 `data.json`은 마이그레이션 후 `data-v1.json`으로 백업됨
 
 ### 매핑 관계
 
@@ -28,7 +29,8 @@
 | `models.json` | `modelsJson` | `ModelData` | 전체 모델 데이터 원본 |
 | `prompts.json` | `defaultPrompts` | `DefaultPrompts` | 기본 프롬프트 참조용 |
 | `model-pricing.json` | `modelPricing` | `any` | 모델별 가격 정보 |
-| `data.json` | `settings` | `PluginSettings` | 사용자 개인 설정 |
+| `data-v2.json` | `settingsv2` | `PluginSettingsV2` | 사용자 개인 설정 (V2 구조) |
+| `data-v1.json` | - | - | V1 설정 백업 파일 (마이그레이션 시 생성) |
 
 ### 사용자 설정 보호
 
@@ -288,6 +290,7 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - 설정 스키마 버전 `settingsSchemaVersion`으로 관리
 - 1.0.0 이전 버전에서 업그레이드 시 자동 변환
 - 구버전 키는 새 키로 매핑 후 제거
+- **V2 시스템 도입 시**: 자동으로 `data-v2.json`으로 마이그레이션되며, 기존 파일은 `data-v1.json`으로 백업
 
 ---
 
@@ -391,13 +394,31 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 
 #### 호환성 보장
 - V1 `data.json` 존재 시 자동 마이그레이션 실행
-- 마이그레이션 후 V2 `data-v2.json` 생성
-- 기존 V1 파일은 백업으로 유지
+- 마이그레이션 완료 후 기존 `data.json`을 `data-v1.json`으로 백업
+- 새로운 V2 설정은 `data-v2.json`에 저장
+- 마이그레이션 실패 시 `data-v1.json`에서 복구 가능
 
 ### 파일 위치 및 관리
 
 #### V2 설정 파일 위치
 - `data-v2.json`: `/.obsidian/plugins/summar/data-v2.json` (V2 사용자 설정 저장)
+- `data-v1.json`: `/.obsidian/plugins/summar/data-v1.json` (V1 설정 백업 파일, 마이그레이션 시 생성)
+
+#### 마이그레이션 프로세스
+1. **플러그인 시작 시 파일 확인**
+   - `data-v2.json` 존재 시: V2 설정 직접 로드
+   - `data-v2.json` 없고 `data.json` 존재 시: 마이그레이션 프로세스 시작
+
+2. **마이그레이션 단계**
+   - V1 `data.json` 파일 읽기 및 파싱
+   - V2 구조로 데이터 변환 (`PluginSettingsV2.migrateFromV1()` 실행)
+   - 변환된 데이터를 `data-v2.json`에 저장
+   - 성공 시 기존 `data.json`을 `data-v1.json`으로 이름 변경 (백업)
+
+3. **오류 처리**
+   - 마이그레이션 실패 시 `data.json` 유지
+   - V2 로딩 실패 시 `data-v1.json`에서 V1 설정 복구 가능
+   - 모든 파일 손상 시 기본값으로 초기화
 
 #### 로딩 및 저장
 - `PluginSettingsV2` 클래스로 통합 관리
