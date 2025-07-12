@@ -671,7 +671,15 @@ export class AudioHandler extends SummarViewContainer {
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
 		if (!summarai.hasKey(true)) return '';
 
-		let systemInstruction = `You are an expert in audio-to-text transcription.\n\n1. Accurately transcribe the provided audio content into text.\n2. You MUST output the transcription in SRT (SubRip Text) format only.\n3. Split each subtitle entry into segments of 2-3 seconds.\n4. Follow this strict SRT format for every output:\n   - ommit Sequential number\n   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)\n   - Text content\n   - Blank line (to separate from next entry)\n\n5. Include appropriate punctuation and paragraphing according to the language's grammar and context.\n6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.\n7. If multiple speakers are present, clearly indicate speaker changes (e.g., "Speaker 1: Hello").\n\nYour response must contain ONLY the SRT format transcript with no additional explanation or text.`;
+		// sttModel에 따라 적절한 prompt 선택
+		let systemInstruction = "";
+		if (this.plugin.settingsv2.recording.sttPrompt[sttModel]) {
+			systemInstruction = this.plugin.settingsv2.recording.sttPrompt[sttModel];
+		} else {
+			// fallback to default instruction
+			systemInstruction = `You are an expert in audio-to-text transcription.\n\n1. Accurately transcribe the provided audio content into text.\n2. You MUST output the transcription in SRT (SubRip Text) format only.\n3. Split each subtitle entry into segments of 2-3 seconds.\n4. Follow this strict SRT format for every output:\n   - ommit Sequential number\n   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)\n   - Text content\n   - Blank line (to separate from next entry)\n\n5. Include appropriate punctuation and paragraphing according to the language's grammar and context.\n6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.\n7. If multiple speakers are present, clearly indicate speaker changes (e.g., "Speaker 1: Hello").\n\nYour response must contain ONLY the SRT format transcript with no additional explanation or text.`;
+		}
+		
 		if (this.plugin.settingsv2.recording.recordingLanguage) {
 			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settingsv2.recording.recordingLanguage)}.`;
 		}

@@ -100,7 +100,11 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
     - `pdfPrompt`: PDF 요약 프롬프트 (배열 형태)
       - 여러 PDF 페이지를 마크다운으로 변환하는 지침
       - 페이지 번호 제거, 테이블 태그 사용, 정확한 내용 인식
-    - `sttPrompt`: 음성 인식 프롬프트 (배열 형태, 현재 빈 값)
+    - `sttPrompt`: 모델별 음성 인식 프롬프트 (객체 형태)
+      - `"gpt-4o-transcribe"`: gpt-4o-transcribe 모델용 프롬프트 (배열 형태)
+      - `"gpt-4o-mini-transcribe"`: gpt-4o-mini-transcribe 모델용 프롬프트 (배열 형태)
+      - `"gemini-2.0-flash"`: gemini-2.0-flash 모델용 프롬프트 (배열 형태)
+      - `"gemini-2.5-flash"`: gemini-2.5-flash 모델용 프롬프트 (배열 형태)
     - `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (배열 형태)
       - STT 원문을 회의록으로 정리하는 상세한 지침
       - 단어 리스트를 참고한 오타 수정
@@ -351,6 +355,8 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `sttPrompt`: 모델별 음성 인식 프롬프트 (object, 기본: {})
   - `"gpt-4o-transcribe"`: gpt-4o-transcribe 모델용 프롬프트 (string, V1에서 마이그레이션된 값)
   - `"gpt-4o-mini-transcribe"`: gpt-4o-mini-transcribe 모델용 프롬프트 (string, 기본: "")
+  - `"gemini-2.0-flash"`: gemini-2.0-flash 모델용 프롬프트 (string, 기본: "" → `prompts.json`에서 자동 설정)
+  - `"gemini-2.5-flash"`: gemini-2.5-flash 모델용 프롬프트 (string, 기본: "" → `prompts.json`에서 자동 설정)
 - `transcriptSummaryModel`: 녹취 요약 모델 (string, 기본: "" → `models.json`의 `transcriptSummaryModel.default`에서 자동 설정)
 - `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.transcriptSummaryPrompt`에서 자동 설정)
 - `refineSummary`: 요약 정제 사용 여부 (boolean, 기본: true)
@@ -393,11 +399,21 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `sttPrompt` → `recording.sttPrompt` 객체
   - V1의 `sttPrompt` 값은 `recording.sttPrompt["gpt-4o-transcribe"]`로 마이그레이션
   - `recording.sttPrompt["gpt-4o-mini-transcribe"]`는 빈 문자열로 초기화
+  - `recording.sttPrompt["gemini-2.0-flash"]`는 `prompts.json`의 기본값으로 설정
+  - `recording.sttPrompt["gemini-2.5-flash"]`는 `prompts.json`의 기본값으로 설정
 
 **섹션별 재구성:**
 - 기존 flat 구조를 7개 섹션으로 분류
 - 모든 설정값의 타입 검증 및 기본값 적용
 - 더 이상 사용하지 않는 설정 필드 자동 제거
+
+### 자동 초기화 및 보완 시스템
+
+**V2 설정 로드 시 자동 보완:**
+- `defaultPrompts.sttPrompt`에 존재하는 모든 모델에 대해 누락된 프롬프트 자동 추가
+- 기존 설정값이 비어있거나 존재하지 않는 경우에만 기본값 적용
+- 변경사항이 발생한 경우 자동으로 `data-v2.json`에 저장
+- 로그를 통해 추가된 프롬프트 정보 확인 가능
 
 #### 호환성 보장
 - V1 `data.json` 존재 시 자동 마이그레이션 실행

@@ -136,7 +136,7 @@ export default class SummarPlugin extends Plugin {
   defaultPrompts: DefaultPrompts = {
     webPrompt: "",
     pdfPrompt: "",
-    sttPrompt: "",
+    sttPrompt: {},
     transcriptSummaryPrompt: "",
     refineSummaryPrompt: ""
   };
@@ -904,7 +904,7 @@ export default class SummarPlugin extends Plugin {
         
         // V1 설정 마이그레이션 완료 후 V2로 마이그레이션
         SummarDebug.log(1, "Starting migration from V1 to V2");
-        await this.settingsv2.migrateFromV1(settings);
+        await this.settingsv2.migrateFromV1(settings, this.defaultPrompts);
         
         // 마이그레이션된 V2 설정 저장
         await this.settingsv2.saveSettings();
@@ -928,6 +928,20 @@ export default class SummarPlugin extends Plugin {
         SummarDebug.error(1, "Error reading V1 settings file or during migration:", error);
         // 에러 발생 시 V2 설정 기본값 로드
         await this.settingsv2.loadSettings(); // 기본값으로 초기화
+        
+        // defaultPrompts.sttPrompt의 값이 settingsv2.recording.sttPrompt에 없을 경우 추가
+        let needsSave = false;
+        for (const [modelKey, defaultPrompt] of Object.entries(this.defaultPrompts.sttPrompt)) {
+          if (!this.settingsv2.recording.sttPrompt[modelKey] || this.settingsv2.recording.sttPrompt[modelKey].trim() === "") {
+            this.settingsv2.recording.sttPrompt[modelKey] = defaultPrompt;
+            needsSave = true;
+            SummarDebug.log(1, `Added missing sttPrompt for ${modelKey}: ${defaultPrompt.length > 50 ? defaultPrompt.substring(0, 50) + '...' : defaultPrompt}`);
+          }
+        }
+        if (needsSave) {
+          await this.settingsv2.saveSettings();
+          SummarDebug.log(1, "Saved settings after adding missing sttPrompts");
+        }
         // return defaultSettings;
         return;
       }
@@ -935,6 +949,20 @@ export default class SummarPlugin extends Plugin {
       // V1 설정 파일이 없으면 V2 설정 로드 시도
       SummarDebug.log(1, "V1 Settings file does not exist, loading V2 settings");
       await this.settingsv2.loadSettings(); // V2 설정 로드
+      
+      // defaultPrompts.sttPrompt의 값이 settingsv2.recording.sttPrompt에 없을 경우 추가
+      let needsSave = false;
+      for (const [modelKey, defaultPrompt] of Object.entries(this.defaultPrompts.sttPrompt)) {
+        if (!this.settingsv2.recording.sttPrompt[modelKey] || this.settingsv2.recording.sttPrompt[modelKey].trim() === "") {
+          this.settingsv2.recording.sttPrompt[modelKey] = defaultPrompt;
+          needsSave = true;
+          SummarDebug.log(1, `Added missing sttPrompt for ${modelKey}: ${defaultPrompt.length > 50 ? defaultPrompt.substring(0, 50) + '...' : defaultPrompt}`);
+        }
+      }
+      if (needsSave) {
+        await this.settingsv2.saveSettings();
+        SummarDebug.log(1, "Saved settings after adding missing sttPrompts");
+      }
       
       // 설정 동기화 상태 검증
       this.settingsv2.validateSync();
@@ -1054,7 +1082,13 @@ export default class SummarPlugin extends Plugin {
         // defaultPrompts에 저장 (참조용)
         this.defaultPrompts.webPrompt = promptData.default_prompts.ko.webPrompt.join("\n");
         this.defaultPrompts.pdfPrompt = promptData.default_prompts.ko.pdfPrompt.join("\n");
-        this.defaultPrompts.sttPrompt = promptData.default_prompts.ko.sttPrompt.join("\n");
+        
+        // sttPrompt는 이제 객체 형태로 처리
+        this.defaultPrompts.sttPrompt = {};
+        for (const [modelKey, promptArray] of Object.entries(promptData.default_prompts.ko.sttPrompt)) {
+          this.defaultPrompts.sttPrompt[modelKey] = promptArray.join("\n");
+        }
+        
         this.defaultPrompts.transcriptSummaryPrompt = promptData.default_prompts.ko.transcriptSummaryPrompt.join("\n");
         this.defaultPrompts.refineSummaryPrompt = promptData.default_prompts.ko.refineSummaryPrompt.join("\n");
 
@@ -1066,7 +1100,8 @@ export default class SummarPlugin extends Plugin {
           this.settings.pdfPrompt = this.defaultPrompts.pdfPrompt;
         }
         if (!this.settings.sttPrompt) {
-          this.settings.sttPrompt = this.defaultPrompts.sttPrompt;
+          // V1 호환성을 위해 gpt-4o-transcribe 값을 사용
+          this.settings.sttPrompt = this.defaultPrompts.sttPrompt["gpt-4o-transcribe"] || "";
         }
         if (!this.settings.transcriptSummaryPrompt) {
           this.settings.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt;
@@ -1082,10 +1117,16 @@ export default class SummarPlugin extends Plugin {
         if (!this.settingsv2.pdf.pdfPrompt) {
           this.settingsv2.pdf.pdfPrompt = this.defaultPrompts.pdfPrompt;
         }
-        if (!this.settingsv2.recording.sttPrompt["gpt-4o-transcribe"] && !this.settingsv2.recording.sttPrompt["gpt-4o-mini-transcribe"]) {
-          this.settingsv2.recording.sttPrompt["gpt-4o-transcribe"] = this.defaultPrompts.sttPrompt;
-          this.settingsv2.recording.sttPrompt["gpt-4o-mini-transcribe"] = "";
+        
+        // V2 sttPrompt 초기화 - 각 모델별로 기본값 설정
+        // 필드가 없거나 비어있는 경우 모두 기본값으로 설정
+        for (const [modelKey, defaultPrompt] of Object.entries(this.defaultPrompts.sttPrompt)) {
+          if (!this.settingsv2.recording.sttPrompt[modelKey] || this.settingsv2.recording.sttPrompt[modelKey].trim() === "") {
+            this.settingsv2.recording.sttPrompt[modelKey] = defaultPrompt;
+            SummarDebug.log(1, `Set default sttPrompt for ${modelKey}: ${defaultPrompt.length > 50 ? defaultPrompt.substring(0, 50) + '...' : defaultPrompt}`);
+          }
         }
+        
         if (!this.settingsv2.recording.transcriptSummaryPrompt) {
           this.settingsv2.recording.transcriptSummaryPrompt = this.defaultPrompts.transcriptSummaryPrompt;
         }

@@ -946,6 +946,12 @@ async activateTab(tabId: string): Promise<void> {
     // Speech to Text Model dropdown 및 프롬프트 영역
     let promptSettingDiv: HTMLDivElement | null = null;
     let promptTextArea: HTMLTextAreaElement | null = null;
+    let promptButtonsDiv: HTMLDivElement | null = null;
+    
+    // STT 프롬프트 버튼 관리 변수들
+    let initialSttPrompt: string | null = null;
+    let setDefaultSttButton: ButtonComponent | undefined;
+    let revertSttButton: ButtonComponent | undefined;
     
     new Setting(containerEl)
       .setName("Speech to Text Model")
@@ -966,20 +972,99 @@ async activateTab(tabId: string): Promise<void> {
             await this.plugin.settingsv2.saveSettings();
             
             // 프롬프트 영역 표시/숨김 처리
-            if (promptSettingDiv) {
+            if (promptSettingDiv && promptButtonsDiv) {
               if (value === "gpt-4o-mini-transcribe" || 
-                value === "gpt-4o-transcribe") {
+                value === "gpt-4o-transcribe" ||
+                value === "gemini-2.0-flash" ||
+                value === "gemini-2.5-flash") {
                 promptSettingDiv.style.display = "";
+                promptButtonsDiv.style.display = "";
                 // 해당 모델의 프롬프트 값으로 텍스트 영역 업데이트
                 if (promptTextArea) {
-                  promptTextArea.value = this.plugin.settingsv2.recording.sttPrompt[value] || "";
+                  const newPrompt = this.plugin.settingsv2.recording.sttPrompt[value] || "";
+                  promptTextArea.value = newPrompt;
+                  initialSttPrompt = newPrompt; // 새로운 초기값 설정
+                  
+                  // 버튼 상태 업데이트
+                  const defaultPrompt = this.plugin.defaultPrompts.sttPrompt[value] || "";
+                  if (setDefaultSttButton) {
+                    setDefaultSttButton.setDisabled(newPrompt === defaultPrompt);
+                  }
+                  if (revertSttButton) {
+                    revertSttButton.setDisabled(true); // 모델 변경 시 revert는 비활성화
+                  }
                 }
               } else {
                 promptSettingDiv.style.display = "none";
+                promptButtonsDiv.style.display = "none";
               }
             }
           });
       });
+
+    // STT 프롬프트 버튼들을 위한 별도 div
+    promptButtonsDiv = containerEl.createDiv({ cls: "transcription-prompt-buttons" });
+    const sttPromptSettingButtons = new Setting(promptButtonsDiv)
+      .setHeading();
+
+    // set default 버튼
+    sttPromptSettingButtons.addButton((button) => {
+      setDefaultSttButton = button;
+      button.setButtonText("set default prompt")
+        .setDisabled(true)
+        .setClass("set-default-btn");
+      button.onClick(async () => {
+        if (setDefaultSttButton && !setDefaultSttButton.buttonEl.hasAttribute('disabled')) {
+          const selectedModel = this.plugin.settingsv2.recording.sttModel;
+          const defaultPrompt = this.plugin.defaultPrompts.sttPrompt[selectedModel] || "";
+          
+          this.plugin.settingsv2.recording.sttPrompt[selectedModel] = defaultPrompt;
+          if (promptTextArea) {
+            promptTextArea.value = defaultPrompt;
+          }
+          await this.plugin.settingsv2.saveSettings();
+          
+          setDefaultSttButton.setDisabled(true);
+          if (revertSttButton) {
+            if (defaultPrompt !== initialSttPrompt) {
+              revertSttButton.setDisabled(false);
+            } else {
+              revertSttButton.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
+
+    // revert 버튼
+    sttPromptSettingButtons.addButton((button) => {
+      revertSttButton = button;
+      button.setButtonText("revert")
+        .setDisabled(true)
+        .setClass("revert-btn");
+      button.onClick(async () => {
+        if (initialSttPrompt !== null) {
+          const selectedModel = this.plugin.settingsv2.recording.sttModel;
+          this.plugin.settingsv2.recording.sttPrompt[selectedModel] = initialSttPrompt;
+          if (promptTextArea) {
+            promptTextArea.value = initialSttPrompt;
+          }
+          await this.plugin.settingsv2.saveSettings();
+          
+          if (revertSttButton) revertSttButton.setDisabled(true);
+          
+          // setDefaultButton 상태 재조정
+          if (setDefaultSttButton) {
+            const defaultPrompt = this.plugin.defaultPrompts.sttPrompt[selectedModel] || "";
+            if (initialSttPrompt !== defaultPrompt) {
+              setDefaultSttButton.setDisabled(false);
+            } else {
+              setDefaultSttButton.setDisabled(true);
+            }
+          }
+        }
+      });
+    });
 
     // 텍스트에어리어를 별도의 div로 감싸고, 클래스를 부여
     promptSettingDiv = containerEl.createDiv({ cls: "transcription-prompt-setting" });
@@ -988,15 +1073,28 @@ async activateTab(tabId: string): Promise<void> {
       .addTextArea((text) => {
         const currentModel = this.plugin.settingsv2.recording.sttModel;
         const currentPrompt = this.plugin.settingsv2.recording.sttPrompt[currentModel] || "";
+        initialSttPrompt = currentPrompt; // 초기값 저장
         
         text
           .setPlaceholder("Enter prompt for transcribing")
           .setValue(currentPrompt)
           .onChange(async (value) => {
             const selectedModel = this.plugin.settingsv2.recording.sttModel;
-            if (selectedModel === "gpt-4o-mini-transcribe" || selectedModel === "gpt-4o-transcribe") {
+            if (selectedModel === "gpt-4o-mini-transcribe" || 
+                selectedModel === "gpt-4o-transcribe" ||
+                selectedModel === "gemini-2.0-flash" ||
+                selectedModel === "gemini-2.5-flash") {
               this.plugin.settingsv2.recording.sttPrompt[selectedModel] = value;
               await this.plugin.settingsv2.saveSettings();
+              
+              // 버튼 상태 업데이트
+              const defaultPrompt = this.plugin.defaultPrompts.sttPrompt[selectedModel] || "";
+              if (setDefaultSttButton) {
+                setDefaultSttButton.setDisabled(value === defaultPrompt);
+              }
+              if (revertSttButton) {
+                revertSttButton.setDisabled(value === initialSttPrompt);
+              }
             }
           });
 
@@ -1005,15 +1103,29 @@ async activateTab(tabId: string): Promise<void> {
         promptTextArea.style.width = "100%";
         promptTextArea.style.height = "150px";
         promptTextArea.style.resize = "none";
+        
+        // 초기 버튼 상태 설정
+        const initModel = this.plugin.settingsv2.recording.sttModel;
+        const defaultPrompt = this.plugin.defaultPrompts.sttPrompt[initModel] || "";
+        if (setDefaultSttButton) {
+          setDefaultSttButton.setDisabled(currentPrompt === defaultPrompt);
+        }
+        if (revertSttButton) {
+          revertSttButton.setDisabled(true); // 초기에는 항상 비활성화
+        }
       });
 
     // 드롭다운 값에 따라 최초 표시/숨김 상태를 정확히 반영 (display로 직접 제어)
     const currentSttModel = this.plugin.settingsv2.recording.sttModel;
     if (currentSttModel !== "gpt-4o-mini-transcribe" 
-      && currentSttModel !== "gpt-4o-transcribe") {
+      && currentSttModel !== "gpt-4o-transcribe"
+      && currentSttModel !== "gemini-2.0-flash"
+      && currentSttModel !== "gemini-2.5-flash") {
       promptSettingDiv.style.display = "none";
+      if (promptButtonsDiv) promptButtonsDiv.style.display = "none";
     } else {
       promptSettingDiv.style.display = "";
+      if (promptButtonsDiv) promptButtonsDiv.style.display = "";
     }
     
     new Setting(containerEl)

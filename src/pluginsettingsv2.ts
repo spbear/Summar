@@ -410,7 +410,7 @@ export class PluginSettingsV2 {
   /**
    * V1 설정에서 V2 설정으로 마이그레이션합니다
    */
-  async migrateFromV1(v1Settings: any): Promise<void> {
+  async migrateFromV1(v1Settings: any, defaultPrompts?: any): Promise<void> {
     SummarDebug.log(1, "Starting migration from V1 to V2 settings");
 
     try {
@@ -445,7 +445,9 @@ export class PluginSettingsV2 {
       // sttPrompt를 객체 형태로 마이그레이션
       this.recording.sttPrompt = {
         "gpt-4o-transcribe": v1Settings.sttPrompt || "",
-        "gpt-4o-mini-transcribe": ""
+        "gpt-4o-mini-transcribe": "",
+        "gemini-2.0-flash": defaultPrompts?.sttPrompt?.["gemini-2.0-flash"] || "",
+        "gemini-2.5-flash": defaultPrompts?.sttPrompt?.["gemini-2.5-flash"] || ""
       };
       
       if (v1Settings.transcriptSummaryModel !== undefined) this.recording.transcriptSummaryModel = v1Settings.transcriptSummaryModel;

@@ -92,7 +92,7 @@ export type ModelCategory = 'webModel' | 'pdfModel' | 'sttModel' | 'transcriptSu
 export interface DefaultPrompts {
     webPrompt: string;
     pdfPrompt: string;
-    sttPrompt: string;
+    sttPrompt: { [modelKey: string]: string };
     transcriptSummaryPrompt: string;
     refineSummaryPrompt: string;
 }
@@ -100,7 +100,7 @@ export interface DefaultPrompts {
 export interface PromptList {
     webPrompt: string[];
     pdfPrompt: string[];
-    sttPrompt: string[];
+    sttPrompt: { [modelKey: string]: string[] };
     transcriptSummaryPrompt: string[];
     refineSummaryPrompt: string[];
 }
