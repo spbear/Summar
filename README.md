@@ -48,6 +48,43 @@ Copy the build output to your Obsidian plugins directory and enable Summar in Ob
 
 ---
 
+## Documentation
+
+For detailed usage instructions, feature explanations, and tips on how to effectively use all of Summar's capabilities, please refer to our comprehensive user manual:
+
+📖 **[User Manual](docs/user-manual.md)** - Complete guide covering all features, settings, and integrations
+
+The user manual includes:
+- Step-by-step configuration guides for all settings tabs
+- Complete feature explanations for SummarView interface
+- Command palette and context menu integrations
+- Keyboard shortcuts and tips for optimal usage
+- Platform-specific features and limitations
+
+---
+
+## Advanced Documentation
+
+For developers and advanced users, additional technical documentation is available:
+
+### 📋 **[Transcription Summary PRD](docs/transcription-summary-prd.md)** - Product Requirements Document
+Comprehensive technical specification for the transcription and summarization features, including:
+- Detailed feature requirements and user scenarios
+- Audio-to-text (STT) and text summarization workflows
+- File naming conventions and folder structures
+- Configuration options and error handling
+- Future feature ideation and implementation considerations
+
+### ⚙️ **[Configuration Schema Documentation](docs/json-schema.md)** - Settings & Data Structure Guide
+Complete reference for Summar's configuration files and data structures:
+- JSON schema documentation for all configuration files
+- Settings structure and data types for each feature tab
+- Migration guides between configuration versions
+- API integration settings and model configurations
+- Troubleshooting configuration-related issues
+
+---
+
 ## Contributing & Issues
 
 - Pull requests and issues are welcome!
