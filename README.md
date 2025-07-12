@@ -52,7 +52,7 @@ Copy the build output to your Obsidian plugins directory and enable Summar in Ob
 
 For detailed usage instructions, feature explanations, and tips on how to effectively use all of Summar's capabilities, please refer to our comprehensive user manual:
 
-📖 **[User Manual](docs/user-manual.md)** - Complete guide covering all features, settings, and integrations
+### 📖 **[User Manual](docs/user-manual.md)** - Complete guide covering all features, settings, and integrations
 
 The user manual includes:
 - Step-by-step configuration guides for all settings tabs
