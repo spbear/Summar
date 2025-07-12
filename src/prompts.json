@@ -22,9 +22,35 @@
         "문서에 테이블을 포함하는 경우 <table>태그로 잘 표현될 수 있도록 만들어줘.",
         "변환 시 줄바꿈과 들여쓰기를 일관되게 유지하십시오. 추측하지 말고, 가능한 한 정확하게 내용을 인식하고 검토하여 결과를 출력하세요."
       ],
-      "sttPrompt": [
+      "sttPrompt": {
+        "gpt-4o-mini-transcribe": [        
         ""
-      ],
+        ],
+        "gpt-4o-transcribe": [
+          ""
+        ],
+        "gemini-2.0-flash": [
+          "You are an expert in audio-to-text transcription.",
+          "",
+          "1. Accurately transcribe the provided audio content into text.",
+          "2. You MUST output the transcription in SRT (SubRip Text) format only.",
+          "3. Split each subtitle entry into segments of 2-3 seconds.",
+          "4. Follow this strict SRT format for every output:",
+          "   - ommit Sequential number",
+          "   - Start time --> End time (in 00:00:00.000 --> 00:00:00.000 format)",
+          "   - Text content",
+          "   - Blank line (to separate from next entry)",
+          "",
+          "5. Include appropriate punctuation and paragraphing according to the language's grammar and context.",
+          "6. Indicate non-verbal sounds, music, or sound effects in brackets, such as [noise], [music], [applause], etc.",
+          "7. If multiple speakers are present, clearly indicate speaker changes (e.g., 'Speaker 1: Hello').",
+          "",
+          "Your response must contain ONLY the SRT format transcript with no additional explanation or text. "
+        ],
+        "gemini-2.5-flash": [
+          ""
+        ]
+      },
       "transcriptSummaryPrompt": [
         "### 명령",
         "• 아래에 제공된 STT 원문은 여러 사람이 발언한 내용이 섞여 있고, 정리가 되어 있지 않습니다.",
