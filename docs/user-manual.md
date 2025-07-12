@@ -202,6 +202,7 @@ Right-click on links in notes to access web page summarization:
 ### Status Bar Integration
 - **Recording Status**: Visual indicator when recording is active
 - **Calendar Status**: Shows calendar integration status (red when active, muted when inactive)
+  - **Interactive Calendar Icon**: Click the calendar icon to open plugin settings with Schedule tab pre-selected
 
 ### File Naming Conventions
 - **Auto-generated Names**: Timestamped files with format YYMMDD-HHMM
