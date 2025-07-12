@@ -123,4 +123,10 @@ Complete reference for Summar's configuration files and data structures:
 - **2025-07-03**: Added macOS installer for easy plugin installation and distribution
 - **2025-07-05**: Added Daily Notes integration for automatic meeting note linking and optimized transcription workflow
 - **2025-07-06**: Updated app icon design and improved UI consistency across all platforms
-- **2025-07-07**: Enhanced calendar event prioritization with improved scoring system and refactored file loading for better error handling 
+- **2025-07-07**: Enhanced calendar event prioritization with improved scoring system and refactored file loading for better error handling
+- **2025-07-08**: Added 2-hour recording time limit with modal confirmation, enhanced plugin loading with indicators, and improved calendar data loading with error handling
+- **2025-07-08**: Improved recording confirmation modal layout and fixed button text overflow issues
+- **2025-07-10**: Updated manifest.json and improved version management
+- **2025-07-11**: Enhanced JSON schema documentation with detailed file loading order and user settings protection
+- **2025-07-12**: Refactored settings structure to v2.0 with model-specific STT prompt configurations and enhanced migration process
+- **2025-07-12**: Added comprehensive user manual documentation with detailed feature guides and tips for optimal usage 
