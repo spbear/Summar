@@ -1,6 +1,31 @@
 import Foundation
+import AppKit
 
 struct PluginManager {
+    // 개선된 로케일 감지 함수
+    private static func detectCurrentLocale() -> String {
+        let preferredLangs = Locale.preferredLanguages
+        let langCode = Locale.current.language.languageCode?.identifier ?? "en"
+        
+        // 사용자의 선호 언어를 우선적으로 확인
+        if let firstPreferred = preferredLangs.first {
+            if firstPreferred.hasPrefix("ko") {
+                return "ko"
+            } else if firstPreferred.hasPrefix("ja") {
+                return "ja"
+            }
+        }
+        
+        // fallback으로 시스템 언어 코드 확인
+        if langCode == "ko" {
+            return "ko"
+        } else if langCode == "ja" {
+            return "ja"
+        }
+        
+        return "en"
+    }
+    
     static func findObsidianVaults() -> [URL] {
         let home = URL(fileURLWithPath: NSHomeDirectoryForUser(NSUserName()) ?? "/Users/Shared", isDirectory: true)
 
@@ -47,5 +72,13 @@ struct PluginManager {
             try? FileManager.default.removeItem(at: target)
             try FileManager.default.copyItem(at: item, to: target)
         }
+    }
+    
+    // Obsidian vault 설치 완료 알림 (모든 vault 설치 완료 후 한 번만 표시)
+    static func notifyInstallationComplete(installedVaults: [String], communityPluginsEnabled: Bool) {
+        print("✅ Installation complete for \(installedVaults.count) vault(s): \(installedVaults.joined(separator: ", "))")
+        
+        // Alert 대신 로그 메시지만 출력
+        // UI에서 설치 완료 메시지를 표시함
     }
 }
