@@ -58,6 +58,33 @@ cp -R "$APP_BUILD_PATH" "$DMG_TEMP_DIR/"
 echo "📋 Adding installation troubleshooting guide..."
 cp "./Summar Installer/security-guide.html" "$DMG_TEMP_DIR/If Installation Blocked.html"
 
+# Create web link shortcuts for DMG
+echo "🔗 Adding web link shortcuts..."
+
+# Create README link
+cat > "$DMG_TEMP_DIR/Read Me.webloc" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>URL</key>
+	<string>https://github.com/mcgabby/Summar/blob/main/README.md</string>
+</dict>
+</plist>
+EOF
+
+# Create Feature Guide link
+cat > "$DMG_TEMP_DIR/Feature Guide.webloc" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>URL</key>
+	<string>https://github.com/mcgabby/Summar/blob/main/docs/user-manual.md</string>
+</dict>
+</plist>
+EOF
+
 echo "📦 Creating DMG: ./dist/$DMG_NAME"
 
 # Create DMG with better compression
@@ -75,6 +102,8 @@ echo ""
 echo "📋 DMG Contents:"
 echo "  📱 Summar Installer.app - Main installer application"
 echo "  📄 If Installation Blocked.html - Troubleshooting guide (Korean/English)"
+echo "  📖 Read Me.webloc - Project README and documentation"
+echo "  📚 Feature Guide.webloc - User manual and feature guide"
 echo ""
 echo "🔒 If installation is blocked, open 'If Installation Blocked.html'"
 echo "🌐 The guide automatically displays in Korean or English based on browser language!"

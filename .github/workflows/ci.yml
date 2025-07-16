@@ -1,14 +1,8 @@
 name: Summar Plugin CI/CD
 
 on:
-  push:
-    branches: [ mcwork ]
-    paths:
-      - 'src/manifest.json'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'src/manifest.json'
+  schedule:
+    - cron: '0 22 * * *'  # 매일 22:00 UTC = 한국 시간 07:00 (UTC+9)
 
 jobs:
   test:
@@ -42,15 +36,6 @@ jobs:
       
     - name: Build plugin
       run: npm run build
-      
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: summar-plugin-build-${{ matrix.node-version }}
-        path: |
-          dist/
-          !dist/node_modules
-        retention-days: 7
         
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -85,10 +70,3 @@ jobs:
       
     - name: Build installer (macOS)
       run: npm run build-installer
-      
-    - name: Upload installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: summar-installer-macos
-        path: dist/*.dmg
-        retention-days: 30
