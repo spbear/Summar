@@ -192,6 +192,69 @@ Right-click on links in notes to access web page summarization:
 - **Result Display**: Shows summarization progress and results in SummarView
 - **Error Handling**: Graceful handling of invalid URLs or network issues
 
+## 7. Testing & Development
+
+### Automated Testing Setup
+
+The Summar plugin includes a comprehensive testing framework to ensure reliability and ease development:
+
+#### Test Types
+- **Unit Tests**: Test individual components and functions in isolation
+- **Integration Tests**: Test workflows and component interactions
+- **E2E Tests**: Test the plugin in a real Obsidian environment
+
+#### Available Test Commands
+```bash
+# Run all unit tests
+npm run test:unit
+
+# Run integration tests
+npm run test:integration
+
+# Run E2E tests (requires local Obsidian setup)
+npm run test:e2e
+
+# Run all tests with coverage
+npm run test:coverage
+
+# Watch mode for development
+npm run test:watch
+
+# Complete build and test pipeline
+npm run build:test
+```
+
+#### Development Workflow
+```bash
+# Quick development cycle
+npm run dev:test
+
+# Manual workflow
+npm run build
+npm run deploy:local
+npm run obsidian:reload
+```
+
+#### VSCode Integration
+Use the built-in tasks (Ctrl/Cmd+Shift+P → "Tasks: Run Task"):
+- **Build Plugin**: Standard build process
+- **Build and Test**: Complete testing pipeline
+- **Dev Mode**: Build, deploy, and reload Obsidian
+- **Deploy to Obsidian**: Deploy to local Obsidian vault
+
+#### Setting Up Test Environment
+1. **Create Test Vault**: Set up an Obsidian vault for testing
+2. **Configure Paths**: Update `scripts/deploy-local.sh` with your vault path
+3. **Install Dependencies**: Run `npm install` to get test dependencies
+4. **Run Tests**: Use any of the test commands above
+
+#### Continuous Integration
+The project includes GitHub Actions for automated testing on:
+- Multiple Node.js versions (18.x, 20.x)
+- Unit and integration tests
+- Build verification
+- Automated installer creation (macOS)
+
 ## Additional Tips
 
 ### Keyboard Shortcuts

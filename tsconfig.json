@@ -13,7 +13,9 @@
     "isolatedModules": true,
     "strictNullChecks": true,
     "esModuleInterop": true,
-    "typeRoots": ["./node_modules/@types", "./types"],
+    "skipLibCheck": true,
+    "typeRoots": ["./node_modules/@types"],
+    "types": ["jest", "node"],
     "lib": [
       "DOM",
       "ES5",
@@ -22,6 +24,13 @@
     ]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.js",
+    "**/*.cjs"
   ]
 }

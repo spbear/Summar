@@ -29,7 +29,7 @@ struct PluginManager {
     static func findObsidianVaults() -> [URL] {
         let home = URL(fileURLWithPath: NSHomeDirectoryForUser(NSUserName()) ?? "/Users/Shared", isDirectory: true)
 
-//        print("🔍 Searching for vaults under: \(home.path)")
+        print("🔍 Searching for vaults under: \(home.path)")
 
         var vaults: Set<URL> = []
 
@@ -41,18 +41,22 @@ struct PluginManager {
 
         while let file = enumerator?.nextObject() as? URL {
             // 디버깅용: 현재 검사 중인 경로 출력
-//            print("📂 Checking: \(file.path)")
+            let relativeDepth = file.pathComponents.count - home.pathComponents.count
+            if file.path.contains("Obsidian") || file.path.contains(".obsidian") {
+                print("📂 Checking: \(file.path) (depth: \(relativeDepth))")
+            }
 
             if file.lastPathComponent == ".obsidian" {
                 let vaultDir = file.deletingLastPathComponent()
-//                print("✅ Found vault: \(vaultDir.path)")
+                print("✅ Found vault: \(vaultDir.path)")
                 vaults.insert(vaultDir)
             }
 
-            // 깊이 제한: 너무 깊은 경로는 탐색 생략
-            let relativeDepth = file.pathComponents.count - home.pathComponents.count
-            if relativeDepth >= 3 {
-//                print("⏭ Skipping deeper path: \(file.path)")
+            // 깊이 제한을 5로 증가: Documents/Obsidian/VaultName/.obsidian까지 허용
+            if relativeDepth >= 5 {
+                if file.path.contains("Obsidian") {
+                    print("⏭ Skipping deeper path: \(file.path) (depth: \(relativeDepth))")
+                }
                 enumerator?.skipDescendants()
             }
         }
