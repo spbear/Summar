@@ -410,3 +410,18 @@ export class SummarTooltip {
     this.hideTooltip();
   }
 }
+
+// 파일명을 안전하게 처리하는 함수 (파일 시스템 + markdown 링크 호환성)
+export function sanitizeFileName(fileName: string): string {
+  // 파일 시스템에서 문제가 되는 문자들과 markdown 링크에서 문제가 되는 문자들을 제거
+  // 파일 시스템: < > : " / \ | ? *
+  // Markdown 링크: # [ ] ^ | ( )
+  // 추가로 백틱, 언더스코어, 틸드 등도 문제가 될 수 있음
+  return fileName
+    .replace(/[<>:"/\\|?*#\[\]^(){}`;~`]/g, '-')  // 특수문자를 하이픈으로 변환
+    .replace(/\s+/g, '_')  // 공백을 언더스코어로 변환
+    .replace(/_{2,}/g, '_')  // 연속된 언더스코어를 하나로 변환
+    .replace(/-{2,}/g, '-')  // 연속된 하이픈을 하나로 변환
+    .replace(/^[-_]+|[-_]+$/g, '')  // 시작과 끝의 하이픈, 언더스코어 제거
+    .trim();
+}

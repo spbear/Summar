@@ -1,5 +1,5 @@
 import { normalizePath } from "obsidian";
-import { SummarDebug } from "./globals";
+import { SummarDebug, sanitizeFileName } from "./globals";
 import SummarPlugin from "./main";
 
 export interface DailyNotesConfig {
@@ -189,7 +189,10 @@ export class DailyNotesHandler {
             // 회의록 링크 생성
             const meetingFileName = meetingFilePath.split('/').pop()?.replace('.md', '') || 'Unknown';
             
-            const linkLine = `- [[${meetingFileName}]]`;
+            // 파일명을 안전하게 처리하여 markdown 링크에서 문제가 되는 문자들을 제거
+            const safeMeetingFileName = sanitizeFileName(meetingFileName);
+            
+            const linkLine = `- [[${safeMeetingFileName}]]`;
 
             // 링크가 이미 존재하는지 확인 (중복 방지)
             if (dailyNoteContent.includes(linkLine)) {

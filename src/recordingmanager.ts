@@ -1,6 +1,6 @@
 import { normalizePath, Platform } from "obsidian";
 import SummarPlugin from "./main";
-import { SummarDebug, SummarViewContainer, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath } from "./globals";
+import { SummarDebug, SummarViewContainer, getDeviceId, getDeviceIdFromLabel, getAvailableFilePath, sanitizeFileName } from "./globals";
 import { SummarAI } from "./summarai";
 import { NativeAudioRecorder } from "./audiorecorder";
 import { RecordingTimer } from "./recordingtimer";
@@ -244,7 +244,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			if (currentEvent) {
 				meetingInfo = this.plugin.calendarHandler.formatEventInfo(currentEvent);
 				// 미팅 제목을 폴더명에 포함 (파일시스템에 안전한 문자만 사용)
-				const safeMeetingTitle = currentEvent.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+				const safeMeetingTitle = sanitizeFileName(currentEvent.title);
 				folderSuffix = `_${safeMeetingTitle}`;
 				SummarDebug.log(1, `Found calendar event: ${currentEvent.title}`);
 			} else {
