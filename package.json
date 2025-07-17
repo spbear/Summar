@@ -23,10 +23,11 @@
 		"test:unit": "jest tests/unit --config jest.config.cjs",
 		"test:integration": "jest tests/integration --config jest.config.cjs",
 		"test:e2e": "./scripts/test-e2e.sh",
-		"test:watch": "jest --watch",
-		"test:coverage": "jest --coverage",
+		"test:watch": "jest --watch --config jest.config.cjs",
+		"test:coverage": "jest --coverage --config jest.config.cjs",
 		"test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
 		"build:test": "npm run build && npm run test:all",
+		"build:full": "./scripts/build-and-test.sh",
 		"dev:test": "npm run build && npm run deploy:local && npm run test:e2e",
 		"deploy:local": "./scripts/deploy-local.sh",
 		"obsidian:reload": "./scripts/reload-obsidian.sh"

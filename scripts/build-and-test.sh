@@ -14,7 +14,6 @@ NC='\033[0m' # No Color
 # Configuration
 OBSIDIAN_VAULT_PATH="$HOME/Documents/Obsidian/TestVault"
 TEST_RESULTS_DIR="./test-results"
-BACKUP_DIR="./backups"
 
 # Function to print colored output
 print_status() {
@@ -74,31 +73,48 @@ check_prerequisites() {
     fi
 }
 
-# Function to backup current plugin
-backup_current_plugin() {
-    if [ -d "$OBSIDIAN_VAULT_PATH/.obsidian/plugins/summar" ]; then
-        print_status "Backing up current plugin..."
-        mkdir -p "$BACKUP_DIR"
-        BACKUP_NAME="summar-backup-$(date +%Y%m%d-%H%M%S)"
-        cp -r "$OBSIDIAN_VAULT_PATH/.obsidian/plugins/summar" "$BACKUP_DIR/$BACKUP_NAME"
-        print_success "Backup created: $BACKUP_DIR/$BACKUP_NAME"
-    fi
-}
-
 # Function to run tests with timeout
 run_with_timeout() {
     local timeout_duration=$1
     local command=$2
     
-    timeout "$timeout_duration" bash -c "$command" || {
-        local exit_code=$?
-        if [ $exit_code -eq 124 ]; then
-            print_error "Command timed out after $timeout_duration seconds"
+    # Convert timeout format (e.g., "60s" to "60")
+    local timeout_seconds=${timeout_duration%s}
+    
+    # macOS doesn't have timeout by default, use alternative approach
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Try using gtimeout (from coreutils) first
+        if command -v gtimeout &> /dev/null; then
+            gtimeout "$timeout_duration" bash -c "$command" || {
+                local exit_code=$?
+                if [ $exit_code -eq 124 ]; then
+                    print_error "Command timed out after $timeout_duration seconds"
+                else
+                    print_error "Command failed with exit code $exit_code"
+                fi
+                return $exit_code
+            }
         else
-            print_error "Command failed with exit code $exit_code"
+            # Fallback: just run the command without timeout on macOS
+            print_warning "timeout/gtimeout not available, running without timeout..."
+            bash -c "$command" || {
+                local exit_code=$?
+                print_error "Command failed with exit code $exit_code"
+                return $exit_code
+            }
         fi
-        return $exit_code
-    }
+    else
+        # Linux has timeout by default
+        timeout "$timeout_duration" bash -c "$command" || {
+            local exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+                print_error "Command timed out after $timeout_duration seconds"
+            else
+                print_error "Command failed with exit code $exit_code"
+            fi
+            return $exit_code
+        }
+    fi
 }
 
 # Main execution
@@ -109,13 +125,9 @@ main() {
     
     # Create directories
     mkdir -p "$TEST_RESULTS_DIR"
-    mkdir -p "$BACKUP_DIR"
     
     # Check prerequisites
     check_prerequisites
-    
-    # Backup current plugin if exists
-    backup_current_plugin
     
     # Step 1: Install dependencies
     print_status "Installing dependencies..."
@@ -197,7 +209,6 @@ main() {
 ## Files Generated
 - Build artifacts in \`./dist/\`
 - Test results in \`./test-results/\`
-- Plugin backup in \`./backups/\`
 
 ## Manual Testing Checklist
 - [ ] Plugin loads without errors
