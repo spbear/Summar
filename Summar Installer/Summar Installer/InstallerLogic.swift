@@ -7,7 +7,150 @@ class InstallerLogic {
         self.log = logHandler
     }
 
+    // Swift runtime 체크 및 설치
+    func checkAndInstallSwiftRuntime() async throws {
+        log("🔍 Checking Swift runtime...")
+        
+        if isSwiftRuntimeInstalled() {
+            log("✅ Swift runtime is already installed")
+            return
+        }
+        
+        log("⚠️ Swift runtime not found. Installing...")
+        try await installSwiftRuntime()
+        
+        // 설치 후 재확인
+        if isSwiftRuntimeInstalled() {
+            log("✅ Swift runtime installed successfully")
+        } else {
+            throw InstallerError.swiftRuntimeInstallationFailed
+        }
+    }
+    
+    private func isSwiftRuntimeInstalled() -> Bool {
+        // Swift 명령어가 존재하고 실행 가능한지 확인
+        let swiftPaths = [
+            "/usr/bin/swift",
+            "/usr/local/bin/swift",
+            "/opt/homebrew/bin/swift"
+        ]
+        
+        for path in swiftPaths {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                // swift --version 명령어로 실제 동작 확인
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: path)
+                process.arguments = ["--version"]
+                
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = pipe
+                
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    
+                    if process.terminationStatus == 0 {
+                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                        if let output = String(data: data, encoding: .utf8), 
+                           output.lowercased().contains("swift") {
+                            return true
+                        }
+                    }
+                } catch {
+                    continue
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    private func installSwiftRuntime() async throws {
+        // Xcode Command Line Tools 설치 시도
+        log("📦 Installing Xcode Command Line Tools (includes Swift runtime)...")
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+        process.arguments = ["--install"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        try process.run()
+        
+        // 프로세스가 완료될 때까지 대기 (최대 30초)
+        let startTime = Date()
+        while process.isRunning {
+            if Date().timeIntervalSince(startTime) > 30 {
+                process.terminate()
+                throw InstallerError.swiftRuntimeInstallationTimeout
+            }
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5초 대기
+        }
+        
+        if process.terminationStatus != 0 {
+            // Command Line Tools가 이미 설치되어 있거나 다른 방법으로 설치 시도
+            log("ℹ️ Xcode Command Line Tools might already be installed or installation dialog appeared")
+            
+            // 사용자에게 Homebrew를 통한 Swift 설치 안내
+            try await installSwiftViaHomebrew()
+        }
+    }
+    
+    private func installSwiftViaHomebrew() async throws {
+        log("🍺 Attempting to install Swift via Homebrew...")
+        
+        // Homebrew가 설치되어 있는지 확인
+        let homebrewPaths = [
+            "/usr/local/bin/brew",
+            "/opt/homebrew/bin/brew"
+        ]
+        
+        var brewPath: String?
+        for path in homebrewPaths {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                brewPath = path
+                break
+            }
+        }
+        
+        guard let validBrewPath = brewPath else {
+            // Homebrew가 없으면 설치 안내
+            throw InstallerError.homebrewNotFound
+        }
+        
+        // brew install swift 실행
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: validBrewPath)
+        process.arguments = ["install", "swift"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        try process.run()
+        
+        // 설치 완료까지 대기 (최대 5분)
+        let startTime = Date()
+        while process.isRunning {
+            if Date().timeIntervalSince(startTime) > 300 { // 5분
+                process.terminate()
+                throw InstallerError.swiftRuntimeInstallationTimeout
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1초 대기
+        }
+        
+        if process.terminationStatus != 0 {
+            throw InstallerError.swiftRuntimeInstallationFailed
+        }
+    }
+
     func installPlugin(from url: URL, into vaults: [URL]) async throws {
+        // Swift runtime 체크를 먼저 수행
+        try await checkAndInstallSwiftRuntime()
+        
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SummarInstaller")
         let zipPath = tempDir.appendingPathComponent("summar.zip")
         let extractedPath = tempDir.appendingPathComponent("unzipped")
@@ -225,5 +368,23 @@ class InstallerLogic {
         }
         
         return communityPluginsWereEnabled
+    }
+}
+
+// Swift runtime 설치 관련 에러 타입
+enum InstallerError: Error, LocalizedError {
+    case swiftRuntimeInstallationFailed
+    case swiftRuntimeInstallationTimeout
+    case homebrewNotFound
+    
+    var errorDescription: String? {
+        switch self {
+        case .swiftRuntimeInstallationFailed:
+            return "Swift runtime installation failed. Please install Xcode Command Line Tools manually by running 'xcode-select --install' in Terminal."
+        case .swiftRuntimeInstallationTimeout:
+            return "Swift runtime installation timed out. Please install Xcode Command Line Tools manually."
+        case .homebrewNotFound:
+            return "Neither Xcode Command Line Tools nor Homebrew found. Please install one of them first.\n\nTo install Xcode Command Line Tools: xcode-select --install\nTo install Homebrew: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        }
     }
 }

@@ -146,6 +146,85 @@ struct ContentView: View {
         default: return "✅ The plugin is automatically activated and ready to use!"
         }
     }
+    
+    // Swift runtime 관련 다국어 메시지
+    private func swiftRuntimeFailedMessage() -> [String] {
+        switch currentLocale {
+        case "ko":
+            return [
+                "❌ Swift runtime 설치 실패",
+                "🔧 Xcode Command Line Tools를 수동으로 설치해주세요:",
+                "   터미널을 열고 실행: xcode-select --install"
+            ]
+        case "ja":
+            return [
+                "❌ Swift runtimeのインストールに失敗しました",
+                "🔧 Xcode Command Line Toolsを手動でインストールしてください：",
+                "   ターミナルで実行: xcode-select --install"
+            ]
+        default:
+            return [
+                "❌ Swift runtime installation failed",
+                "🔧 Please install Xcode Command Line Tools manually:",
+                "   Open Terminal and run: xcode-select --install"
+            ]
+        }
+    }
+    
+    private func swiftRuntimeTimeoutMessage() -> [String] {
+        switch currentLocale {
+        case "ko":
+            return [
+                "⏱️ Swift runtime 설치 시간 초과",
+                "🔧 Xcode Command Line Tools를 수동으로 설치해주세요:",
+                "   터미널을 열고 실행: xcode-select --install"
+            ]
+        case "ja":
+            return [
+                "⏱️ Swift runtimeのインストールがタイムアウトしました",
+                "🔧 Xcode Command Line Toolsを手動でインストールしてください：",
+                "   ターミナルで実行: xcode-select --install"
+            ]
+        default:
+            return [
+                "⏱️ Swift runtime installation timed out",
+                "🔧 Please install Xcode Command Line Tools manually:",
+                "   Open Terminal and run: xcode-select --install"
+            ]
+        }
+    }
+    
+    private func homebrewNotFoundMessage() -> [String] {
+        switch currentLocale {
+        case "ko":
+            return [
+                "❌ Swift runtime을 찾을 수 없습니다",
+                "🔧 다음 중 하나를 설치해주세요:",
+                "   옵션 1: Xcode Command Line Tools",
+                "   터미널에서 실행: xcode-select --install",
+                "   옵션 2: Homebrew",
+                "   방문: https://brew.sh"
+            ]
+        case "ja":
+            return [
+                "❌ Swift runtimeが見つかりません",
+                "🔧 以下のいずれかをインストールしてください：",
+                "   オプション1: Xcode Command Line Tools",
+                "   ターミナルで実行: xcode-select --install",
+                "   オプション2: Homebrew",
+                "   アクセス: https://brew.sh"
+            ]
+        default:
+            return [
+                "❌ Swift runtime not found",
+                "🔧 Please install one of the following:",
+                "   Option 1: Xcode Command Line Tools",
+                "   Run in Terminal: xcode-select --install",
+                "   Option 2: Homebrew",
+                "   Visit: https://brew.sh"
+            ]
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -268,8 +347,25 @@ struct ContentView: View {
                     isInstalling = false
                 }
             } catch {
-                logMessages.append("❌ Installation failed: \(error.localizedDescription)")
-                isInstalling = false
+                DispatchQueue.main.async {
+                    // Swift runtime 관련 에러에 대한 특별 처리
+                    if let installerError = error as? InstallerError {
+                        switch installerError {
+                        case .swiftRuntimeInstallationFailed:
+                            logMessages.append(contentsOf: swiftRuntimeFailedMessage())
+                        case .swiftRuntimeInstallationTimeout:
+                            logMessages.append(contentsOf: swiftRuntimeTimeoutMessage())
+                        case .homebrewNotFound:
+                            logMessages.append(contentsOf: homebrewNotFoundMessage())
+                        }
+                    } else {
+                        let errorMessage = currentLocale == "ko" ? "❌ 설치 실패: \(error.localizedDescription)" :
+                                         currentLocale == "ja" ? "❌ インストール失敗: \(error.localizedDescription)" :
+                                         "❌ Installation failed: \(error.localizedDescription)"
+                        logMessages.append(errorMessage)
+                    }
+                    isInstalling = false
+                }
             }
         }
     }
