@@ -1,6 +1,6 @@
 import { TFile, TFolder, normalizePath, RequestUrlParam } from "obsidian";
 import SummarPlugin from "./main";
-import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath } from "./globals";
+import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath, sanitizeFileName } from "./globals";
 import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
 import { get } from "http";
@@ -56,12 +56,12 @@ export class AudioHandler extends SummarViewContainer {
 		
 		if (!givenFolderPath || givenFolderPath.length===0) {
 			if (sortedFiles.length === 1) {
-				folderPath  = sortedFiles[0].name.substring(0,sortedFiles[0].name.lastIndexOf('.')) || sortedFiles[0].name;
+				folderPath  = sanitizeFileName(sortedFiles[0].name.substring(0,sortedFiles[0].name.lastIndexOf('.')) || sortedFiles[0].name);
 				originalFolderPath = folderPath;
 				noteFilePath = normalizePath(`${this.plugin.settingsv2.recording.recordingDir}`);
 				SummarDebug.log(1, `sendAudioData - only one file`)
 			} else {
-				folderPath = getCommonFolderPath(sortedFiles);
+				folderPath = sanitizeFileName(getCommonFolderPath(sortedFiles));
 				originalFolderPath = folderPath;
 				SummarDebug.log(1, `sendAudioData - Detected folder path: ${folderPath}`); // Debug log
 				noteFilePath = normalizePath(`${this.plugin.settingsv2.recording.recordingDir}/${folderPath}`);
@@ -69,7 +69,7 @@ export class AudioHandler extends SummarViewContainer {
 		} else {
 			noteFilePath = givenFolderPath;
 			const match = givenFolderPath.match(/[^\/]+$/);
-			folderPath = match ? match[0] : noteFilePath;
+			folderPath = match ? sanitizeFileName(match[0]) : sanitizeFileName(noteFilePath);
 			originalFolderPath = folderPath;
 			SummarDebug.log(1, `sendAudioData - Given folder path: ${folderPath}`); // Debug log
 		}
@@ -263,7 +263,7 @@ export class AudioHandler extends SummarViewContainer {
 					const audioFiles = filesToSave.map(f => f.file);
 					const event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
 					if (event) {
-						const safeMeetingTitle = event.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+						const safeMeetingTitle = sanitizeFileName(event.title);
 						// 폴더명에 미팅 제목이 포함되어 있지 않으면 폴더명 업데이트
 						if (!originalFolderPath.includes(safeMeetingTitle)) {
 							SummarDebug.log(1, `Updating folder for existing meeting-info with calendar event: ${event.title}`);
@@ -837,7 +837,7 @@ export class AudioHandler extends SummarViewContainer {
 			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
 		}
 
-		const safeMeetingTitle = event.title.replace(/[<>:"/\\|?*]/g, '-').replace(/\s+/g, '_');
+		const safeMeetingTitle = sanitizeFileName(event.title);
 		
 		// 미팅 제목이 폴더명에 포함되어 있지 않으면 폴더명을 업데이트
 		if (originalFolderPath.includes(safeMeetingTitle)) {

@@ -1,5 +1,5 @@
 import SummarPlugin from "./main";
-import { SummarViewContainer, SummarDebug } from "./globals";
+import { SummarViewContainer, SummarDebug, sanitizeFileName } from "./globals";
 import { SummarAI } from "./summarai";
 import { SummarTimer } from "./summartimer";
 import { PdfToPng } from "./pdftopng";
@@ -211,8 +211,8 @@ export class PdfHandler extends SummarViewContainer {
 	 */
 	async createNewNoteFromPdf(fileName: string, content: string): Promise<void> {
 		try {
-			// PDF 파일명에서 확장자 제거하고 .md 확장자 추가
-			const baseFileName = fileName.replace(/\.pdf$/i, '');
+			// PDF 파일명에서 확장자 제거하고 안전한 파일명으로 변환
+			const baseFileName = sanitizeFileName(fileName.replace(/\.pdf$/i, ''));
 			const now = new Date();
 			const timestamp = now.getFullYear().toString().slice(2) +
 				String(now.getMonth() + 1).padStart(2, "0") +
