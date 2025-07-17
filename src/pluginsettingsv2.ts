@@ -82,7 +82,9 @@ export class PluginSettingsV2 {
     sttModel: "",
     sttPrompt: {
       "gpt-4o-transcribe": "",
-      "gpt-4o-mini-transcribe": ""
+      "gpt-4o-mini-transcribe": "",
+      "gemini-2.0-flash": "",
+      "gemini-2.5-flash": ""
     },
     transcriptSummaryModel: "",
     transcriptSummaryPrompt: "",
@@ -160,14 +162,14 @@ export class PluginSettingsV2 {
     // Recording 섹션 초기화
     Object.assign(this.recording, {
       autoRecordOnZoomMeeting: false,
-      selectedDeviceId: "",
+      selectedDeviceId: {},
       recordingDir: "",
       saveTranscriptAndRefineToNewNote: true,
       addLinkToDailyNotes: true,
       recordingUnit: 15,
       recordingLanguage: "ko-KR",
       sttModel: "",
-      sttPrompt: "",
+      sttPrompt: {},
       transcriptSummaryModel: "",
       transcriptSummaryPrompt: "",
       refineSummary: true,

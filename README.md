@@ -24,10 +24,21 @@ Download and install the latest version using our installer:
 
 1. **Download the installer**: [Summar Installer.dmg](https://github.com/mcgabby/Summar/releases/latest/download/Summar.Installer.dmg)
 2. **Run the installer**: Double-click the downloaded `.dmg` file and follow the installation steps
-3. **Security Warning (macOS)**: If you see a warning that the app cannot be opened because it's from an unidentified developer:
-   - Go to **System Settings** > **Privacy & Security**
-   - Find the message about "Summar Installer was blocked from use because it is not from an identified developer"
-   - Click **"Open Anyway"** to proceed with the installation
+
+#### 🔐 Security Warning (macOS) - MDM/Gatekeeper Bypass
+
+If Summar Installer is blocked by macOS security policies or MDM, the DMG includes a troubleshooting guide to help you resolve this:
+
+**Included Solution:**
+- **If Installation Blocked.html** - Bilingual troubleshooting guide (Korean/English auto-detected) with step-by-step instructions
+
+**Quick Resolution Methods:**
+1. **Fastest method**: Right-click `Summar Installer.app` → Select "Open" → Click "Open" in security dialog
+2. **System Settings method**: 
+   - Go to **System Settings** > **Privacy & Security** > **Security** section
+   - Find the message about "Summar Installer was blocked"
+   - Click **"Open Anyway"** or **"Allow"** 
+3. **Use the guide**: If installation is blocked, open the troubleshooting guide HTML file in the DMG
 
 ### Option 2: Manual Build
 

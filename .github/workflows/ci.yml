@@ -1,0 +1,72 @@
+name: Summar Plugin CI/CD
+
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 매일 22:00 UTC = 한국 시간 07:00 (UTC+9)
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint || true
+      
+    - name: Run unit tests
+      run: npm run test:unit || true
+      
+    - name: Run integration tests
+      run: npm run test:integration || true
+      
+    - name: Build plugin
+      run: npm run build
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.node-version }}
+        path: |
+          test-results/
+          coverage/
+        retention-days: 7
+
+  build-installer:
+    needs: test
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build plugin
+      run: npm run build
+      
+    - name: Build installer (macOS)
+      run: npm run build-installer
