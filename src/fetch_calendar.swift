@@ -53,12 +53,34 @@ if let searchDate = searchDate {
 
 // macOS 14 이상에서는 requestFullAccessToEventsWithCompletion 사용
 func requestCalendarAccess(completion: @escaping (Bool) -> Void) {
+    // 현재 권한 상태 확인
+    let currentStatus: EKAuthorizationStatus
+    if #available(macOS 14.0, *) {
+        currentStatus = EKEventStore.authorizationStatus(for: .event)
+    } else {
+        currentStatus = EKEventStore.authorizationStatus(for: .event)
+    }
+    
+    // 이미 권한이 거부된 경우 사용자에게 알리기
+    if currentStatus == .denied {
+        print("Error: Calendar access previously denied. Please grant access in System Settings > Privacy & Security > Calendar.")
+        completion(false)
+        return
+    }
+    
+    // 권한 요청
     if #available(macOS 14.0, *) {
         eventStore.requestFullAccessToEvents { granted, error in
+            if let error = error {
+                print("Error requesting calendar access: \(error.localizedDescription)")
+            }
             completion(granted && error == nil)
         }
     } else {
         eventStore.requestAccess(to: .event) { granted, error in
+            if let error = error {
+                print("Error requesting calendar access: \(error.localizedDescription)")
+            }
             completion(granted && error == nil)
         }
     }

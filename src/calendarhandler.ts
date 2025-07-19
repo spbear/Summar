@@ -2,7 +2,7 @@ import { Platform, normalizePath, FileSystemAdapter, Modal, App } from "obsidian
 import { spawn, exec } from "child_process";
 import { promisify } from "util";
 import { SummarDebug } from "./globals";
-import { writeFileSync, unlinkSync } from "fs";
+import { writeFileSync, unlinkSync, truncate } from "fs";
 import SummarPlugin from "./main";
 
 interface CalendarEvent {
@@ -44,6 +44,9 @@ export class CalendarHandler {
     private async init() {
         try {
             if (Platform.isMacOS && Platform.isDesktopApp) {
+                // Swift 환경 사전 검증
+                await this.checkSwiftEnvironment();
+                
                 // 초기 실행
                 await this.updateScheduledMeetings();
                 if (this.plugin.settingsv2.schedule.autoLaunchZoomOnSchedule) {
@@ -70,28 +73,146 @@ export class CalendarHandler {
     }
 
     /**
-     * Checks if Xcode is installed and available on the system.
+     * Checks if Swift is installed and available on the system.
      * Returns true if installed, false otherwise.
+     * This checks for both Xcode-installed Swift or standalone Swift toolchain.
      */
-    async checkXcodeInstalled(): Promise<boolean> {
+    async checkSwiftInstalled(): Promise<boolean> {
         return new Promise((resolve) => {
             const { exec } = require("child_process");
-            exec("xcode-select -p", (error: Error | null, stdout: string, stderr: string) => {
+            exec("which swift", (error: Error | null, stdout: string, stderr: string) => {
                 if (error || !stdout || stdout.trim() === "") {
+                    // Swift가 설치되어 있지 않음
                     resolve(false);
                 } else {
+                    // Swift가 설치되어 있음
                     resolve(true);
                 }
             });
         });
     }
+    
+    /**
+     * 사전에 Swift 환경을 검증하여 모듈 충돌 등의 문제를 감지
+     */
+    async checkSwiftEnvironment(): Promise<void> {
+        try {
+            // Swift가 설치되어 있는지 확인
+            const swiftInstalled = await this.checkSwiftInstalled();
+            if (!swiftInstalled) {
+                // Swift가 없으면 검사 중단 (설치 시 체크할 예정)
+                return;
+            }
+            
+            // 파일 경로 설정
+            const basePath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath());
+            const wrapperPath = basePath + "/.obsidian/plugins/summar/fetch_calendar_wrapper.sh";
+            
+            // 래퍼 스크립트로 환경 진단 실행
+            const { exec } = require("child_process");
+            const execAsync = promisify(exec);
+            
+            const { stdout, stderr } = await execAsync(`/bin/bash "${wrapperPath}" --check-environment`);
+            
+            // 결과 확인 (모듈 충돌이 있으면 표시)
+            if (stderr && stderr.includes("MODULE_CONFLICT")) {
+                // 모듈 충돌 문제 감지됨
+                const errorMessage = stderr.split("MODULE_CONFLICT:")[1]?.trim() || "Swift 모듈 충돌이 감지되었습니다.";
+                
+                // 사용자에게 알림
+                const notice = SummarDebug.Notice(0, `⚠️ Swift 환경 문제 감지됨\n\n${errorMessage}`, 0);
+                
+                // Swift 환경 재설정 명령어 표시 및 링크 제공
+                if (notice && notice.noticeEl) {
+                    notice.noticeEl.createEl("button", { text: "환경 재설정 방법 복사" }, (button) => {
+                        button.onclick = () => {
+                            navigator.clipboard.writeText("sudo xcode-select --reset\nsudo xcodebuild -runFirstLaunch");
+                            if (notice) notice.hide();
+                            SummarDebug.Notice(0, "명령어가 클립보드에 복사되었습니다. 터미널에서 실행하세요.", 3000);
+                        };
+                    });
+                }
+            }
+        } catch (error) {
+            SummarDebug.error(1, "Swift 환경 검증 오류:", error);
+        }
+    }
+    
+    /**
+     * Legacy method for backward compatibility.
+     * Now checks for Swift instead of Xcode specifically.
+     * @deprecated Use checkSwiftInstalled instead
+     */
+    async checkXcodeInstalled(): Promise<boolean> {
+        return this.checkSwiftInstalled();
+    }
 
     async fetchZoomMeetings(): Promise<ZoomMeeting[]> {
-        // Check if Xcode is installed
-        const xcodeInstalled = await this.checkXcodeInstalled();
-        if (!xcodeInstalled) {
-            SummarDebug.Notice(0, `Xcode is not installed or not properly configured.\n\nCalendar integration via Swift requires Xcode.\n\nHow to install:\n1. Install Xcode from the App Store.\n2. After installation, run the following commands in Terminal:\n\n  sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer\n  sudo xcodebuild -runFirstLaunch\n\nRestart Obsidian after installation.`);
-            throw new Error("Xcode is not installed or not configured.");
+        // Check if Swift is installed
+        const swiftInstalled = await this.checkSwiftInstalled();
+        if (!swiftInstalled) {
+            // 스크립트 경로 구성
+            const basePath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath());
+            const installerPath = basePath + "/.obsidian/plugins/summar/install_swift.sh";
+            
+            // 설치 옵션이 있는 알림 표시
+            const notice = SummarDebug.Notice(0, `Swift가 설치되어 있지 않습니다.\n\n캘린더 기능을 사용하려면 Swift가 필요합니다.\n\n지금 설치하시겠습니까?\n\n설치 방법을 선택하세요:`, 0);
+            
+            // 설치 버튼 추가
+            if (notice && notice.noticeEl) notice.noticeEl.createEl("button", { text: "Swift 자동 설치" }, (button) => {
+                button.style.marginRight = "10px";
+                button.onclick = async () => {
+                    if (notice) notice.hide();
+                    
+                    // 새로운 알림 표시 (진행 중)
+                    const installNotice = SummarDebug.Notice(0, "Swift 설치 준비 중...\n\n터미널이 열리고 설치가 진행됩니다.\n\n관리자 권한이 필요할 수 있으며, 설치 파일 다운로드로 인해 몇 분 정도 소요될 수 있습니다.", 0);
+                    
+                    try {
+                        // 설치 스크립트 실행
+                        const { exec } = require("child_process");
+                        const execAsync = promisify(exec);
+                        await execAsync(`open -a Terminal.app ${installerPath}`);
+                        
+                        // 알림 업데이트
+                        if (installNotice) installNotice.setMessage("Swift 설치가 터미널에서 진행 중입니다.\n\n설치가 완료되면 Obsidian을 재시작해주세요.\n\n설치 중에는 터미널 창을 닫지 마세요.");
+                        
+                        // 30초 후에 알림 내용 업데이트
+                        setTimeout(() => {
+                            if (installNotice) installNotice.setMessage("Swift 설치가 계속 진행 중입니다...\n\n설치가 완료되면 터미널에서 성공 메시지가 표시됩니다.\n\n설치 완료 후 Obsidian을 재시작해주세요.");
+                            
+                            // 1분 후에도 알림 유지
+                            setTimeout(() => {
+                                if (installNotice) installNotice.hide();
+                            }, 60000);
+                        }, 30000);
+                        
+                    } catch (error) {
+                        // 설치 스크립트 실행 실패
+                        if (installNotice) installNotice.hide();
+                        SummarDebug.Notice(0, `Swift 설치 스크립트 실행에 실패했습니다: ${error.message}\n\n수동으로 설치해주세요.`);
+                    }
+                };
+            });
+            
+            // 수동 설치 안내 링크 추가
+            if (notice && notice.noticeEl) notice.noticeEl.createEl("button", { text: "수동 설치 안내" }, (button) => {
+                button.onclick = () => {
+                    if (notice) notice.hide();
+                    SummarDebug.Notice(0, `Swift 수동 설치 방법:\n\n1. Swift 툴체인 설치 (권장, 용량이 작음):\n   - https://www.swift.org/download/ 에서 macOS용 Swift 다운로드\n   - 설치 안내에 따라 설치\n\n2. 또는 Xcode Command Line Tools 설치:\n   - 터미널에서 실행: xcode-select --install\n\n설치 과정이 완료되면 터미널에서 'swift --version' 명령어로 설치를 확인하세요.\n설치 후 Obsidian을 재시작하면 캘린더 기능을 사용할 수 있습니다.`);
+                };
+            });
+            
+            throw new Error("Swift is not installed or not configured.");
+        }
+        
+        // Swift 모듈 관련 오류 확인 및 해결 안내
+        try {
+            const { exec } = require("child_process");
+            const execAsync = promisify(exec);
+            await execAsync("swift --version");
+        } catch (error) {
+            SummarDebug.Notice(0, `Swift 모듈 충돌 오류가 발생할 수 있습니다.\n\n해결 방법:\n터미널에서 다음 명령어를 실행하세요.\n\n  sudo xcode-select --reset\n  sudo xcodebuild -runFirstLaunch\n\n실행 후 Obsidian을 재시작하세요.`);
+            throw new Error("Swift module configuration issue detected.");
         }
 
         return new Promise((resolve, reject) => {
@@ -121,9 +242,9 @@ export class CalendarHandler {
             }
 
             args.push(`--fetch-calendars=${calendarList.join(",")}`);
-            const scriptPath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath() + "/.obsidian/plugins/summar/fetch_calendar.swift");
-            const spawnArgs = [scriptPath, ...args];
-            const process = spawn("swift", spawnArgs);
+            const basePath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath());
+            const wrapperPath = basePath + "/.obsidian/plugins/summar/fetch_calendar_wrapper.sh";
+            const process = spawn("/bin/bash", [wrapperPath, ...args]);
             let output = "";
             let errorOutput = "";
 
@@ -405,8 +526,8 @@ export class CalendarHandler {
             const { normalizePath } = require('obsidian');
             const { FileSystemAdapter } = require('obsidian');
             const basePath = (this.plugin.app.vault.adapter as typeof FileSystemAdapter).getBasePath();
-            const scriptPath = normalizePath(basePath + "/.obsidian/plugins/summar/fetch_calendar.swift");
-            const process = spawn('swift', [scriptPath, '--list-calendars']);
+            const wrapperPath = normalizePath(basePath + "/.obsidian/plugins/summar/fetch_calendar_wrapper.sh");
+            const process = spawn('/bin/bash', [wrapperPath, '--list-calendars']);
             let output = '';
             let errorOutput = '';
             process.stdout.on('data', (data: Buffer) => {
@@ -420,6 +541,10 @@ export class CalendarHandler {
                 if (trimmed === '-1') {
                     SummarDebug.error(1, '[Calendar] Permission denied.');
                     if (errorOutput) SummarDebug.error(1, '[Calendar][stderr]', errorOutput);
+                    
+                    // 권한 거부 안내 메시지 추가
+                    SummarDebug.Notice(0, "캘린더 접근 권한이 거부되었습니다.\n\n캘린더 기능을 사용하려면 시스템 환경설정 > 개인 정보 보호 및 보안 > 개인 정보 보호 > 캘린더에서 Obsidian 앱에 대한 권한을 허용해주세요.\n\n권한을 설정한 후 Obsidian을 재시작해주세요.", 0);
+                    
                     resolve(null); // Permission error
                     return;
                 }
@@ -819,11 +944,72 @@ export class CalendarHandler {
             return [];
         }
 
-        // Check if Xcode is installed
-        const xcodeInstalled = await this.checkXcodeInstalled();
-        if (!xcodeInstalled) {
-            SummarDebug.log(1, "Xcode가 설치되지 않아 캘린더 기능을 사용할 수 없습니다.");
+        // Check if Swift is installed
+        const swiftInstalled = await this.checkSwiftInstalled();
+        if (!swiftInstalled) {
+            // 스크립트 경로 구성
+            const basePath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath());
+            const installerPath = basePath + "/.obsidian/plugins/summar/install_swift.sh";
+            
+            // 설치 옵션이 있는 알림 표시
+            const notice = SummarDebug.Notice(0, `Swift가 설치되어 있지 않습니다.\n\n캘린더 기능을 사용하려면 Swift가 필요합니다.\n\n지금 설치하시겠습니까?\n\n설치 방법을 선택하세요:`, 0);
+            
+            // 설치 버튼 추가
+            if (notice && notice.noticeEl) notice.noticeEl.createEl("button", { text: "Swift 자동 설치" }, (button) => {
+                button.style.marginRight = "10px";
+                button.onclick = async () => {
+                    if (notice) notice.hide();
+                    
+                    // 새로운 알림 표시 (진행 중)
+                    const installNotice = SummarDebug.Notice(0, "Swift 설치 준비 중...\n\n터미널이 열리고 설치가 진행됩니다.\n\n관리자 권한이 필요할 수 있으며, 설치 파일 다운로드로 인해 몇 분 정도 소요될 수 있습니다.", 0);
+                    
+                    try {
+                        // 설치 스크립트 실행
+                        const { exec } = require("child_process");
+                        const execAsync = promisify(exec);
+                        await execAsync(`open -a Terminal.app ${installerPath}`);
+                        
+                        // 알림 업데이트
+                        if (installNotice) installNotice.setMessage("Swift 설치가 터미널에서 진행 중입니다.\n\n설치가 완료되면 Obsidian을 재시작해주세요.\n\n설치 중에는 터미널 창을 닫지 마세요.");
+                        
+                        // 30초 후에 알림 내용 업데이트
+                        setTimeout(() => {
+                            if (installNotice) installNotice.setMessage("Swift 설치가 계속 진행 중입니다...\n\n설치가 완료되면 터미널에서 성공 메시지가 표시됩니다.\n\n설치 완료 후 Obsidian을 재시작해주세요.");
+                            
+                            // 1분 후에도 알림 유지
+                            setTimeout(() => {
+                                if (installNotice) installNotice.hide();
+                            }, 60000);
+                        }, 30000);
+                        
+                    } catch (error) {
+                        // 설치 스크립트 실행 실패
+                        if (installNotice) installNotice.hide();
+                        SummarDebug.Notice(0, `Swift 설치 스크립트 실행에 실패했습니다: ${error.message}\n\n수동으로 설치해주세요.`);
+                    }
+                };
+            });
+            
+            // 수동 설치 안내 링크 추가
+            if (notice && notice.noticeEl) notice.noticeEl.createEl("button", { text: "수동 설치 안내" }, (button) => {
+                button.onclick = () => {
+                    if (notice) notice.hide();
+                    SummarDebug.Notice(0, `Swift 수동 설치 방법:\n\n1. Swift 툴체인 설치 (권장, 용량이 작음):\n   - https://www.swift.org/download/ 에서 macOS용 Swift 다운로드\n   - 설치 안내에 따라 설치\n\n2. 또는 Xcode Command Line Tools 설치:\n   - 터미널에서 실행: xcode-select --install\n\n설치 과정이 완료되면 터미널에서 'swift --version' 명령어로 설치를 확인하세요.\n설치 후 Obsidian을 재시작하면 캘린더 기능을 사용할 수 있습니다.`);
+                };
+            });
+            
+            SummarDebug.log(1, "Swift가 설치되지 않아 캘린더 기능을 사용할 수 없습니다.");
             return [];
+        }
+        
+        // Swift 모듈 관련 오류 확인
+        try {
+            const { exec } = require("child_process");
+            const execAsync = promisify(exec);
+            await execAsync("swift --version");
+        } catch (error) {
+            SummarDebug.log(1, "Swift 모듈 오류가 발생했습니다. 래퍼 스크립트에서 처리할 예정입니다.");
+            // 오류는 래퍼 스크립트에서 자세히 처리하므로 여기서는 계속 진행합니다.
         }
 
         return new Promise((resolve, reject) => {
@@ -860,10 +1046,10 @@ export class CalendarHandler {
             }
 
             args.push(`--fetch-calendars=${calendarList.join(",")}`);
-            const scriptPath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath() + "/.obsidian/plugins/summar/fetch_calendar.swift");
-            const spawnArgs = [scriptPath, ...args];
-            SummarDebug.log(1, `Executing Swift command: swift ${spawnArgs.join(" ")}`);
-            const process = spawn("swift", spawnArgs);
+            const basePath = normalizePath((this.plugin.app.vault.adapter as FileSystemAdapter).getBasePath());
+            const wrapperPath = basePath + "/.obsidian/plugins/summar/fetch_calendar_wrapper.sh";
+            SummarDebug.log(1, `Executing calendar wrapper with args: ${args.join(" ")}`);
+            const process = spawn("/bin/bash", [wrapperPath, ...args]);
             let output = "";
             let errorOutput = "";
 
