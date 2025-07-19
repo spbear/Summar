@@ -63,9 +63,10 @@ export class SummarDebug {
     this.debugLevel = debugLevel;
   }
 
-  static Notice(debugLevel: number, msg: string | DocumentFragment, duration?: number): void {
+  static Notice(debugLevel: number, msg: string | DocumentFragment, duration?: number): Notice | null {
     if (this.debugLevel >= debugLevel)
-      new Notice(msg, duration);
+      return new Notice(msg, duration);
+    return null;
   }
   static log(debugLevel: number, message?: any, ...optionalParams: any[]): void {
     if (this.debugLevel >= debugLevel)

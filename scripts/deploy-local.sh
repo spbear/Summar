@@ -49,6 +49,16 @@ if [ -f "$BUILD_DIR/fetch_calendar.swift" ]; then
     cp "$BUILD_DIR/fetch_calendar.swift" "$PLUGIN_DIR/"
 fi
 
+if [ -f "$BUILD_DIR/fetch_calendar_wrapper.sh" ]; then
+    cp "$BUILD_DIR/fetch_calendar_wrapper.sh" "$PLUGIN_DIR/"
+    chmod +x "$PLUGIN_DIR/fetch_calendar_wrapper.sh"
+fi
+
+if [ -f "$BUILD_DIR/install_swift.sh" ]; then
+    cp "$BUILD_DIR/install_swift.sh" "$PLUGIN_DIR/"
+    chmod +x "$PLUGIN_DIR/install_swift.sh"
+fi
+
 echo "✅ Plugin deployed successfully to: $PLUGIN_DIR"
 echo ""
 echo "📋 Next steps:"
