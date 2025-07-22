@@ -1,6 +1,6 @@
 import { PluginSettingTab, Setting, Platform, ButtonComponent, Modal, App } from "obsidian";
 
-import { SummarDebug, SummarRequestUrl, getDeviceId, sanitizeLabel, SummarTooltip } from "./globals";
+import { SummarDebug, SummarRequestUrl, getDeviceId, sanitizeLabel, SummarTooltip, extractDomain } from "./globals";
 import { PluginUpdater } from "./pluginupdater";
 import SummarPlugin from "./main";
 import { ConfluenceAPI } from "./confluenceapi";
@@ -437,7 +437,7 @@ async activateTab(tabId: string): Promise<void> {
       )
       .addText((text) => {
         text.setPlaceholder("Enter your Confluence Domain")
-          .setValue(this.plugin.settingsv2.common.confluenceDomain || "wiki.workers-hub.com")
+          .setValue(this.plugin.settingsv2.common.confluenceDomain || "")
           .onChange(async (value) => {
             this.plugin.settingsv2.common.confluenceDomain = value;
             await this.plugin.settingsv2.saveSettings();
@@ -498,6 +498,17 @@ async activateTab(tabId: string): Promise<void> {
 
               if (url) {
                 try {
+                  // URL에서 도메인 추출 및 confluenceDomain 설정
+                  const domain = extractDomain(url);
+                  if (domain) {
+                    this.plugin.settingsv2.common.confluenceDomain = domain;
+                    // Confluence Domain 입력 필드 업데이트
+                    const domainInput = containerEl.querySelector<HTMLInputElement>(".confluence-url-input");
+                    if (domainInput) {
+                      domainInput.value = domain;
+                    }
+                  }
+
                   const conflueceapi = new ConfluenceAPI(this.plugin);
                   const result = await conflueceapi.getPageId(url);
                   
