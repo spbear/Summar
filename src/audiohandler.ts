@@ -261,9 +261,17 @@ export class AudioHandler extends SummarViewContainer {
 				// 기존 meeting-info가 있어도 다중 파일의 경우 폴더명이 캘린더 기반으로 변경되었는지 확인
 				if (filesToSave.length > 1) {
 					const audioFiles = filesToSave.map(f => f.file);
-					const event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
+					
+					// 먼저 저장된 이벤트 메타데이터를 확인
+					let event = await this.loadEventMetadata(originalFolderPath);
+					
+					// 메타데이터가 없으면 오디오 파일을 기반으로 이벤트 찾기
+					if (!event) {
+						event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
+					}
+					
 					if (event) {
-						const safeMeetingTitle = sanitizeFileName(event.title);
+						const safeMeetingTitle = event.safeMeetingTitle || sanitizeFileName(event.title);
 						// 폴더명에 미팅 제목이 포함되어 있지 않으면 폴더명 업데이트
 						if (!originalFolderPath.includes(safeMeetingTitle)) {
 							SummarDebug.log(1, `Updating folder for existing meeting-info with calendar event: ${event.title}`);
@@ -806,7 +814,18 @@ export class AudioHandler extends SummarViewContainer {
 		SummarDebug.log(1, `Searching calendar events for ${audioFiles.length} audio files`);
 		SummarDebug.log(1, `Audio file names: ${audioFiles.map(f => f.name).join(', ')}`);
 		
-		const event = await this.plugin.calendarHandler.findEventFromAudioFiles(audioFiles);
+		// 먼저 첫 번째 파일의 폴더에서 저장된 이벤트 메타데이터를 확인
+		const firstFile = audioFiles[0];
+		const firstFilePath = firstFile.name;
+		const folderPath = firstFilePath.substring(0, firstFilePath.lastIndexOf('/'));
+		
+		let event = await this.loadEventMetadata(folderPath);
+		
+		// 메타데이터가 없으면 오디오 파일을 기반으로 이벤트 찾기
+		if (!event) {
+			event = await this.plugin.calendarHandler.findEventFromAudioFiles(audioFiles);
+		}
+		
 		if (event) {
 			SummarDebug.log(1, `Calendar event found: ${event.title}`);
 			return this.plugin.calendarHandler.formatEventInfo(event);
@@ -814,6 +833,25 @@ export class AudioHandler extends SummarViewContainer {
 			SummarDebug.log(1, `No calendar event found for audio files`);
 			return "";
 		}
+	}
+
+	/**
+	 * 저장된 이벤트 메타데이터를 로드합니다.
+	 */
+	private async loadEventMetadata(folderPath: string): Promise<any> {
+		try {
+			const metadataPath = normalizePath(folderPath + '/event-metadata.json');
+			const file = this.plugin.app.vault.getAbstractFileByPath(metadataPath);
+			if (file) {
+				const content = await this.plugin.app.vault.read(file as any);
+				const metadata = JSON.parse(content);
+				SummarDebug.log(1, `Loaded event metadata from: ${metadataPath}`);
+				return metadata;
+			}
+		} catch (error) {
+			SummarDebug.log(2, `Failed to load event metadata from: ${folderPath}`, error);
+		}
+		return null;
 	}
 
 	/**
@@ -832,12 +870,20 @@ export class AudioHandler extends SummarViewContainer {
 			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
 		}
 
-		const event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
+		// 먼저 저장된 이벤트 메타데이터를 확인
+		let event = await this.loadEventMetadata(originalFolderPath);
+		
+		// 메타데이터가 없으면 오디오 파일을 기반으로 이벤트 찾기
+		if (!event) {
+			event = await this.plugin.calendarHandler?.findEventFromAudioFiles(audioFiles);
+		}
+		
 		if (!event) {
 			return { updatedNoteFilePath: noteFilePath, updatedFolderPath: folderPath };
 		}
 
-		const safeMeetingTitle = sanitizeFileName(event.title);
+		// 메타데이터에 저장된 safeMeetingTitle이 있으면 사용, 없으면 현재 제목으로 생성
+		const safeMeetingTitle = event.safeMeetingTitle || sanitizeFileName(event.title);
 		
 		// 미팅 제목이 폴더명에 포함되어 있지 않으면 폴더명을 업데이트
 		if (originalFolderPath.includes(safeMeetingTitle)) {
