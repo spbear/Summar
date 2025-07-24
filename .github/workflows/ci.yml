@@ -3,6 +3,7 @@ name: Summar Plugin CI/CD
 on:
   schedule:
     - cron: '0 22 * * *'  # 매일 22:00 UTC = 한국 시간 07:00 (UTC+9)
+  workflow_dispatch:  # 수동 실행 허용
 
 jobs:
   test:
@@ -28,11 +29,17 @@ jobs:
     - name: Run linting
       run: npm run lint || true
       
-    - name: Run unit tests
-      run: npm run test:unit || true
+    - name: Create test results directory
+      run: mkdir -p test-results
       
-    - name: Run integration tests
-      run: npm run test:integration || true
+    - name: Run unit tests
+      run: npm run test:unit -- --outputFile=test-results/unit-results.json --json || true
+      
+    - name: Run integration tests  
+      run: npm run test:integration -- --outputFile=test-results/integration-results.json --json || true
+      
+    - name: Generate test coverage
+      run: npm run test:coverage || true
       
     - name: Build plugin
       run: npm run build
@@ -46,6 +53,7 @@ jobs:
           test-results/
           coverage/
         retention-days: 7
+        if-no-files-found: warn
 
   build-installer:
     needs: test
@@ -56,6 +64,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '16.1'
+      
     - name: Use Node.js 20.x
       uses: actions/setup-node@v4
       with:
@@ -64,9 +77,6 @@ jobs:
         
     - name: Install dependencies
       run: npm ci
-      
-    - name: Build plugin
-      run: npm run build
       
     - name: Build installer (macOS)
       run: npm run build-installer

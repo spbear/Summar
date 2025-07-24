@@ -140,8 +140,21 @@ export class SummarView extends View {
               title = `${title} - ${entitle}`;
             }
           }
-          const md = new MarkdownIt();
-          const html = md.render(content);
+          const md = new MarkdownIt({
+            html: true,
+            xhtmlOut: true,  // XHTML 호환 출력 모드 활성화
+            breaks: true,
+            linkify: true
+          });
+          let html = md.render(content);
+          
+          // Confluence XHTML 호환성을 위한 후처리
+          html = html
+            .replace(/<br>/g, '<br />')  // <br>을 <br />로 변경
+            .replace(/<hr>/g, '<hr />')  // <hr>을 <hr />로 변경
+            .replace(/<img([^>]*?)>/g, '<img$1 />')  // <img>를 자동 닫힘 태그로 변경
+            .replace(/<input([^>]*?)>/g, '<input$1 />')  // <input>을 자동 닫힘 태그로 변경
+            .replace(/&(?!amp;|lt;|gt;|quot;|#\d+;|#x[\da-fA-F]+;)/g, '&amp;');  // 인코딩되지 않은 & 문자 처리
           const confluenceApi = new ConfluenceAPI(this.plugin);
           const { updated, statusCode, message, reason } = await confluenceApi.createPage(title, html);
           if (statusCode === 200) {
