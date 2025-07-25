@@ -189,10 +189,9 @@ export class DailyNotesHandler {
             // 회의록 링크 생성
             const meetingFileName = meetingFilePath.split('/').pop()?.replace('.md', '') || 'Unknown';
             
-            // 파일명을 안전하게 처리하여 markdown 링크에서 문제가 되는 문자들을 제거
-            const safeMeetingFileName = sanitizeFileName(meetingFileName);
-            
-            const linkLine = `- [[${safeMeetingFileName}]]`;
+            // Daily Note 링크는 실제 파일명을 그대로 사용 (sanitizeFileName 적용하지 않음)
+            // 파일명에 이미 sanitizeFileName이 적용되어 있으므로 추가 처리 불필요
+            const linkLine = `- [[${meetingFileName}]]`;
 
             // 링크가 이미 존재하는지 확인 (중복 방지)
             if (dailyNoteContent.includes(linkLine)) {

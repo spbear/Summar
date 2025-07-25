@@ -239,12 +239,14 @@ export class AudioRecordingManager extends SummarViewContainer {
 		// 현재 시간에 해당하는 캘린더 이벤트 찾기
 		let meetingInfo = "";
 		let folderSuffix = "";
+		let currentEvent = null;
+		let safeMeetingTitle = "";
 		if (this.plugin.calendarHandler) {
-			const currentEvent = this.plugin.calendarHandler.findEventAtTime(this.startTime);
+			currentEvent = this.plugin.calendarHandler.findEventAtTime(this.startTime);
 			if (currentEvent) {
 				meetingInfo = this.plugin.calendarHandler.formatEventInfo(currentEvent);
 				// 미팅 제목을 폴더명에 포함 (파일시스템에 안전한 문자만 사용)
-				const safeMeetingTitle = sanitizeFileName(currentEvent.title);
+				safeMeetingTitle = sanitizeFileName(currentEvent.title);
 				folderSuffix = `_${safeMeetingTitle}`;
 				SummarDebug.log(1, `Found calendar event: ${currentEvent.title}`);
 			} else {
@@ -257,12 +259,31 @@ export class AudioRecordingManager extends SummarViewContainer {
 		await this.plugin.app.vault.adapter.mkdir(this.recordingPath);
 		SummarDebug.log(1,`recordingPath: ${this.recordingPath}`);
 
-		// 미팅 정보가 있으면 (폴더명) meeting-info.md 파일로 저장
+		// 미팅 정보가 있으면 meeting-info.md 파일과 event-metadata.json 파일로 저장
 		if (meetingInfo) {
 			const folderName = this.recordingPath.split('/').pop() || this.timeStamp;
 			const meetingInfoPath = normalizePath(this.recordingPath + `/${folderName} meeting-info.md`);
 			await this.plugin.app.vault.adapter.write(meetingInfoPath, meetingInfo);
 			SummarDebug.log(1, `Meeting info saved to: ${meetingInfoPath}`);
+
+			// 캘린더 이벤트 메타데이터를 JSON으로 저장 (일관성 보장을 위해)
+			if (currentEvent) {
+				const eventMetadata = {
+					title: currentEvent.title,
+					start: currentEvent.start.toISOString(),
+					end: currentEvent.end.toISOString(),
+					description: currentEvent.description,
+					location: currentEvent.location,
+					zoom_link: currentEvent.zoom_link,
+					attendees: currentEvent.attendees,
+					participant_status: currentEvent.participant_status,
+					safeMeetingTitle: safeMeetingTitle, // sanitized된 제목도 함께 저장
+					recordingTimestamp: this.startTime?.toISOString() // 녹음 시작 시간도 저장
+				};
+				const metadataPath = normalizePath(this.recordingPath + `/event-metadata.json`);
+				await this.plugin.app.vault.adapter.write(metadataPath, JSON.stringify(eventMetadata, null, 2));
+				SummarDebug.log(1, `Event metadata saved to: ${metadataPath}`);
+			}
 		}
 
 			this.recordingInterval = window.setInterval(async () => {
