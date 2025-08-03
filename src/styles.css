@@ -46,7 +46,7 @@
 .settings-tab-button:focus-visible,
 .settings-tab-button.active:focus,
 .settings-tab-button.active:focus-visible,
-.clickable-icon.active:focus {
+.settings-tabs .clickable-icon.active:focus {
     background-color: var(--interactive-accent) !important;
     color: var(--text-on-accent) !important;
     opacity: 1 !important;
@@ -85,15 +85,15 @@
     margin-bottom: 10px !important; /* Custom commands 등에서 아이템 간격 확보 */
   }
   
-/* 기본 버튼 스타일 */
-.clickable-icon {
+/* 기본 버튼 스타일 - Summar plugin specific */
+.settings-tabs .clickable-icon {
     background-color: transparent;
     border: none;
     cursor: pointer;
 }
 
-/* 활성화된 버튼 스타일 */
-.clickable-icon.active {
+/* 활성화된 버튼 스타일 - Summar plugin specific */
+.settings-tabs .clickable-icon.active {
     background-color: var(--interactive-accent); /* Obsidian의 주요 색상 */
     /* color: white; */
     border-radius: 5px;
@@ -103,15 +103,14 @@
     color: var(--text-on-accent);
 }
 
-/* 아이콘 강조 효과 */
-.clickable-icon.active svg {
-
+/* 아이콘 강조 효과 - Summar plugin specific */
+.settings-tabs .clickable-icon.active svg {
     stroke: white;
 }
 
-/* 활성화된 버튼 호버 효과 */
+/* 활성화된 버튼 호버 효과 - Summar plugin specific */
 .settings-tab-button.active:hover,
-.clickable-icon.active:hover {
+.settings-tabs .clickable-icon.active:hover {
     background-color: var(--interactive-accent-hover);
     box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
 }
@@ -286,7 +285,7 @@
 .event-obsidian-link:hover {
   color: var(--interactive-accent);
 }
-.event-loading {
+.summar-plugin .event-loading {
   padding: 18px 0;
   text-align: center;
   color: var(--text-muted);
@@ -303,7 +302,7 @@
   margin-right: auto;
 }
 
-/* Obsidian settings desc 영역에서 .event-loading 중앙 정렬 보조 */
+/* Obsidian settings desc 영역에서 .event-loading 중앙 정렬 보조 - Summar plugin specific */
 .setting-item-description > .event-loading {
   display: flex;
   flex-direction: column;
@@ -510,8 +509,8 @@
     outline-offset: 2px;
 }
 
-/* Ensure modal container is properly centered */
-.modal-container {
+/* Ensure modal container is properly centered - Summar plugin specific */
+.summar-plugin .modal-container {
     position: fixed;
     top: 0;
     left: 0;
@@ -523,8 +522,8 @@
     z-index: 1000;
 }
 
-/* Ensure modal is properly centered */
-.modal {
+/* Ensure modal is properly centered - Summar plugin specific */
+.summar-plugin .modal {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -532,8 +531,8 @@
     box-sizing: border-box;
 }
 
-/* Modal container centered */
-.modal .modal-container {
+/* Modal container centered - Summar plugin specific */
+.summar-plugin .modal .modal-container {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -542,7 +541,7 @@
 }
 
 /* Recording modal specific sizing and centering */
-.modal .modal-content.summar-recording-confirm-modal {
+.summar-recording-confirm-modal {
     width: 320px;
     max-width: 90vw;
     min-width: 250px;

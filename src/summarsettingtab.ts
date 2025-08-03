@@ -24,6 +24,12 @@ export class SummarSettingsTab extends PluginSettingTab {
   async hide(): Promise<void> {
     await this.plugin.saveSettingsToFile();
     this.plugin.registerCustomCommandAndMenus();
+    
+    // Remove the class we added to scope CSS
+    const { containerEl } = this;
+    if (containerEl) {
+      containerEl.removeClass('summar-plugin');
+    }
   }
 
   async display(): Promise<void> {
@@ -37,6 +43,7 @@ export class SummarSettingsTab extends PluginSettingTab {
     }
 
     containerEl.empty();
+    containerEl.addClass('summar-plugin'); // Add a class to scope our CSS
 
     // Create tabs container
     const tabsContainer = containerEl.createDiv({ cls: 'settings-tabs' });
@@ -192,30 +199,20 @@ export class SummarSettingsTab extends PluginSettingTab {
 
         switch (tab.id) {
           case 'common-tab':
-            tabContent.style.width = "100%";
-            tabContent.style.maxWidth = "none";
             await this.buildCommonSettings(tabContent);
             break;
           case 'webpage-tab':
-            tabContent.style.width = "100%";
-            tabContent.style.maxWidth = "none";
             await this.buildWebpageSettings(tabContent);
             break;
           case 'pdf-tab':
             if (Platform.isMacOS && Platform.isDesktopApp) {
-              tabContent.style.width = "100%";
-              tabContent.style.maxWidth = "none";
               await this.buildPdfSettings(tabContent);
             }
             break;
           case 'recording-tab':
-            tabContent.style.width = "100%";
-            tabContent.style.maxWidth = "none";
             await this.buildRecordingSettings(tabContent);
             break;
           case 'custom-tab':
-            tabContent.style.width = "100%";
-            tabContent.style.maxWidth = "none";
             await this.buildCustomCommandSettings(tabContent);
             break;
           case 'stats-tab':
@@ -236,8 +233,6 @@ export class SummarSettingsTab extends PluginSettingTab {
 
           case 'schedule-tab':
             if (Platform.isMacOS && Platform.isDesktopApp) {
-              tabContent.style.width = "100%";
-              tabContent.style.maxWidth = "none";
               await this.buildCalendarSettings(tabContent);
             }
             break;
