@@ -72,10 +72,3 @@ jspm_packages/
 
 # dotenv environment variables file
 .env
-
-# Installer build outputs
-installer/dist/
-installer/node_modules/
-installer/plugin/summar.zip
-installer/assets/icon.png
-installer/assets/icon.iconset/
