@@ -328,10 +328,9 @@ export class AudioHandler extends SummarViewContainer {
 			const fileExists = await this.plugin.app.vault.adapter.exists(audioFilePath);
 			if (!fileExists) {
 				const fileContent = await fileInfo.file.arrayBuffer();
-				const binaryContent = new Uint8Array(fileContent);
 
 				try {
-					await this.plugin.app.vault.adapter.writeBinary(audioFilePath, binaryContent);
+					await this.plugin.app.vault.adapter.writeBinary(audioFilePath, fileContent);
 					SummarDebug.log(1, `File saved at: ${audioFilePath}`);
 				} catch (error) {
 					SummarDebug.error(1, `Error saving file: ${audioFilePath}`, error);
@@ -491,7 +490,7 @@ export class AudioHandler extends SummarViewContainer {
 		const boundary = "----SummarFormBoundary" + Math.random().toString(16).slice(2);
 		const CRLF = "\r\n";
 
-		const bodyParts: (Uint8Array | Blob | string)[] = [];
+		const bodyParts: BlobPart[] = [];
 
 		function addField(name: string, value: string) {
 			bodyParts.push(
@@ -501,7 +500,7 @@ export class AudioHandler extends SummarViewContainer {
 			);
 		}
 
-		function addFileField(name: string, filename: string, type: string, content: Uint8Array) {
+		function addFileField(name: string, filename: string, type: string, content: ArrayBuffer) {
 			bodyParts.push(
 				encoder.encode(`--${boundary}${CRLF}`),
 				encoder.encode(`Content-Disposition: form-data; name="${name}"; filename="${filename}"${CRLF}`),
@@ -512,9 +511,8 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		const arrayBuffer = await blob.arrayBuffer();
-		const binaryContent = new Uint8Array(arrayBuffer);
 
-		addFileField("file", fileName, fileType, binaryContent);
+		addFileField("file", fileName, fileType, arrayBuffer);
 		// addField("model", this.plugin.settings.sttModel || "whisper-1");
 		addField("model", this.plugin.settingsv2.recording.sttModel || this.plugin.getDefaultModel("sttModel"));
 

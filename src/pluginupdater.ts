@@ -145,7 +145,8 @@ export class PluginUpdater {
       }); 
     
       if (result.status === 200) { // 상태 코드를 확인 (ok 대신)
-        await this.writeFile(outputPath, new Uint8Array(await result.arrayBuffer)); // arrayBuffer 직접 사용
+        const arrayBuffer = await result.arrayBuffer;
+        await this.writeFile(outputPath, new Uint8Array(arrayBuffer));
       } else {
         // 상태 코드가 200이 아닐 경우 에러 처리
         throw new Error(`Failed to download plugin. Status code: ${result.status}`);
@@ -173,7 +174,7 @@ export class PluginUpdater {
       }
 
       // Write the file
-      await this.plugin.app.vault.adapter.writeBinary(filePath, data);
+      await this.plugin.app.vault.adapter.writeBinary(filePath, data.buffer as ArrayBuffer);
     } catch (error) {
       SummarDebug.error(1, `Error writing file: ${(error as Error).message}`);
       throw error;
@@ -202,7 +203,7 @@ export class PluginUpdater {
         } else {
           // 파일 추출
           const fileContent = await zipEntry.async("uint8array");
-          await this.plugin.app.vault.adapter.writeBinary(targetPath, fileContent);
+          await this.plugin.app.vault.adapter.writeBinary(targetPath, fileContent.buffer as ArrayBuffer);
         }
       }
 

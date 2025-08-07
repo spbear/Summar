@@ -415,8 +415,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				SummarDebug.log(1, `saveFile(filenName): ${fileName}`);
 				blob.arrayBuffer()
 					.then((buffer) => {
-						const data = new Uint8Array(buffer);
-						this.plugin.app.vault.createBinary(fileName, data)
+						this.plugin.app.vault.createBinary(fileName, buffer)
 							.then(() => {
 								SummarDebug.Notice(0, `File saved: ${fileName}`);
 								SummarDebug.log(1,`File saved: ${fileName}`);
