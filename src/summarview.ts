@@ -3,6 +3,7 @@ import { View, WorkspaceLeaf, Platform, setIcon, normalizePath, MarkdownView } f
 import SummarPlugin  from "./main";
 import { SummarDebug, SummarViewContainer, showSettingsTab } from "./globals";
 import { ConfluenceAPI } from "./confluenceapi";
+import { SlackAPI } from "./slackapi";
 import MarkdownIt from "markdown-it";
 
 export class SummarView extends View {
@@ -223,6 +224,162 @@ export class SummarView extends View {
       uploadNoteToWikiButton.disabled = true;        // 비활성화
       uploadNoteToWikiButton.style.width = "100%";
     }
+
+    
+    // uploadNoteToSlackButton 추가
+    const uploadNoteToSlackButton = buttonContainer.createEl("button", {
+      cls: "lucide-icon-button",
+    });
+    
+    // 플러그인에 버튼 참조 저장
+    this.plugin.uploadNoteToSlackButton = uploadNoteToSlackButton;
+    
+    // 동적으로 버튼 라벨과 아이콘 설정 (Channel ID 포함)
+    const channelId = this.plugin.settingsv2.common.slackChannelId || "Not set";
+    let channelInfo = " (No Channel)";
+    
+    if (channelId !== "Not set") {
+      if (channelId.includes("#")) {
+        channelInfo = ` (Channel: ${channelId})`;
+      } else if (channelId.includes("@")) {
+        channelInfo = ` (DM: ${channelId})`;
+      } else {
+        channelInfo = ` (Channel: ${channelId})`;
+      }
+    }
+    
+    if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+      uploadNoteToSlackButton.setAttribute("aria-label", `Create Slack Canvas${channelInfo}`);
+      setIcon(uploadNoteToSlackButton, "hash"); // Canvas 아이콘
+    } else {
+      uploadNoteToSlackButton.setAttribute("aria-label", `Send Slack Message${channelInfo}`);
+      setIcon(uploadNoteToSlackButton, "hash"); // 메시지 아이콘
+    }
+
+    // uploadNoteToSlackButton 클릭 이벤트 리스너
+    uploadNoteToSlackButton.addEventListener("click", async() => {
+      const viewType = await this.getCurrentMainPaneTabType();
+      if (viewType === "markdown") {
+        // Slack API가 활성화되어 있는지만 확인 (토큰은 선택적)
+        if (!this.plugin.settingsv2.common.useSlackAPI) {
+            const fragment = document.createDocumentFragment();
+            const message1 = document.createElement("span");
+            
+            if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+              message1.textContent = "To create a Canvas in Slack, " +
+                "please enable Slack API integration. Bot Token is optional " +
+                "(if not set, will attempt anonymous access). \n";
+            } else {
+              message1.textContent = "To send a message to Slack, " +
+                "please enable Slack API integration. Bot Token and Channel ID may be required. \n";
+            }
+            fragment.appendChild(message1);
+
+            // 링크 생성 및 스타일링
+            const link = document.createElement("a");
+            link.textContent = "Enable Slack API integration in the settings";
+            link.href = "#";
+            link.style.cursor = "pointer";
+            link.style.color = "var(--text-accent)";
+            link.addEventListener("click", (event) => {
+              event.preventDefault();
+              showSettingsTab(this.plugin, 'common-tab');
+            });
+            fragment.appendChild(link);
+            SummarDebug.Notice(0, fragment, 0);
+            
+            return;
+        }
+        
+        const file = this.plugin.app.workspace.getActiveFile();
+        if (file) {
+          let title = file.basename;
+          const content = await this.plugin.app.vault.read(file);
+          SummarDebug.log(1, `Slack upload - title: ${title}`);
+          SummarDebug.log(3, `Slack upload - content: ${content}`);
+
+          const slackApi = new SlackAPI(this.plugin);
+          const result = await slackApi.uploadNote(title, content);
+          
+          if (result.success) {
+            // HTML 형식의 성공 메시지 생성
+            const messageFragment = document.createDocumentFragment();
+              
+            const successText = document.createElement("div");
+            if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+              successText.textContent = "Canvas has been created successfully in Slack.";
+            } else {
+              successText.textContent = "Message has been posted to Slack successfully.";
+            }
+            messageFragment.appendChild(successText);
+
+            if (result.canvasUrl) {
+              const lineBreak = document.createElement("br");
+              messageFragment.appendChild(lineBreak);
+
+              const link = document.createElement("a");
+              link.href = result.canvasUrl;
+              link.textContent = result.canvasUrl;
+              link.style.color = "var(--link-color)";
+              link.style.textDecoration = "underline";
+              link.target = "_blank"; // 새 창에서 열기
+              messageFragment.appendChild(link);
+            }
+
+            SummarDebug.Notice(0, messageFragment, 0);
+          } else {
+            const frag = document.createDocumentFragment();
+            const title = document.createElement("div");
+            if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+              title.textContent = "⚠️ Slack Canvas Upload Failed";
+            } else {
+              title.textContent = "⚠️ Slack Message Send Failed";
+            }
+            title.style.fontWeight = "bold";
+            title.style.marginBottom = "4px";
+
+            const messageNoti = document.createElement("div");
+            messageNoti.textContent = result.message;
+            
+            frag.appendChild(title);
+            frag.appendChild(messageNoti);
+
+            SummarDebug.Notice(0, frag, 0);
+          }
+        } else {
+          SummarDebug.Notice(0, "No active editor was found.");
+        }
+      } else {
+        const frag = document.createDocumentFragment();
+
+        const title = document.createElement("div");
+        if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+          title.textContent = "⚠️ Slack Canvas Upload Failed";
+        } else {
+          title.textContent = "⚠️ Slack Message Send Failed";
+        }
+        title.style.fontWeight = "bold";
+        title.style.marginBottom = "4px";
+        
+        const message = document.createElement("div");
+        message.textContent = "No active editor was found.";
+        
+        frag.appendChild(title);
+        frag.appendChild(message);
+        
+        SummarDebug.Notice(0, frag);
+      } 
+    });
+
+    if (!(Platform.isMacOS && Platform.isDesktopApp)) {
+      // Slack 버튼도 플랫폼 제한
+      uploadNoteToSlackButton.style.display = "none";
+      uploadNoteToSlackButton.disabled = true;
+    } else {
+      // 초기 버튼 상태 설정
+      this.plugin.updateSlackButtonState();
+    }
+  
 
     const newNoteButton = buttonContainer.createEl("button", {
       cls: "lucide-icon-button",

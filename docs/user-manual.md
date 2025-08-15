@@ -12,12 +12,32 @@ The Summar plugin settings are organized into multiple tabs, each offering speci
   - Toggle Confluence API usage on/off
   - Enter Confluence Parent Page URL to automatically extract Space Key and Page ID
   - Use the "✓" button to validate and auto-populate Confluence settings
+  - Automatic domain extraction from Parent Page URL
+  - Enhanced XHTML compatibility for content upload
+- **Slack API Integration** *(macOS/Desktop only)*: Complete Slack workspace integration for note sharing
+  - **Master Toggle**: "Use Slack API" checkbox enables/disables all Slack features
+  - **Bot Token**: Enter your Slack Bot Token (xoxb-...) for API authentication
+    - Supports empty token mode for limited functionality
+    - Dynamic validation and connection testing
+  - **Target Configuration**: 
+    - Channel/User targeting with #channel or @username format
+    - Automatic channel type detection (public, private, DM)
+    - Dynamic tooltips showing channel information
+  - **Workspace Settings**:
+    - Workspace domain (without https://, auto-added)
+    - Custom API domain for enterprise Slack installations
+  - **Dual Upload Modes**:
+    - **Canvas Mode**: Creates collaborative Slack Canvas documents
+    - **Message Mode**: Sends formatted messages to channels/DMs
+  - **Smart UI Controls**: All Slack settings automatically enable/disable based on master toggle
+  - **Advanced Markdown Processing**: Converts Obsidian markdown to Slack-compatible formats
 - **Version Management**: View current plugin version and check for updates
   - Force update button becomes available when new versions are detected
   - Automatic Obsidian restart after plugin updates
+  - Enhanced update mechanism with progress indicators
 
 ### Webpage Tab
-- **Model Selection**: Choose AI model for web page summarization (gpt-4o, gpt-4.1, o1-mini, o3-mini)
+- **Model Selection**: Choose AI model for web page summarization (gpt-4o, gpt-4.1, gpt-4.1-mini, gpt-5, gpt-5-mini, gpt-5-nano, o1-mini, o3-mini, gemini-2.0-flash, gemini-2.5-flash)
 - **Prompt Management**: 
   - Edit custom prompts for web page summarization
   - "Set default prompt" button to restore original settings
@@ -51,7 +71,7 @@ The Summar plugin settings are organized into multiple tabs, each offering speci
 - **Command Management**: Create up to 10 custom commands
 - **Command Configuration**:
   - Menu name for context menu display
-  - AI model selection (gpt-4o, gpt-4.1, o1-mini, o3-mini)
+  - AI model selection (gpt-4o, gpt-4.1, gpt-4.1-mini, gpt-5, gpt-5-mini, gpt-5-nano, o1-mini, o3-mini, gemini-2.0-flash, gemini-2.5-flash)
   - Custom prompt for selected text processing
   - Hotkey assignment (supports Ctrl/Cmd + Shift + Alt combinations)
   - Result handling options:
@@ -93,6 +113,22 @@ The SummarView provides a dedicated interface for interacting with Summar featur
   - Upload current note content to Confluence wiki
   - Automatically detects note type and formats accordingly
   - Shows success/failure notifications with links to created pages
+  - Enhanced domain extraction and XHTML compatibility
+- **Upload to Slack Button** *(macOS/Desktop only)*: 
+  - Share current note content to Slack workspace
+  - **Dual Mode Operation**:
+    - **Canvas Mode**: Creates collaborative Slack Canvas documents
+    - **Message Mode**: Sends formatted messages to configured channel/DM
+  - **Smart Content Processing**:
+    - Converts Obsidian markdown to Slack-compatible formats
+    - Preserves formatting (bold, italic, lists, code blocks)
+    - Removes Obsidian-specific elements (frontmatter, comments, block references)
+  - **Dynamic State Management**: 
+    - Auto-enables/disables based on Slack API toggle in settings
+    - Shows appropriate success messages with direct Slack links
+  - **Enhanced Tooltips**: 
+    - Displays channel type information (#channel vs @DM)
+    - Shows real-time channel status and type detection
 - **New Note Button** (file-output icon):
   - Create new notes from summarization results
   - Auto-generates timestamped filenames
@@ -109,6 +145,15 @@ The SummarView provides a dedicated interface for interacting with Summar featur
   - Available content for processing
   - API key configuration
   - Platform compatibility (PDF/Calendar features)
+  - Service integration toggles (Confluence/Slack API status)
+- **Smart UI Controls**: 
+  - Settings automatically enable/disable related controls
+  - Real-time state synchronization between settings and UI
+  - Visual feedback for configuration status
+- **Enhanced Tooltips**: 
+  - Context-sensitive help and status information
+  - Dynamic content based on current configuration
+  - Interactive channel/service information display
 
 ## 3. Command Palette Integrations
 

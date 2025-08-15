@@ -29,6 +29,11 @@ export class PluginSettingsV2 {
     confluenceParentPageUrl: string;
     confluenceParentPageSpaceKey: string;
     confluenceParentPageId: string;
+    useSlackAPI: boolean;
+    slackBotToken: string;
+    slackChannelId: string;
+    slackWorkspaceUrl: string;
+    slackApiDomain: string;
   } = {
     openaiApiKey: "",
     openaiApiEndpoint: "",
@@ -38,7 +43,12 @@ export class PluginSettingsV2 {
     confluenceDomain: "",
     confluenceParentPageUrl: "",
     confluenceParentPageSpaceKey: "",
-    confluenceParentPageId: ""
+    confluenceParentPageId: "",
+    useSlackAPI: false,
+    slackBotToken: "",
+    slackChannelId: "",
+    slackWorkspaceUrl: "",
+    slackApiDomain: ""
   };
   
   web: {

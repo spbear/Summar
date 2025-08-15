@@ -84,6 +84,7 @@ export default class SummarPlugin extends Plugin {
 
   resultContainer: HTMLTextAreaElement;
   // uploadNoteToWikiButton: HTMLButtonElement;
+  uploadNoteToSlackButton: HTMLButtonElement;
   newNoteButton: HTMLButtonElement;
   newNoteLabel: HTMLSpanElement;
   inputField: HTMLInputElement;
@@ -115,6 +116,9 @@ export default class SummarPlugin extends Plugin {
   PLUGIN_PROMPTS: string = "";  // 플러그인 디렉토리의 prompts.json
   PLUGIN_MODELPRICING: any = {}; // 플러그인 디렉토리의 model-pricing.json
   PLUGIN_SETTINGS_SCHEMA_VERSION = "1.0.1"; // 플러그인 설정 스키마 버전
+
+  SLACK_UPLOAD_TO_CANVAS = false;
+
   modelsJson: any = {}; // models.json
   
   modelsByCategory: Record<ModelCategory, ModelInfo> = {
@@ -580,7 +584,6 @@ export default class SummarPlugin extends Plugin {
       },
     });
 
-// if (this.settings.debugLevel > 0) {    
     // Summar stats 대시보드 커맨드 추가
     this.addCommand({
       id: "show-summar-stats",
@@ -590,7 +593,7 @@ export default class SummarPlugin extends Plugin {
         modal.open();
       },
     });
-// }
+
 
     this.registerCustomCommandAndMenus();
 
@@ -1301,7 +1304,25 @@ export default class SummarPlugin extends Plugin {
     const mimeType = "application/pdf"; // or use a function to detect based on extension
     // Create a browser File object
     return new File([arrayBuffer], tfile.name, { type: mimeType });
-  }  
+  }
+
+  /**
+   * Slack 버튼의 상태를 업데이트합니다.
+   */
+  updateSlackButtonState(): void {
+    if (this.uploadNoteToSlackButton) {
+      const isEnabled = this.settingsv2.common.useSlackAPI;
+      this.uploadNoteToSlackButton.disabled = !isEnabled;
+      
+      if (isEnabled) {
+        this.uploadNoteToSlackButton.style.opacity = "1";
+        this.uploadNoteToSlackButton.style.pointerEvents = "auto";
+      } else {
+        this.uploadNoteToSlackButton.style.opacity = "0.5";
+        this.uploadNoteToSlackButton.style.pointerEvents = "none";
+      }
+    }
+  }
 }
 
 

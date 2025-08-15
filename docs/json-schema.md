@@ -64,12 +64,12 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
   - `webModel`: 웹페이지 요약용 모델 그룹
     - `default`: 기본 모델 (예: "gpt-4.1-mini")
     - `models`: 사용 가능한 모델 목록
-      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `o1-mini`, `o3-mini`
+      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `o1-mini`, `o3-mini`
       - `gemini-2.0-flash`, `gemini-2.5-flash`
   - `pdfModel`: PDF 요약용 모델 그룹
     - `default`: 기본 모델 (예: "gpt-4o")
     - `models`: 사용 가능한 모델 목록
-      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`
+      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
   - `sttModel`: 음성 인식용 모델 그룹
     - `default`: 기본 모델 (예: "whisper-1")
     - `models`: 사용 가능한 모델 목록
@@ -78,12 +78,12 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
   - `transcriptSummaryModel`: 녹취 요약용 모델 그룹
     - `default`: 기본 모델 (예: "gpt-4.1-mini")
     - `models`: 사용 가능한 모델 목록
-      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `o1-mini`, `o3-mini`
+      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `o1-mini`, `o3-mini`
       - `gemini-2.0-flash`, `gemini-2.5-flash`
   - `customModel`: 커스텀 명령용 모델 그룹
     - `default`: 기본 모델 (예: "gpt-4.1-mini")
     - `models`: 사용 가능한 모델 목록
-      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `o1-mini`, `o3-mini`
+      - `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `o1-mini`, `o3-mini`
       - `gemini-2.0-flash`, `gemini-2.5-flash`
 ---
 
@@ -121,17 +121,24 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 모델별 과금 정보 - OpenAI와 Gemini 모델의 토큰당 가격 정보
 
 - `openai`: OpenAI 모델별 과금 정보
-  - `gpt-4o`: `{ "inputPerK": 0.005, "outputPerK": 0.015 }`
-  - `gpt-4.1`: `{ "inputPerK": 0.01, "outputPerK": 0.03 }`
-  - `gpt-4.1-mini`: `{ "inputPerK": 0.003, "outputPerK": 0.009 }`
+  - `gpt-5`: `{ "inputPerK": 0.00125, "outputPerK": 0.010 }`
+  - `gpt-5-mini`: `{ "inputPerK": 0.00025, "outputPerK": 0.002 }`
+  - `gpt-5-nano`: `{ "inputPerK": 0.00005, "outputPerK": 0.0004 }`
+  - `gpt-4.1`: `{ "inputPerK": 0.002, "outputPerK": 0.008 }`
+  - `gpt-4.1-mini`: `{ "inputPerK": 0.0004, "outputPerK": 0.0016 }`
+  - `gpt-4o`: `{ "inputPerK": 0.0025, "outputPerK": 0.010 }`
+  - `gpt-4o-mini`: `{ "inputPerK": 0.00015, "outputPerK": 0.0006 }`
   - `gpt-4`: `{ "inputPerK": 0.03, "outputPerK": 0.06 }`
   - `gpt-4-turbo`: `{ "inputPerK": 0.01, "outputPerK": 0.03 }`
-  - `gpt-3.5-turbo`: `{ "inputPerK": 0.001, "outputPerK": 0.002 }`
+  - `gpt-3.5-turbo`: `{ "inputPerK": 0.0005, "outputPerK": 0.0015 }`
+  - `o1`: `{ "inputPerK": 0.015, "outputPerK": 0.060 }`
   - `o1-mini`: `{ "inputPerK": 0.0011, "outputPerK": 0.0044 }`
+  - `o3`: `{ "inputPerK": 0.002, "outputPerK": 0.008 }`
   - `o3-mini`: `{ "inputPerK": 0.0011, "outputPerK": 0.0044 }`
+  - `o4-mini`: `{ "inputPerK": 0.0011, "outputPerK": 0.0044 }`
   - `whisper-1`: `{ "inputPerMinute": 0.006 }` (음성 모델, 분당 가격)
   - `gpt-4o-transcribe`: `{ "inputPerMinute": 0.006 }`
-  - `gpt-4o-mini-transcribe`: `{ "inputPerMinute": 0.006 }`
+  - `gpt-4o-mini-transcribe`: `{ "inputPerMinute": 0.003 }`
 
 - `gemini`: Gemini 모델별 과금 정보
   - `gemini-2.5-pro`: 토큰 수에 따른 차등 가격
@@ -171,6 +178,13 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `confluenceParentPageUrl`: 부모 페이지 URL (string, 기본: "")
 - `confluenceParentPageSpaceKey`: Space 키 (string, 기본: "")
 - `confluenceParentPageId`: 부모 페이지 ID (string, 기본: "")
+
+**Slack 연동 설정**
+- `useSlackAPI`: Slack API 사용 여부 (boolean, 기본: false)
+- `slackBotToken`: Slack Bot 토큰 (string, 기본: "")
+- `slackChannelId`: Slack 채널 ID 또는 사용자명 (string, 기본: "")
+- `slackWorkspaceUrl`: Slack 워크스페이스 도메인 (string, 기본: "")
+- `slackApiDomain`: 커스텀 Slack API 도메인 (string, 기본: "")
 
 ### 2. Webpage Tab (`webpage-tab`)
 - `webModel`: 웹페이지 요약 모델 (string, 기본: "" → `models.json`의 `webModel.default`에서 자동 설정)
@@ -328,6 +342,20 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `confluenceParentPageSpaceKey`: Space 키 (string, 기본: "")
 - `confluenceParentPageId`: 부모 페이지 ID (string, 기본: "")
 
+**Slack 연동 설정** *macOS 데스크탑 전용*
+- `useSlackAPI`: Slack API 사용 여부 (boolean, 기본: false)
+- `slackBotToken`: Slack Bot 토큰 (string, 기본: "")
+- `slackChannelId`: 채널명 또는 사용자명 (#channel 또는 @username 형식, string, 기본: "")
+- `slackWorkspaceUrl`: Slack 워크스페이스 도메인 (도메인만, 예: "your-team.slack.com", string, 기본: "")
+- `slackApiDomain`: 커스텀 Slack API 도메인 (엔터프라이즈용, 도메인만, string, 기본: "")
+
+**Slack 연동 설정**
+- `useSlackAPI`: Slack API 사용 여부 (boolean, 기본: false)
+- `slackBotToken`: Slack Bot 토큰 (string, 기본: "")
+- `slackChannelId`: Slack 채널 ID 또는 사용자명 (string, 기본: "")
+- `slackWorkspaceUrl`: Slack 워크스페이스 도메인 (string, 기본: "")
+- `slackApiDomain`: 커스텀 Slack API 도메인 (string, 기본: "")
+
 #### 2. Web 섹션 (`web`)
 **웹페이지 요약 설정**
 - `webModel`: 웹페이지 요약 모델 (string, 기본: "" → `models.json`의 `webModel.default`에서 자동 설정)
@@ -461,3 +489,55 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - 타입 안전성 보장
 - 자동 마이그레이션으로 원활한 업그레이드
 - 통합된 설정 클래스로 일관된 데이터 접근
+- Slack Canvas/메시지 이중 모드 지원
+- 엔터프라이즈 도메인 구성 지원
+- 동적 UI 제어 및 스마트 설정 상태 관리
+
+---
+
+## 새로운 기능 및 통합 (2025년 7월 이후 추가)
+
+### Slack API 통합
+**주요 기능:**
+- **Slack Canvas 생성**: 노트 내용을 Slack Canvas로 변환하여 팀과 공유
+- **Slack 메시지 전송**: 채널 또는 DM으로 노트 내용을 메시지로 전송
+- **이중 모드 지원**: Canvas 모드와 메시지 모드 선택 가능
+- **빈 토큰 지원**: Bot 토큰 없이도 API 호출 가능 (제한적 기능)
+- **엔터프라이즈 지원**: 커스텀 Slack API 도메인 설정 지원
+
+**마크다운 변환:**
+- Obsidian 마크다운을 Slack 호환 형식으로 자동 변환
+- 볼드, 이탤릭, 불릿 포인트, 코드 블록 등 완벽 지원
+- Canvas용 마크다운과 메시지용 mrkdwn 형식 별도 처리
+
+**동적 UI 제어:**
+- `useSlackAPI` 토글에 따른 하위 설정 자동 활성화/비활성화
+- 채널 타입 자동 감지 (public/private 채널, DM 등)
+- 동적 툴팁으로 채널 정보 표시
+
+### 최신 AI 모델 지원
+**새로 추가된 OpenAI 모델:**
+- `gpt-5` 시리즈: `gpt-5`, `gpt-5-mini`, `gpt-5-nano`
+- `o3`/`o4` 시리즈: `o3`, `o3-mini`, `o4-mini`
+- 특수 모델: `o1-pro`, `o3-pro`, `computer-use-preview`
+
+**업데이트된 가격 정보:**
+- 모든 신규 모델의 토큰당 정확한 가격 반영
+- 음성 모델 분당 가격 업데이트
+- Gemini 모델 오디오 처리 가격 추가
+
+### UI/UX 개선사항
+**설정 탭 개선:**
+- 시각적 구분을 위한 HR 요소 추가
+- 도메인 입력 시 https:// 자동 처리
+- 동적 버튼 상태 관리 및 즉각적인 피드백
+- 스크롤 가능한 탭 네비게이션
+
+**향상된 툴팁 시스템:**
+- 채널 타입별 다른 아이콘 표시
+- 동적 채널 정보 로딩
+- 지연 시간 조절 가능한 툴팁
+
+**CSS 스코핑:**
+- Obsidian UI와의 충돌 방지를 위한 CSS 클래스 스코핑
+- 플러그인 전용 스타일 네임스페이스 적용

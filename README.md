@@ -140,4 +140,18 @@ Complete reference for Summar's configuration files and data structures:
 - **2025-07-10**: Updated manifest.json and improved version management
 - **2025-07-11**: Enhanced JSON schema documentation with detailed file loading order and user settings protection
 - **2025-07-12**: Refactored settings structure to v2.0 with model-specific STT prompt configurations and enhanced migration process
-- **2025-07-12**: Added comprehensive user manual documentation with detailed feature guides and tips for optimal usage 
+- **2025-07-12**: Added comprehensive user manual documentation with detailed feature guides and tips for optimal usage
+- **2025-07-12**: Enhanced status bar integration with interactive calendar icon feature and improved UI
+- **2025-07-15**: Added multilingual installation troubleshooting guide with bilingual support for improved user experience
+- **2025-07-16**: Implemented comprehensive testing infrastructure with Jest configuration and enhanced build scripts
+- **2025-07-17**: Added Swift runtime installation checks with user feedback and calendar permission validation
+- **2025-07-20**: Enhanced macOS installer with CI/CD workflow improvements and web link shortcuts integration
+- **2025-07-22**: Improved Confluence integration with automatic domain extraction and enhanced XHTML compatibility
+- **2025-07-25**: Fixed calendar event inconsistency and underscore issues in Zoom auto-recording functionality
+- **2025-08-03**: Enhanced CSS styling with proper scoping to prevent Obsidian UI conflicts
+- **2025-08-13**: Added comprehensive Slack API integration with Canvas and messaging support for note sharing
+- **2025-08-13**: Implemented dynamic UI controls with smart settings state management and enhanced tooltips
+- **2025-08-14**: Added latest OpenAI models (GPT-4.1, O3/O4 series) with updated pricing and model configurations
+- **2025-08-14**: Enhanced Slack integration with empty token support, markdown formatting improvements, and enterprise domain configuration
+- **2025-08-14**: Improved UI/UX with visual separators, simplified domain inputs, and dynamic button state management
+- **2025-08-16**: Added comprehensive Slack Canvas API integration with dual-mode support (Canvas/Message) and advanced markdown processing 

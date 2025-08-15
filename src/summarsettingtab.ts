@@ -4,6 +4,7 @@ import { SummarDebug, SummarRequestUrl, getDeviceId, sanitizeLabel, SummarToolti
 import { PluginUpdater } from "./pluginupdater";
 import SummarPlugin from "./main";
 import { ConfluenceAPI } from "./confluenceapi";
+import { SlackAPI } from "./slackapi";
 import { SummarStatsModal } from "./summarstatsmodal";
 
 export class SummarSettingsTab extends PluginSettingTab {
@@ -398,7 +399,7 @@ async activateTab(tabId: string): Promise<void> {
         textAreaEl.style.width = "100%";
       });
 
-      containerEl.createEl("p"); 
+      containerEl.createEl("hr");
 
     new Setting(containerEl)
       .setName("Confluence API Token")
@@ -455,9 +456,7 @@ async activateTab(tabId: string): Promise<void> {
       if (Platform.isMacOS && Platform.isDesktopApp) {
         const urlContainer = new Setting(containerEl)
         .setName("Confluence Parent Page URL")
-        .setDesc(
-          "To post content to a Confluence page, you need the space key and the ID of the parent page where the content will be stored. " +
-          "Enter the Confluence page URL here so you can get the required space key and parent page ID.")
+        .setDesc("Enter the URL of the parent page where content will be posted to get the space key and page ID.")
         .addText((text) => {
           text
             .setPlaceholder("Enter Confluence page URL")
@@ -565,6 +564,128 @@ async activateTab(tabId: string): Promise<void> {
           textEl.style.width = "100%";
         });      
       }
+
+      containerEl.createEl("hr");
+      
+      // Slack API 설정
+      const slackToggleSetting = new Setting(containerEl)
+        .setName("Use Slack API")
+        .setDesc("Enable Slack Canvas integration for uploading notes");
+
+      let slackBotTokenSetting: Setting;
+      let slackChannelIdSetting: Setting;
+      let slackWorkspaceSetting: Setting;
+      let slackApiDomainSetting: Setting;
+
+      // useSlackAPI 토글과 하위 설정들의 상태를 업데이트하는 함수
+      const updateSlackSettingsState = (enabled: boolean) => {
+        if (slackBotTokenSetting) {
+          const botTokenInput = slackBotTokenSetting.controlEl.querySelector('input') as HTMLInputElement;
+          if (botTokenInput) botTokenInput.disabled = !enabled;
+        }
+        if (slackChannelIdSetting) {
+          const channelIdInput = slackChannelIdSetting.controlEl.querySelector('input') as HTMLInputElement;
+          if (channelIdInput) channelIdInput.disabled = !enabled;
+        }
+        if (slackWorkspaceSetting) {
+          const workspaceInput = slackWorkspaceSetting.controlEl.querySelector('input') as HTMLInputElement;
+          if (workspaceInput) workspaceInput.disabled = !enabled;
+        }
+        if (slackApiDomainSetting) {
+          const apiDomainInput = slackApiDomainSetting.controlEl.querySelector('input') as HTMLInputElement;
+          if (apiDomainInput) apiDomainInput.disabled = !enabled;
+        }
+      };
+
+      slackToggleSetting.addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settingsv2.common.useSlackAPI)
+          .onChange(async (value) => {
+            this.plugin.settingsv2.common.useSlackAPI = value;
+            await this.plugin.settingsv2.saveSettings();
+            updateSlackSettingsState(value);
+            // summarview의 버튼 상태도 업데이트
+            this.plugin.updateSlackButtonState();
+          })
+      );
+
+      if (Platform.isMacOS && Platform.isDesktopApp) {
+        slackBotTokenSetting = new Setting(containerEl)
+          .setName("Slack Bot Token")
+          .setDesc("Enter your Slack Bot Token (xoxb-...). You can get this from your Slack app settings.")
+          .addText((text) => {
+            text
+              .setPlaceholder("xoxb-...")
+              .setValue(this.plugin.settingsv2.common.slackBotToken || "")
+              .onChange(async (value) => {
+                this.plugin.settingsv2.common.slackBotToken = value;
+                await this.plugin.settingsv2.saveSettings();
+              });
+            const textEl = text.inputEl;
+            textEl.style.width = "100%";
+            // textEl.type = "password"; // 토큰 숨김
+          });
+
+        slackChannelIdSetting = new Setting(containerEl);
+        
+        // SLACK_UPLOAD_TO_CANVAS 값에 따라 동적으로 Name과 Desc 설정
+        const isCanvasMode = this.plugin.SLACK_UPLOAD_TO_CANVAS;
+        if (isCanvasMode) {
+          slackChannelIdSetting
+            .setName("Slack Canvas Target")
+            .setDesc("Enter #channelname or @username where you want to create Canvas from active note");
+        } else {
+          slackChannelIdSetting
+            .setName("Slack Message Target")
+            .setDesc("Enter #channelname or @username where you want to send active note as message");
+        }
+        
+        slackChannelIdSetting.addText((text) => {
+            text
+              .setPlaceholder(isCanvasMode ? "#channelname or @username" : "#channelname or @username")
+              .setValue(this.plugin.settingsv2.common.slackChannelId || "")
+              .onChange(async (value) => {
+                this.plugin.settingsv2.common.slackChannelId = value;
+                await this.plugin.settingsv2.saveSettings();
+              });
+            const textEl = text.inputEl;
+            textEl.style.width = "100%";
+          });
+
+        slackWorkspaceSetting = new Setting(containerEl)
+          .setName("Slack Workspace Domain")
+          .setDesc("Your Slack workspace domain (without https://)")
+          .addText((text) => {
+            text
+              .setPlaceholder("your-workspace.slack.com")
+              .setValue(this.plugin.settingsv2.common.slackWorkspaceUrl || "")
+              .onChange(async (value) => {
+                this.plugin.settingsv2.common.slackWorkspaceUrl = value;
+                await this.plugin.settingsv2.saveSettings();
+              });
+            const textEl = text.inputEl;
+            textEl.style.width = "100%";
+          });
+
+        slackApiDomainSetting = new Setting(containerEl)
+          .setName("Slack API Domain")
+          .setDesc("Custom Slack API domain (without https://, leave empty to use default slack.com). Used for enterprise installations.")
+          .addText((text) => {
+            text
+              .setPlaceholder("your-enterprise.slack.com")
+              .setValue(this.plugin.settingsv2.common.slackApiDomain || "")
+              .onChange(async (value) => {
+                this.plugin.settingsv2.common.slackApiDomain = value;
+                await this.plugin.settingsv2.saveSettings();
+              });
+            const textEl = text.inputEl;
+            textEl.style.width = "100%";
+          });
+
+        // 초기 상태 설정
+        updateSlackSettingsState(this.plugin.settingsv2.common.useSlackAPI);
+      }
+      
   }
 
   async buildWebpageSettings(containerEl: HTMLElement): Promise<void> {
