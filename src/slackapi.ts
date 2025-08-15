@@ -136,7 +136,7 @@ export class SlackAPI {
                 if (!channelId || channelId.trim().length === 0) {
                     return {
                         success: false,
-                        message: "메시지 전송을 위해서는 Channel ID가 필요합니다. 설정에서 Channel ID를 입력해주세요."
+                        message: "To send messages, you must specify #channelname or @username in the settings."
                     };
                 }
                 
