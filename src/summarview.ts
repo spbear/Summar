@@ -469,7 +469,7 @@ export class SummarView extends View {
       cls: "summarview-result",
     });
     resultContainer.style.width = "calc(100% - 10px)";
-    resultContainer.style.height = "calc(100% - 80px)"; // 높이 재조정
+    resultContainer.style.height = "calc(100% - 110px)"; // status bar 높이(30px) 추가로 고려하여 80px에서 110px로 조정
     resultContainer.style.border = "1px solid var(--background-modifier-border)";
     resultContainer.style.padding = "10px";
     resultContainer.style.margin = "5px"; // 위로 붙임
@@ -517,6 +517,34 @@ export class SummarView extends View {
     const existingLeaf = this.app.workspace.getMostRecentLeaf();
     if (!existingLeaf) return ""; 
     return existingLeaf.view.getViewType();
+  }
+
+  updateSlackButtonTooltip(): void {
+    try {
+      if (!this.plugin.uploadNoteToSlackButton) return;
+      
+      // 동적으로 버튼 라벨과 아이콘 설정 (Channel ID 포함)
+      const channelId = this.plugin.settingsv2.common.slackChannelId || "Not set";
+      let channelInfo = " (No Channel)";
+      
+      if (channelId !== "Not set") {
+        if (channelId.includes("#")) {
+          channelInfo = ` (Channel: ${channelId})`;
+        } else if (channelId.includes("@")) {
+          channelInfo = ` (DM: ${channelId})`;
+        } else {
+          channelInfo = ` (Channel: ${channelId})`;
+        }
+      }
+      
+      if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+        this.plugin.uploadNoteToSlackButton.setAttribute("aria-label", `Create Slack Canvas${channelInfo}`);
+      } else {
+        this.plugin.uploadNoteToSlackButton.setAttribute("aria-label", `Send Slack Message${channelInfo}`);
+      }
+    } catch (error) {
+      console.error('Error updating Slack button tooltip:', error);
+    }
   }
 
 }

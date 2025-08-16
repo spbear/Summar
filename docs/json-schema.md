@@ -183,7 +183,7 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `useSlackAPI`: Slack API 사용 여부 (boolean, 기본: false)
 - `slackBotToken`: Slack Bot 토큰 (string, 기본: "")
 - `slackChannelId`: Slack 채널 ID 또는 사용자명 (string, 기본: "")
-- `slackWorkspaceUrl`: Slack 워크스페이스 도메인 (string, 기본: "")
+- `slackWorkspaceDomain`: Slack 워크스페이스 도메인 (string, 기본: "")
 - `slackApiDomain`: 커스텀 Slack API 도메인 (string, 기본: "")
 
 ### 2. Webpage Tab (`webpage-tab`)
@@ -346,14 +346,14 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `useSlackAPI`: Slack API 사용 여부 (boolean, 기본: false)
 - `slackBotToken`: Slack Bot 토큰 (string, 기본: "")
 - `slackChannelId`: 채널명 또는 사용자명 (#channel 또는 @username 형식, string, 기본: "")
-- `slackWorkspaceUrl`: Slack 워크스페이스 도메인 (도메인만, 예: "your-team.slack.com", string, 기본: "")
+- `slackWorkspaceDomain`: Slack 워크스페이스 도메인 (도메인만, 예: "your-team.slack.com", string, 기본: "")
 - `slackApiDomain`: 커스텀 Slack API 도메인 (엔터프라이즈용, 도메인만, string, 기본: "")
 
 **Slack 연동 설정**
 - `useSlackAPI`: Slack API 사용 여부 (boolean, 기본: false)
 - `slackBotToken`: Slack Bot 토큰 (string, 기본: "")
 - `slackChannelId`: Slack 채널 ID 또는 사용자명 (string, 기본: "")
-- `slackWorkspaceUrl`: Slack 워크스페이스 도메인 (string, 기본: "")
+- `slackWorkspaceDomain`: Slack 워크스페이스 도메인 (string, 기본: "")
 - `slackApiDomain`: 커스텀 Slack API 도메인 (string, 기본: "")
 
 #### 2. Web 섹션 (`web`)

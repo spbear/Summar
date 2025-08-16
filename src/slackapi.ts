@@ -214,7 +214,7 @@ export class SlackAPI {
             
             if (response.status === 200 && apiResponse.ok) {
                 const canvasId = apiResponse.canvas_id;
-                const workspaceDomain = this.plugin.settingsv2.common.slackWorkspaceUrl;
+                const workspaceDomain = this.plugin.settingsv2.common.slackWorkspaceDomain;
                 const workspaceUrl = workspaceDomain ? `https://${workspaceDomain}` : "https://app.slack.com";
                 
                 let canvasUrl: string;
@@ -342,7 +342,7 @@ export class SlackAPI {
             if (response.status === 200 && response.json.ok) {
                 const timestamp = response.json.ts;
                 const channel = response.json.channel;
-                const workspaceDomain = this.plugin.settingsv2.common.slackWorkspaceUrl;
+                const workspaceDomain = this.plugin.settingsv2.common.slackWorkspaceDomain;
                 const workspaceUrl = workspaceDomain ? `https://${workspaceDomain}` : "https://app.slack.com";
                 const messageUrl = `${workspaceUrl}/archives/${channel}/p${timestamp.replace('.', '')}`;
                 

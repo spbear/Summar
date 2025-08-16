@@ -1,11 +1,13 @@
 import { PluginSettingTab, Setting, Platform, ButtonComponent, Modal, App } from "obsidian";
 
-import { SummarDebug, SummarRequestUrl, getDeviceId, sanitizeLabel, SummarTooltip, extractDomain } from "./globals";
+import { SummarDebug, SummarRequestUrl, SummarRequestUrlWithTimeout, getDeviceId, sanitizeLabel, SummarTooltip, extractDomain } from "./globals";
 import { PluginUpdater } from "./pluginupdater";
 import SummarPlugin from "./main";
 import { ConfluenceAPI } from "./confluenceapi";
 import { SlackAPI } from "./slackapi";
 import { SummarStatsModal } from "./summarstatsmodal";
+import { SettingHelperConfig } from "./types";
+import { SettingHelperModal } from "./settinghelper";
 
 export class SummarSettingsTab extends PluginSettingTab {
   plugin: SummarPlugin;
@@ -352,6 +354,60 @@ async activateTab(tabId: string): Promise<void> {
 
     containerEl.createEl("p"); 
 
+    // Setting Helper 섹션을 위한 placeholder 생성
+    const settingHelperContainer = containerEl.createDiv();
+
+    // Setting Helper 버튼 추가를 위한 로컬 서버 확인
+    (async () => {
+      try {
+        const response = await SummarRequestUrlWithTimeout(this.plugin, "https://line-objects-dev.com/summar/summar_common.json", 2000);
+
+        if (response.status === 200 && response.json) {
+          SummarDebug.log(1, `settingHelper() response: \n${JSON.stringify(response.json)}`);
+
+          // 200 응답이고 JSON이 있으면 Setting Helper 버튼 추가
+          const helperConfig = response.json as SettingHelperConfig;
+          settingHelperContainer.createEl("hr");
+          
+          new Setting(settingHelperContainer)
+            .setName("Setting Helper")
+            .setDesc(helperConfig.helper_desc)
+            .addButton((button) => {
+              button
+                .setButtonText("Open Setting Helper")
+                .onClick(() => {
+                  const settingHelperModal = new SettingHelperModal(this.plugin, helperConfig, () => {
+                    // Apply Selected Settings 버튼을 클릭했을 때 실행될 콜백
+                    this.refreshSettingsUI();
+                  });
+                  settingHelperModal.open();
+                });
+              
+              // 버튼 스타일링: 평상시 더욱 흐린 레드, 호버 시 더더욱 흐린 레드
+              button.buttonEl.style.backgroundColor = "#F08080"; // 더욱 흐린 레드 (Light Coral)
+              button.buttonEl.style.color = "white";
+              button.buttonEl.style.border = "1px solid #CD5C5C";
+              button.buttonEl.style.transition = "background-color 0.3s ease";
+              
+              // 마우스 오버 이벤트
+              button.buttonEl.addEventListener("mouseenter", () => {
+                button.buttonEl.style.backgroundColor = "#FFA07A"; // 더더욱 흐린 레드 (Light Salmon)
+              });
+              
+              // 마우스 아웃 이벤트
+              button.buttonEl.addEventListener("mouseleave", () => {
+                button.buttonEl.style.backgroundColor = "#F08080"; // 더욱 흐린 레드로 복원
+              });
+            });
+        }
+      } catch (error) {
+        // 에러가 발생하거나 200이 아니면 무시
+        SummarDebug.log(2, "Setting Helper not available:", error);
+      }
+    })();
+
+    containerEl.createEl("hr");
+
     new Setting(containerEl)
       .setName("OpenAI API Key")
       .setDesc("Enter your OpenAI API key.")
@@ -633,20 +689,22 @@ async activateTab(tabId: string): Promise<void> {
         if (isCanvasMode) {
           slackChannelIdSetting
             .setName("Slack Canvas Target")
-            .setDesc("Enter #channelname or @username where you want to create Canvas from active note");
+            .setDesc("Enter #channelname, @username, or CHANNELID where you want to create Canvas from active note");
         } else {
           slackChannelIdSetting
             .setName("Slack Message Target")
-            .setDesc("Enter #channelname or @username where you want to send active note as message");
+            .setDesc("Enter #channelname, @username, or CHANNELID where you want to send active note as message");
         }
         
         slackChannelIdSetting.addText((text) => {
             text
-              .setPlaceholder(isCanvasMode ? "#channelname or @username" : "#channelname or @username")
+              .setPlaceholder("#.. or @.. or C..")
               .setValue(this.plugin.settingsv2.common.slackChannelId || "")
               .onChange(async (value) => {
                 this.plugin.settingsv2.common.slackChannelId = value;
                 await this.plugin.settingsv2.saveSettings();
+                // Slack 버튼 툴팁 업데이트
+                this.plugin.updateSlackButtonTooltip();
               });
             const textEl = text.inputEl;
             textEl.style.width = "100%";
@@ -658,9 +716,9 @@ async activateTab(tabId: string): Promise<void> {
           .addText((text) => {
             text
               .setPlaceholder("your-workspace.slack.com")
-              .setValue(this.plugin.settingsv2.common.slackWorkspaceUrl || "")
+              .setValue(this.plugin.settingsv2.common.slackWorkspaceDomain || "")
               .onChange(async (value) => {
-                this.plugin.settingsv2.common.slackWorkspaceUrl = value;
+                this.plugin.settingsv2.common.slackWorkspaceDomain = value;
                 await this.plugin.settingsv2.saveSettings();
               });
             const textEl = text.inputEl;
@@ -2050,6 +2108,12 @@ async activateTab(tabId: string): Promise<void> {
       }
       dropdownComponent.setValue(currentValue);
     }
+  }
+
+  private refreshSettingsUI(): void {
+    // 설정이 변경되었을 때 UI를 새로고침하는 메소드
+    // 현재 탭을 다시 표시하여 변경된 설정값을 반영
+    this.display();
   }
 }
 

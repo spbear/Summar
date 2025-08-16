@@ -1321,6 +1321,27 @@ export default class SummarPlugin extends Plugin {
         this.uploadNoteToSlackButton.style.opacity = "0.5";
         this.uploadNoteToSlackButton.style.pointerEvents = "none";
       }
+      
+      // SummarView의 툴팁 업데이트
+      this.updateSlackButtonTooltip();
+    }
+  }
+
+  /**
+   * Slack 버튼의 툴팁을 업데이트합니다.
+   */
+  updateSlackButtonTooltip(): void {
+    try {
+      // SummarView가 활성화되어 있는지 확인하고 툴팁 업데이트
+      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+      if (leaves.length > 0) {
+        const summarView = leaves[0].view as SummarView;
+        if (summarView && typeof summarView.updateSlackButtonTooltip === 'function') {
+          summarView.updateSlackButtonTooltip();
+        }
+      }
+    } catch (error) {
+      console.error('Error updating Slack button tooltip:', error);
     }
   }
 }

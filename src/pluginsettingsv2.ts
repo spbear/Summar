@@ -32,7 +32,7 @@ export class PluginSettingsV2 {
     useSlackAPI: boolean;
     slackBotToken: string;
     slackChannelId: string;
-    slackWorkspaceUrl: string;
+    slackWorkspaceDomain: string;
     slackApiDomain: string;
   } = {
     openaiApiKey: "",
@@ -47,7 +47,7 @@ export class PluginSettingsV2 {
     useSlackAPI: false,
     slackBotToken: "",
     slackChannelId: "",
-    slackWorkspaceUrl: "",
+    slackWorkspaceDomain: "",
     slackApiDomain: ""
   };
   

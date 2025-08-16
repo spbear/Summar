@@ -92,6 +92,28 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+export function SummarRequestUrlWithTimeout(
+  plugin: SummarPlugin,
+  request: RequestUrlParam | string,
+  timeoutMs: number
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error("⏰ Request timed out"));
+    }, timeoutMs);
+
+    SummarRequestUrl(plugin, request)
+      .then((response) => {
+        clearTimeout(timeoutId);
+        resolve(response);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
 export function SummarRequestUrl(plugin: SummarPlugin, request: RequestUrlParam | string, throwFlag: boolean = true): RequestUrlResponsePromise {
   let requestParam: RequestUrlParam;
   

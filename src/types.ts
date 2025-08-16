@@ -113,4 +113,18 @@ export interface PromptData {
     default_prompts: LangPromptData;
 }
 
+export interface SettingHelperConfig {
+    version: string;
+    helper_desc: string;
+    common: {
+        getChatAIPat: string;
+        openaiApiEndpoint: string;
+        getConfluencePat: string;
+        confluenceDomain: string;
+        slackWorkspaceDomain: string;
+        slackApiDomain: string;
+        slackApiProxyDoc: string;
+    };
+}
+
 // export type PromptCategory = 'webPrompt' | 'pdfPrompt' | 'sttPrompt' | 'transcriptSummaryPrompt' | 'refineSummaryPrompt';
