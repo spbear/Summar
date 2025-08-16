@@ -526,8 +526,8 @@ async activateTab(tabId: string): Promise<void> {
             // 📏 입력창 크기 크게 조정
             textEl.style.width = "100%";
             // textEl.style.height = "3em";
-            textEl.style.fontSize = "1em";
-            textEl.style.padding = "8px";
+            // textEl.style.fontSize = "1em";
+            // textEl.style.padding = "8px";
 
             // 🔠 긴 URL도 잘 보이도록
             textEl.style.whiteSpace = "normal";

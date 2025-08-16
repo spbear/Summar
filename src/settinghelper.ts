@@ -25,18 +25,8 @@ export class SettingHelperModal extends Modal {
         // 모달 제목 설정
         contentEl.createEl("h2", { text: "Setting Helper" });
 
-        // 설명 텍스트 추가
-        const descEl = contentEl.createEl("p", { 
-            text: this.helperConfig.helper_desc,
-            cls: "setting-helper-description"
-        });
-        descEl.style.marginBottom = "20px";
-        descEl.style.color = "var(--text-muted)";
-
-        // Default Domain 섹션
         if (this.helperConfig.common) {
             const defaultDomainSection = contentEl.createDiv({ cls: "setting-helper-default-domain" });
-            defaultDomainSection.createEl("h3", { text: "Default Domain" });
             
             // 설명 텍스트
             const descriptionText = defaultDomainSection.createEl("p", {
@@ -47,7 +37,7 @@ export class SettingHelperModal extends Modal {
             // 설정 정보 표시 (각각 체크박스 포함)
             const settingsInfo = defaultDomainSection.createDiv({ cls: "settings-info" });
             settingsInfo.style.marginLeft = "20px";
-            settingsInfo.style.fontSize = "0.9em";
+            settingsInfo.style.fontSize = "1.0em"; // 0.9em에서 1.0em으로 증가
             
             const { common } = this.helperConfig;
             
@@ -59,8 +49,21 @@ export class SettingHelperModal extends Modal {
             this.openaiCheckbox = openaiDiv.createEl("input", { type: "checkbox" });
             this.openaiCheckbox.style.marginRight = "8px";
             this.openaiCheckbox.checked = true;
-            const openaiSpan = openaiDiv.createEl("span");
-            openaiSpan.innerHTML = `OpenAI API Endpoint URL : <span style="color: var(--text-accent)">${common.openaiApiEndpoint || 'N/A'}</span>`;
+            const openaiLabel = openaiDiv.createEl("label");
+            openaiLabel.style.cursor = "pointer";
+            openaiLabel.innerHTML = `OpenAI API Endpoint URL : <span style="color: var(--text-accent)">${common.openaiApiEndpoint || 'N/A'}</span>`;
+            // 라벨 클릭 시 체크박스 토글
+            openaiLabel.addEventListener("click", () => {
+                this.openaiCheckbox.checked = !this.openaiCheckbox.checked;
+            });
+            
+            // ChatAI PAT 링크 (OpenAI 아래에 추가)
+            const chatAIPatDiv = settingsInfo.createEl("div");
+            chatAIPatDiv.style.marginBottom = "8px";
+            chatAIPatDiv.style.marginLeft = "23px"; // 체크박스 너비(14px) + 마진(8px) = 22px로 정렬
+            chatAIPatDiv.style.fontSize = "0.9em"; // 0.85em에서 0.9em으로 증가
+            chatAIPatDiv.style.color = "var(--text-muted)";
+            chatAIPatDiv.innerHTML = `Get ChatAI PAT : <a href="${this.helperConfig.common.getChatAIPat || '#'}" target="_blank">Go to link</a>`;
             
             // Confluence Domain
             const confluenceDiv = settingsInfo.createEl("div");
@@ -70,8 +73,21 @@ export class SettingHelperModal extends Modal {
             this.confluenceCheckbox = confluenceDiv.createEl("input", { type: "checkbox" });
             this.confluenceCheckbox.style.marginRight = "8px";
             this.confluenceCheckbox.checked = true;
-            const confluenceSpan = confluenceDiv.createEl("span");
-            confluenceSpan.innerHTML = `Confluence Domain : <span style="color: var(--text-accent)">${common.confluenceDomain || 'N/A'}</span>`;
+            const confluenceLabel = confluenceDiv.createEl("label");
+            confluenceLabel.style.cursor = "pointer";
+            confluenceLabel.innerHTML = `Confluence Domain : <span style="color: var(--text-accent)">${common.confluenceDomain || 'N/A'}</span>`;
+            // 라벨 클릭 시 체크박스 토글
+            confluenceLabel.addEventListener("click", () => {
+                this.confluenceCheckbox.checked = !this.confluenceCheckbox.checked;
+            });
+            
+            // Confluence PAT 링크 (Confluence 아래에 추가)
+            const confluencePatDiv = settingsInfo.createEl("div");
+            confluencePatDiv.style.marginBottom = "8px";
+            confluencePatDiv.style.marginLeft = "23px"; // 체크박스 너비(14px) + 마진(8px) = 22px로 정렬
+            confluencePatDiv.style.fontSize = "0.9em"; // 0.85em에서 0.9em으로 증가
+            confluencePatDiv.style.color = "var(--text-muted)";
+            confluencePatDiv.innerHTML = `Get Confluence PAT : <a href="${this.helperConfig.common.getConfluencePat || '#'}" target="_blank">Go to link</a>`;
             
             // Slack Workspace Domain
             const slackWorkspaceDiv = settingsInfo.createEl("div");
@@ -81,8 +97,13 @@ export class SettingHelperModal extends Modal {
             this.slackWorkspaceCheckbox = slackWorkspaceDiv.createEl("input", { type: "checkbox" });
             this.slackWorkspaceCheckbox.style.marginRight = "8px";
             this.slackWorkspaceCheckbox.checked = true;
-            const slackWorkspaceSpan = slackWorkspaceDiv.createEl("span");
-            slackWorkspaceSpan.innerHTML = `Slack Workspace Domain : <span style="color: var(--text-accent)">${common.slackWorkspaceDomain || 'N/A'}</span>`;
+            const slackWorkspaceLabel = slackWorkspaceDiv.createEl("label");
+            slackWorkspaceLabel.style.cursor = "pointer";
+            slackWorkspaceLabel.innerHTML = `Slack Workspace Domain : <span style="color: var(--text-accent)">${common.slackWorkspaceDomain || 'N/A'}</span>`;
+            // 라벨 클릭 시 체크박스 토글
+            slackWorkspaceLabel.addEventListener("click", () => {
+                this.slackWorkspaceCheckbox.checked = !this.slackWorkspaceCheckbox.checked;
+            });
             
             // Slack API Domain
             const slackApiDiv = settingsInfo.createEl("div");
@@ -92,43 +113,37 @@ export class SettingHelperModal extends Modal {
             this.slackApiCheckbox = slackApiDiv.createEl("input", { type: "checkbox" });
             this.slackApiCheckbox.style.marginRight = "8px";
             this.slackApiCheckbox.checked = true;
-            const slackApiSpan = slackApiDiv.createEl("span");
-            slackApiSpan.innerHTML = `Slack API Domain : <span style="color: var(--text-accent)">${common.slackApiDomain || 'N/A'}</span>`;
-        }
-
-        // PAT 구하기 섹션
-        if (this.helperConfig.common) {
-            const patSection = contentEl.createDiv({ cls: "setting-helper-pat" });
-            patSection.style.marginTop = "20px";
-            patSection.createEl("h3", { text: "Get PAT (Personal Access Token)" });
+            const slackApiLabel = slackApiDiv.createEl("label");
+            slackApiLabel.style.cursor = "pointer";
+            slackApiLabel.innerHTML = `Slack API Domain : <span style="color: var(--text-accent)">${common.slackApiDomain || 'N/A'}</span>`;
+            // 라벨 클릭 시 체크박스 토글
+            slackApiLabel.addEventListener("click", () => {
+                this.slackApiCheckbox.checked = !this.slackApiCheckbox.checked;
+            });
             
-            const patList = patSection.createEl("ul");
-            
-            // ChatAI PAT
-            const chatAIItem = patList.createEl("li");
-            chatAIItem.innerHTML = `Get ChatAI PAT : <a href="${this.helperConfig.common.getChatAIPat || '#'}" target="_blank">Go to link</a>`;
-            
-            // Confluence PAT
-            const confluenceItem = patList.createEl("li");
-            confluenceItem.innerHTML = `Get Confluence PAT : <a href="${this.helperConfig.common.getConfluencePat || '#'}" target="_blank">Go to link</a>`;
-        }
-
-        // etc 섹션
-        if (this.helperConfig.common) {
-            const etcSection = contentEl.createDiv({ cls: "setting-helper-etc" });
-            etcSection.style.marginTop = "20px";
-            etcSection.createEl("h3", { text: "etc" });
-            
-            const patList = etcSection.createEl("ul");
-            const slackProxyInfo = patList.createEl("li");
-            slackProxyInfo.innerHTML = `Reference Slack API Proxy Help : <a href="${this.helperConfig.common.slackApiProxyDoc || '#'}" target="_blank">Go to link</a>`;
+            // Slack API Proxy 도움말 링크 (Slack API Domain 아래에 추가)
+            const slackProxyHelpDiv = settingsInfo.createEl("div");
+            slackProxyHelpDiv.style.marginBottom = "8px";
+            slackProxyHelpDiv.style.marginLeft = "23px"; // 체크박스 너비(14px) + 마진(8px) = 22px로 정렬
+            slackProxyHelpDiv.style.fontSize = "0.9em"; // 0.85em에서 0.9em으로 증가
+            slackProxyHelpDiv.style.color = "var(--text-muted)";
+            slackProxyHelpDiv.innerHTML = `Reference Slack API Proxy Help : <a href="${this.helperConfig.common.slackApiProxyDoc || '#'}" target="_blank">Go to link</a>`;
             
             // Slack API Proxy 사용 시 설명 추가
-            const slackProxyDesc = patList.createEl("li");
-            slackProxyDesc.style.marginLeft = "20px";
-            slackProxyDesc.style.fontSize = "0.9em";
-            slackProxyDesc.style.color = "var(--text-muted)";
-            slackProxyDesc.innerHTML = `When using Slack API proxy in the office, Slack bot token is not required.`;
+            const slackProxyDescDiv = settingsInfo.createEl("div");
+            slackProxyDescDiv.style.marginBottom = "8px";
+            slackProxyDescDiv.style.marginLeft = "23px"; // 체크박스 정렬(22px) + 추가 들여쓰기(20px) = 42px
+            slackProxyDescDiv.style.fontSize = "0.85em"; // 0.8em에서 0.85em으로 증가
+            slackProxyDescDiv.style.color = "var(--text-muted)";
+            slackProxyDescDiv.innerHTML = `When using Slack API proxy in the office, Slack bot token is not required.`;
+            
+            // Slack 앱 설치 관련 추가 설명
+            const slackAppNoticeDiv = settingsInfo.createEl("div");
+            slackAppNoticeDiv.style.marginBottom = "8px";
+            slackAppNoticeDiv.style.marginLeft = "23px";
+            slackAppNoticeDiv.style.fontSize = "0.85em";
+            slackAppNoticeDiv.style.color = "var(--text-muted)";
+            slackAppNoticeDiv.innerHTML = `Note: Add the Slack app to your target channel first. See help link above.`;
         }
 
         // 버튼 영역
