@@ -14,6 +14,7 @@
     "strictNullChecks": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "jsx": "react-jsx",
     "typeRoots": ["./node_modules/@types"],
     "types": ["jest", "node"],
     "lib": [
@@ -25,6 +26,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "src/**/*.tsx",
     "tests/**/*.ts"
   ],
   "exclude": [
