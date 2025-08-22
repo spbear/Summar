@@ -131,4 +131,35 @@ export class NativeAudioRecorder implements AudioRecorder {
 			}
 		});
 	}
+
+	/**
+	 * 강제로 레코더를 정리하고 모든 리소스를 해제합니다.
+	 */
+	cleanup(): void {
+		try {
+			if (this.recorder) {
+				// 녹음 중이라면 중단
+				if (this.recorder.state === "recording" || this.recorder.state === "paused") {
+					this.recorder.stop();
+				}
+
+				// Stream의 모든 트랙 중단
+				if (this.recorder.stream) {
+					this.recorder.stream.getTracks().forEach((track) => {
+						track.stop();
+						SummarDebug.log(2, `Stopped track: ${track.kind}`);
+					});
+				}
+
+				this.recorder = null;
+			}
+
+			// Chunks 초기화
+			this.chunks.length = 0;
+			
+			SummarDebug.log(1, "AudioRecorder cleanup completed");
+		} catch (error) {
+			SummarDebug.error(1, "Error during AudioRecorder cleanup:", error);
+		}
+	}
 }

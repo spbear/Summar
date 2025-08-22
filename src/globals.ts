@@ -77,6 +77,12 @@ export class SummarDebug {
     if (this.debugLevel >= debugLevel)
       console.error(message, ...optionalParams);
   }
+
+  static warn(debugLevel: number, message?: any, ...optionalParams: any[]): void {
+    if (this.debugLevel >= debugLevel)
+      console.warn(message, ...optionalParams);
+  }
+
   static level(): number {
     return this.debugLevel;
   }

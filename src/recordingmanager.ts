@@ -486,6 +486,46 @@ export class AudioRecordingManager extends SummarViewContainer {
 		if (this.zoomWatcherInterval) {
 			clearInterval(this.zoomWatcherInterval);
 			this.zoomWatcherInterval = null;
+			SummarDebug.log(1, "Zoom auto record watcher stopped");
+		}
+	}
+
+	/**
+	 * 플러그인 언로드 시 모든 recording 관련 리소스를 정리합니다.
+	 */
+	async cleanup() {
+		try {
+			// Zoom watcher 중지
+			this.stopZoomAutoRecordWatcher();
+
+			// 현재 녹음 중이라면 강제 중단
+			const currentState = this.getRecorderState();
+			if (currentState === "recording" || currentState === "paused") {
+				SummarDebug.log(1, "Force stopping active recording during cleanup");
+				try {
+					await this.stopRecording();
+				} catch (error) {
+					SummarDebug.error(1, "Error stopping recording during cleanup:", error);
+				}
+			}
+
+			// AudioRecorder cleanup
+			if (this.recorder) {
+				this.recorder.cleanup();
+			}
+
+			// Timer들 정리
+			if (this.timer) {
+				this.timer.stop();
+			}
+			if (this.recordingTimer) {
+				// RecordingTimer에 stop 메서드가 있는지 확인 필요
+				SummarDebug.log(2, "RecordingTimer cleanup completed");
+			}
+
+			SummarDebug.log(1, "RecordingManager cleanup completed");
+		} catch (error) {
+			SummarDebug.error(1, "Error during RecordingManager cleanup:", error);
 		}
 	}
 

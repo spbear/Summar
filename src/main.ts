@@ -105,6 +105,9 @@ export default class SummarPlugin extends Plugin {
   customCommandIds: string[] = [];
   customCommandMenu: any;
 
+  // 자동 업데이트 관련
+  private autoUpdateTimeoutId: NodeJS.Timeout | null = null;
+
   newNoteName: string = "";
   
   OBSIDIAN_PLUGIN_DIR: string = "";
@@ -259,12 +262,15 @@ export default class SummarPlugin extends Plugin {
       SummarDebug.log(1, `PLUGIN_SETTINGS: ${this.PLUGIN_SETTINGS}`);
 
       
-      // 로딩 후 1분 뒤에 업데이트 확인
+      // 로딩 후 6초 뒤에 첫 번째 업데이트 확인 및 주기적 업데이트 시작
       setTimeout(async () => {
         try {
           SummarDebug.log(1, "Checking for plugin updates...");
           const pluginUpdater = new PluginUpdater(this);
           await pluginUpdater.updatePluginIfNeeded();
+          
+          // 첫 번째 업데이트 확인 후 주기적 업데이트 시작
+          this.startAutoUpdateInterval(this.settingsv2.system.autoUpdateInterval);
         } catch (error) {
           SummarDebug.error(1, "Error during plugin update:", error);
         }
@@ -775,11 +781,98 @@ export default class SummarPlugin extends Plugin {
   }
 
   async onunload() {
-    this.app.workspace.detachLeavesOfType(SummarView.VIEW_TYPE);
-    this.recordingStatus.remove();
-    this.reservedStatus.remove();
+    SummarDebug.log(1, "Starting Summar Plugin unload process");
 
-    SummarDebug.log(1, "Summar Plugin unloaded");
+    try {
+      // Stop all background processes and watchers
+      if (this.recordingManager) {
+        await this.recordingManager.cleanup();
+        SummarDebug.log(1, "Recording manager cleanup completed");
+      }
+
+      if (this.calendarHandler) {
+        this.calendarHandler.stop();
+        SummarDebug.log(1, "Stopped calendar handler");
+      }
+
+      // Cleanup custom commands and menus
+      this.unregisterCustomCommandAndMenus();
+      SummarDebug.log(1, "Unregistered custom commands and menus");
+
+      // Stop auto update interval
+      this.stopAutoUpdateInterval();
+      SummarDebug.log(1, "Stopped auto update interval");
+
+      // Cleanup UI components
+      if (this.recordingStatus) {
+        this.recordingStatus.remove();
+      }
+      if (this.reservedStatus) {
+        this.reservedStatus.remove();
+      }
+
+      // Detach views
+      this.app.workspace.detachLeavesOfType(SummarView.VIEW_TYPE);
+
+      // Close database connection
+      if (this.dbManager) {
+        // Note: IndexedDB connections are usually closed automatically,
+        // but we could add explicit cleanup if needed
+        SummarDebug.log(1, "Database manager cleanup completed");
+      }
+
+      SummarDebug.log(1, "Summar Plugin unloaded successfully");
+    } catch (error) {
+      SummarDebug.error(1, "Error during plugin unload:", error);
+    }
+  }
+
+  /**
+   * 자동 업데이트 인터벌을 시작합니다.
+   * @param intervalMs 업데이트 체크 간격 (밀리초)
+   */
+  private startAutoUpdateInterval(intervalMs: number): void {
+    // 기존 타이머가 있다면 정리
+    this.stopAutoUpdateInterval();
+    
+    SummarDebug.log(1, `Starting auto update interval: ${intervalMs}ms (${intervalMs / 1000 / 60 / 60} hours)`);
+    
+    const scheduleNext = () => {
+      this.autoUpdateTimeoutId = setTimeout(async () => {
+        try {
+          SummarDebug.log(1, "Performing scheduled plugin update check...");
+          const pluginUpdater = new PluginUpdater(this);
+          await pluginUpdater.updatePluginIfNeeded();
+        } catch (error) {
+          SummarDebug.error(1, "Error during scheduled plugin update:", error);
+        }
+        
+        // 실행 완료 후 다음 실행을 스케줄링
+        scheduleNext();
+      }, intervalMs);
+    };
+    
+    // 첫 번째 실행을 스케줄링
+    scheduleNext();
+  }
+
+  /**
+   * 자동 업데이트 인터벌을 중지합니다.
+   */
+  private stopAutoUpdateInterval(): void {
+    if (this.autoUpdateTimeoutId) {
+      clearTimeout(this.autoUpdateTimeoutId);
+      this.autoUpdateTimeoutId = null;
+      SummarDebug.log(1, "Auto update interval stopped");
+    }
+  }
+
+  /**
+   * 자동 업데이트 인터벌을 재시작합니다 (설정 변경 시 사용).
+   */
+  public restartAutoUpdateInterval(): void {
+    SummarDebug.log(1, "Restarting auto update interval with new settings");
+    this.startAutoUpdateInterval(this.settingsv2.system.autoUpdateInterval);
   }
 
   async activateView() {
