@@ -10,7 +10,7 @@ export class SummarTimer extends SummarViewContainer {
     super(plugin);
   }
   // 타이머 시작 함수
-  start(resultKey: string): void {
+  start(resultKey: string, label: string): void {
     if (this.started) {
       return;
     }
@@ -18,7 +18,7 @@ export class SummarTimer extends SummarViewContainer {
     this.dotCount = 0; // 초기화
     this.timerInterval = window.setInterval(() => {
       // 텍스트에 점(.) 추가
-      this.appendResultText(resultKey, ".");
+      this.appendResultText(resultKey, label, ".");
       this.enableNewNote(false);
       this.dotCount++;
     }, 500); // 500ms마다 실행

@@ -37,6 +37,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 		}
 
 		const resultKey = this.plugin.generateUniqueId();
+		const label = "custom";
 		
 		const cmdModel = command.model || 'gpt-4o';
 		const cmdPrompt = command.prompt || '';
@@ -45,13 +46,13 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 
-		if (!summarai.hasKey(true, resultKey)) return;
+		if (!summarai.hasKey(true, resultKey, label)) return;
 
-		this.updateResultText(resultKey, `Execute prompt with selected text using [${cmdModel}]...`);
+		this.updateResultText(resultKey, label, `Execute prompt with selected text using [${cmdModel}]...`);
 		this.enableNewNote(false);
 
 		try {
-			this.timer.start(resultKey);
+			this.timer.start(resultKey, label);
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
 
@@ -63,14 +64,14 @@ export class CustomCommandHandler extends SummarViewContainer {
 			if (responseStatus !== 200) {
 				const errorText = responseText || "Unknown error occurred.";
 				SummarDebug.error(1, "AI API Error:", errorText);
-				this.updateResultText(resultKey, `Error: ${responseStatus} - ${errorText}`);
+				this.updateResultText(resultKey, label, `Error: ${responseStatus} - ${errorText}`);
 				this.enableNewNote(false);
 
 				return;
 			}
 
 			if (responseText && responseText.length > 0) {
-				this.updateResultText(resultKey, responseText);
+				this.updateResultText(resultKey, label, responseText);
 				this.enableNewNote(true);
 
 				// 결과를 노트에 append (설정에 따라)
@@ -114,7 +115,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 					}
 				}
 			} else {
-				this.updateResultText(resultKey, "No valid response from OpenAI API.");
+				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
 				this.enableNewNote(false);
 			}
 
@@ -125,7 +126,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 			if (error) {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
-			this.updateResultText(resultKey, msg);
+			this.updateResultText(resultKey, label, msg);
 			this.enableNewNote(false);
 		}
 	}

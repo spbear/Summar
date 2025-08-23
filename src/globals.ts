@@ -20,12 +20,12 @@ export class SummarViewContainer {
    * @param resultContainer The container object to update.
    * @param message The message to set as the value.
    */
-  updateResultText(key: string, message: string): string {
-      return this.plugin.updateResultText(key, message);
+  updateResultText(key: string, label: string, message: string): string {
+      return this.plugin.updateResultText(key, label, message);
   }
 
-  appendResultText(key: string, message: string): string {
-      return this.plugin.appendResultText(key, message);  
+  appendResultText(key: string, label: string, message: string): string {
+      return this.plugin.appendResultText(key, label, message);  
   }
   getResultText(key: string): string {
       return this.plugin.getResultText(key);

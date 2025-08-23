@@ -40,13 +40,13 @@ export class PdfToPng extends SummarViewContainer {
     }
   }
 
-  async convert(file: any, resultKey: string, removeflag: boolean): Promise<string[]> {
+  async convert(file: any, resultKey: string, label: string, removeflag: boolean): Promise<string[]> {
     this.file = file;
     this.page = 0; // initial value
     let result: string[] = [];
 
     SummarDebug.log(1, "Starting PDF to PNG conversion...");
-    this.updateResultText(resultKey, "Initial rendering...");
+    this.updateResultText(resultKey, label, "Initial rendering...");
     this.enableNewNote(false);
 
     // Save the PDF file to a temporary location
@@ -56,18 +56,18 @@ export class PdfToPng extends SummarViewContainer {
     if (!fs.existsSync(this.tempDir)) {
       await this.createDirectory(this.tempDir);
       SummarDebug.log(1, `Temporary directory created: ${this.tempDir}`);
-      this.updateResultText(resultKey, `Temporary directory created: ${this.tempDir}`);
+      this.updateResultText(resultKey, label, `Temporary directory created: ${this.tempDir}`);
       this.enableNewNote(false);
     } else {
       SummarDebug.log(1, `Temporary directory already exists: ${this.tempDir}`);
-      this.updateResultText(resultKey, `Temporary directory already exists: ${this.tempDir}`);
+      this.updateResultText(resultKey, label, `Temporary directory already exists: ${this.tempDir}`);
       this.enableNewNote(false);
     }
 
     SummarDebug.log(1, "PDF file will be save at:", this.pdfName);
     fs.writeFileSync(this.pdfName, Buffer.from(await this.file.arrayBuffer()));
     SummarDebug.log(1, "PDF file saved at:", this.pdfName);
-    this.updateResultText(resultKey, `PDF file saved at: ${this.pdfName}`);
+    this.updateResultText(resultKey, label, `PDF file saved at: ${this.pdfName}`);
     this.enableNewNote(false);
 
     // Output directory for PNGs
@@ -76,7 +76,7 @@ export class PdfToPng extends SummarViewContainer {
     await this.createDirectory(this.outputDir);
 
     SummarDebug.log(1, "Converting PDF to images using Poppler...");
-    this.updateResultText(resultKey, "Converting PDF to images using Poppler...");
+    this.updateResultText(resultKey, label, "Converting PDF to images using Poppler...");
     this.enableNewNote(false);
 
     SummarDebug.log(1, this.pdfName);
@@ -87,7 +87,7 @@ export class PdfToPng extends SummarViewContainer {
       await this.deleteIfExists(this.pdfName);
     }
 
-    result = this.listPngFiles(resultKey);
+    result = this.listPngFiles(resultKey, label);
     SummarDebug.log(1, "outputDir: ", this.outputDir);
 
     if (removeflag) {
@@ -201,7 +201,7 @@ export class PdfToPng extends SummarViewContainer {
    * 
    * @returns A sorted array of matching PNG file names.
    */
-  private listPngFiles(resultKey: string): string[] {
+  private listPngFiles(resultKey: string, label: string): string[] {
     const fs = require("fs");
     const path = require("path");
 
@@ -235,7 +235,7 @@ export class PdfToPng extends SummarViewContainer {
           base64Values.push(base64String); // Add Base64 to result
         } catch (readError) {
           SummarDebug.error(1,`Error reading file ${file}:`, readError);
-          this.updateResultText(resultKey, `Failed to process ${file}`);
+          this.updateResultText(resultKey, label, `Failed to process ${file}`);
           this.enableNewNote(false);
         }
       });

@@ -10,11 +10,20 @@ export class SummarView extends View {
   static VIEW_TYPE = "summar-view";
 
   plugin: SummarPlugin;
-  resultContainer: HTMLTextAreaElement;
+  resultContainer: HTMLDivElement;
+  resultItems: Map<string, HTMLDivElement> = new Map();
+  markdownRenderer: MarkdownIt;
 
   constructor(leaf: WorkspaceLeaf, plugin: SummarPlugin) {
     super(leaf);
     this.plugin = plugin;
+    this.markdownRenderer = new MarkdownIt({
+      html: true,
+      linkify: true,
+      typographer: true,
+      // breaks: false, // 자동 줄바꿈 변환 비활성화
+      // xhtmlOut: false, // XHTML 출력 비활성화
+    });
   }
 
   getViewType(): string {
@@ -41,6 +50,61 @@ export class SummarView extends View {
   private async renderView(): Promise<void> {
     const container: HTMLElement = this.containerEl;
     container.empty();
+
+    // CSS 스타일 추가 (텍스트 선택 유지 및 상하단 간격 제거)
+    const style = document.createElement('style');
+    style.textContent = `
+      .result-text {
+        -webkit-touch-callout: text;
+        -webkit-user-select: text;
+        -khtml-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        user-select: text;
+        /* 모바일 터치 동작 개선 */
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+        touch-action: manipulation;
+        cursor: text;
+        line-height: 1.6;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+        hyphens: auto;
+      }
+      .result-text > *:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+      }
+      .result-text > *:last-child {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+      }
+      .result-text p {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      .result-text p:first-child {
+        margin-top: 0 !important;
+      }
+      .result-text p:last-child {
+        margin-bottom: 0 !important;
+      }
+      .result-text::selection {
+        background-color: var(--text-selection) !important;
+        color: var(--text-on-accent) !important;
+      }
+      .result-text::-moz-selection {
+        background-color: var(--text-selection) !important;
+        color: var(--text-on-accent) !important;
+      }
+      .result-text * {
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        user-select: text !important;
+      }
+    `;
+    document.head.appendChild(style);
 
     // Input Container
     const inputContainer: HTMLDivElement = container.createEl("div", {
@@ -466,25 +530,20 @@ export class SummarView extends View {
     recordButton.style.cursor = "pointer";
 
     // Result Container
-    const resultContainer: HTMLTextAreaElement = container.createEl("textarea", {
+    const resultContainer: HTMLDivElement = container.createEl("div", {
       cls: "summarview-result",
     });
     resultContainer.style.width = "calc(100% - 10px)";
-    resultContainer.style.height = "calc(100% - 110px)"; // status bar 높이(30px) 추가로 고려하여 80px에서 110px로 조정
+    resultContainer.style.height = "calc(100% - 120px)"; // status bar 높이(30px) 추가로 고려하여 80px에서 110px로 조정
     resultContainer.style.border = "1px solid var(--background-modifier-border)";
     resultContainer.style.padding = "10px";
     resultContainer.style.margin = "5px"; // 위로 붙임
-    resultContainer.style.whiteSpace = "pre-wrap";
-    resultContainer.style.wordWrap = "break-word";
     resultContainer.style.overflowY = "auto";
     resultContainer.style.overflowX = "hidden";
-    resultContainer.style.resize = "none";
-    resultContainer.readOnly = true;
+    resultContainer.style.backgroundColor = "var(--background-primary)";
     resultContainer.style.color = "var(--text-normal)"; // Obsidian의 기본 텍스트 색상 변수 사용
   
     this.resultContainer = resultContainer;
-
-    this.plugin.resultContainer = resultContainer;
 
     this.plugin.recordButton = recordButton;
 
@@ -548,18 +607,322 @@ export class SummarView extends View {
     }
   }
 
-  updateResultText(key: string, message: string): string {
-      this.resultContainer.value = message;
-      return key;
+  /**
+   * MarkdownIt 렌더링 결과에서 불필요한 줄바꿈을 제거합니다.
+   */
+  private cleanupMarkdownOutput(html: string): string {
+    return html
+      // 연속된 <br> 태그를 하나로 줄임
+      .replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '<br>')
+      // p 태그 사이의 불필요한 공백 제거
+      .replace(/<\/p>\s*<p>/gi, '</p><p>')
+      // p 태그 내부의 시작/끝 공백 제거
+      .replace(/<p>\s+/gi, '<p>')
+      .replace(/\s+<\/p>/gi, '</p>')
+      // 빈 p 태그 제거
+      .replace(/<p>\s*<\/p>/gi, '')
+      // 연속된 공백을 하나로 줄임
+      .replace(/\s{2,}/gi, ' ')
+      // 태그 사이의 불필요한 줄바꿈 제거
+      .replace(/>\s*\n\s*</gi, '><')
+      // 시작과 끝의 공백 제거
+      .trim();
   }
 
-  appendResultText(key: string, message: string): string {
-      this.resultContainer.value += message;
-      return key;
+  updateResultText(key: string, label: string, message: string): string {
+    let resultItem = this.resultItems.get(key);
+    let isNewItem = false;
+    
+    if (!resultItem) {
+      // 새 resultItem 생성
+      resultItem = this.createResultItem(key, label);
+      this.resultItems.set(key, resultItem);
+      this.resultContainer.appendChild(resultItem);
+      isNewItem = true;
+    }
+    
+    // resultText 영역 업데이트
+    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+    if (resultText) {
+      resultText.setAttribute('data-raw-text', message);
+      const renderedHtml = this.markdownRenderer.render(message);
+      const cleanedHtml = this.cleanupMarkdownOutput(renderedHtml);
+      resultText.innerHTML = cleanedHtml;
+      SummarDebug.log(1, `Original message: ${message}`);
+      SummarDebug.log(1, `Rendered HTML: ${renderedHtml}`);
+      SummarDebug.log(1, `Cleaned HTML: ${cleanedHtml}`);
+    }
+    
+    // 새 아이템이 추가된 경우 스크롤을 맨 아래로 이동
+    if (isNewItem) {
+      setTimeout(() => {
+        this.resultContainer.scrollTop = this.resultContainer.scrollHeight;
+      }, 10); // 렌더링 완료 후 스크롤
+    }
+    
+    return key;
+  }
+
+  appendResultText(key: string, label: string, message: string): string {
+    let resultItem = this.resultItems.get(key);
+    
+    if (!resultItem) {
+      // 존재하지 않으면 updateResultText 호출
+      return this.updateResultText(key, label, message);
+    }
+    
+    // 기존 텍스트에 추가
+    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+    if (resultText) {
+      const currentText = resultText.getAttribute('data-raw-text') || '';
+      const newText = currentText + message;
+      resultText.setAttribute('data-raw-text', newText);
+      const renderedHtml = this.markdownRenderer.render(newText);
+      const cleanedHtml = this.cleanupMarkdownOutput(renderedHtml);
+      resultText.innerHTML = cleanedHtml;
+    }
+    
+    return key;
   }
 
   getResultText(key: string): string {
-    return this.resultContainer.value;
+    if (key === "") {
+      // 빈 키인 경우 모든 resultItem의 텍스트를 합쳐서 반환
+      let allText = "";
+      this.resultItems.forEach((resultItem, itemKey) => {
+        const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+        if (resultText) {
+          const text = resultText.getAttribute('data-raw-text') || '';
+          if (text) {
+            allText += (allText ? '\n\n' : '') + text;
+          }
+        }
+      });
+      return allText;
+    }
+    
+    const resultItem = this.resultItems.get(key);
+    if (!resultItem) {
+      return "";
+    }
+    
+    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+    if (resultText) {
+      return resultText.getAttribute('data-raw-text') || '';
+    }
+    
+    return "";
+  }
+
+  private createResultItem(key: string, label: string): HTMLDivElement {
+    // 전체 컨테이너 생성
+    const resultItem = document.createElement('div');
+    resultItem.className = 'result-item';
+    resultItem.style.width = '100%';
+    resultItem.style.marginBottom = '8px';
+    
+    // resultHeader 생성
+    const resultHeader = document.createElement('div');
+    resultHeader.className = 'result-header';
+    resultHeader.style.width = '100%';
+    resultHeader.style.display = 'flex';
+    resultHeader.style.alignItems = 'center';
+    resultHeader.style.gap = '0px'; // 간격을 0으로 변경
+    resultHeader.style.marginBottom = '0px'; // 4px에서 0px로 변경
+    resultHeader.style.padding = '2px';
+    resultHeader.style.border = '1px solid var(--background-modifier-border)';
+    resultHeader.style.borderRadius = '4px';
+    resultHeader.style.backgroundColor = 'var(--background-primary)';
+    
+    // 라벨 추가
+    const labelElement = document.createElement('span');
+    labelElement.textContent = label;
+    labelElement.style.fontSize = '10px';
+    labelElement.style.color = 'var(--text-muted)';
+    labelElement.style.marginLeft = '2px'; // 상하단 간격(1px)만큼 왼쪽 간격 추가
+    labelElement.style.marginRight = '0px'; // 버튼과 붙이기 위해 0으로 변경
+    labelElement.style.fontWeight = 'bold';
+    labelElement.style.flexShrink = '0'; // 라벨이 축소되지 않도록 설정
+    labelElement.style.backgroundColor = 'var(--interactive-normal)'; // lucide icon button과 동일한 바탕색
+    labelElement.style.padding = '2px 4px'; // 패딩 추가로 바탕색이 잘 보이도록
+    labelElement.style.borderRadius = '3px'; // 둥근 모서리 추가
+    resultHeader.appendChild(labelElement);
+    
+    // uploadNoteToWikiButton 추가
+    const uploadNoteToWikiButton = document.createElement('button');
+    uploadNoteToWikiButton.className = 'lucide-icon-button';
+    uploadNoteToWikiButton.setAttribute('aria-label', 'Upload Note to Confluence');
+    uploadNoteToWikiButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    uploadNoteToWikiButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    uploadNoteToWikiButton.style.margin = '0'; // 버튼 간격 제거
+    setIcon(uploadNoteToWikiButton, 'file-up');
+    uploadNoteToWikiButton.addEventListener('click', () => {
+      SummarDebug.Notice(1, 'uploadNoteToWikiButton');
+    });
+    resultHeader.appendChild(uploadNoteToWikiButton);
+    
+    // uploadNoteToSlackButton 추가
+    const uploadNoteToSlackButton = document.createElement('button');
+    uploadNoteToSlackButton.className = 'lucide-icon-button';
+    uploadNoteToSlackButton.setAttribute('aria-label', 'Upload Note to Slack');
+    uploadNoteToSlackButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    uploadNoteToSlackButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    uploadNoteToSlackButton.style.margin = '0'; // 버튼 간격 제거
+    setIcon(uploadNoteToSlackButton, 'hash');
+    uploadNoteToSlackButton.addEventListener('click', () => {
+      SummarDebug.Notice(1, 'uploadNoteToSlackButton');
+    });
+    resultHeader.appendChild(uploadNoteToSlackButton);
+    
+    // newNoteButton 추가
+    const newNoteButton = document.createElement('button');
+    newNoteButton.className = 'lucide-icon-button';
+    newNoteButton.setAttribute('aria-label', 'Create new note with this result');
+    newNoteButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    newNoteButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    newNoteButton.style.margin = '0'; // 버튼 간격 제거
+    setIcon(newNoteButton, 'file-output');
+    newNoteButton.addEventListener('click', async () => {
+      try {
+        let newNoteName = this.plugin.newNoteName;
+        
+        if (!newNoteName || newNoteName === "") {
+          const summarView = new SummarViewContainer(this.plugin);
+          summarView.enableNewNote(true, newNoteName);
+          newNoteName = this.plugin.newNoteName;
+        }
+
+        const filePath = normalizePath(newNoteName);
+        const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
+
+        if (existingFile) {
+          const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
+          
+          for (const leaf of leaves) {
+            const view = leaf.view;
+            if (view instanceof MarkdownView && view.file && view.file.path === filePath) {
+              this.plugin.app.workspace.setActiveLeaf(leaf);
+              return;
+            }
+          }
+          await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
+        } else {
+          SummarDebug.log(1, `file is not exist: ${filePath}`);
+          const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
+          const folderExists = await this.plugin.app.vault.adapter.exists(folderPath);
+          if (!folderExists) {
+            await this.plugin.app.vault.adapter.mkdir(folderPath);
+          }
+          
+          // resultText의 내용을 가져와서 노트 생성
+          const resultTextContent = resultText.getAttribute('data-raw-text') || resultText.textContent || '';
+          SummarDebug.log(1, `resultText content===\n${resultTextContent}`);
+          await this.plugin.app.vault.create(filePath, resultTextContent);
+          await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
+        }
+      } catch (error) {
+        SummarDebug.log(1, `Error creating new note: ${error}`);
+        SummarDebug.Notice(1, 'Failed to create new note');
+      }
+    });
+    resultHeader.appendChild(newNoteButton);
+    
+    // deleteResultItemButton 추가
+    const deleteResultItemButton = document.createElement('button');
+    deleteResultItemButton.className = 'lucide-icon-button';
+    deleteResultItemButton.setAttribute('aria-label', 'Delete this result item');
+    deleteResultItemButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    deleteResultItemButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    deleteResultItemButton.style.margin = '0'; // 버튼 간격 제거
+    setIcon(deleteResultItemButton, 'trash-2');
+    deleteResultItemButton.addEventListener('click', () => {
+      // 현재 resultItem 삭제
+      this.resultItems.delete(key);
+      resultItem.remove();
+    });
+    resultHeader.appendChild(deleteResultItemButton);
+    
+    // resultText 영역 생성 (기존 resultItem과 합침)
+    const resultText = document.createElement('div');
+    resultText.className = 'result-text';
+    resultText.setAttribute('data-key', key);
+    
+    // resultItem의 스타일을 resultText에 적용
+    resultText.style.width = '100%';
+    resultText.style.minHeight = '10px';
+    resultText.style.border = '1px solid var(--background-modifier-border)';
+    resultText.style.borderRadius = '4px';
+    resultText.style.padding = '8px';
+    resultText.style.marginBottom = '0px';
+    resultText.style.backgroundColor = 'var(--background-secondary)';
+    resultText.style.wordWrap = 'break-word';
+    resultText.style.whiteSpace = 'pre-wrap';
+    
+    // resultText 기본 스타일 추가
+    resultText.style.color = 'var(--text-normal)';
+    resultText.style.fontSize = '14px';
+    resultText.style.lineHeight = '1.4';
+    resultText.style.userSelect = 'text';
+    resultText.style.cursor = 'text';
+    resultText.style.margin = '0';
+    resultText.style.wordBreak = 'break-word';
+    resultText.style.overflowWrap = 'break-word';
+    resultText.style.display = 'block';
+    resultText.style.verticalAlign = 'top';
+    resultText.setAttribute('data-raw-text', '');
+    
+    // 텍스트 선택 상태 유지를 위한 이벤트 리스너 추가 (모바일 호환)
+    let savedSelection: {range: Range, startOffset: number, endOffset: number} | null = null;
+    
+    // 텍스트 선택 처리 함수 (mouse와 touch 이벤트 공통)
+    const handleSelectionEnd = () => {
+      try {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+          const range = selection.getRangeAt(0);
+          if (resultText.contains(range.commonAncestorContainer)) {
+            savedSelection = {
+              range: range.cloneRange(),
+              startOffset: range.startOffset,
+              endOffset: range.endOffset
+            };
+          }
+        }
+      } catch (error) {
+        // 모바일에서 selection API 오류 시 무시
+        console.debug('Selection handling error (safe to ignore on mobile):', error);
+      }
+    };
+    
+    // 데스크톱용 mouseup 이벤트
+    resultText.addEventListener('mouseup', handleSelectionEnd);
+    
+    // 모바일용 touchend 이벤트
+    resultText.addEventListener('touchend', handleSelectionEnd);
+    
+    resultText.addEventListener('blur', (e) => {
+      // 포커스를 잃어도 선택 상태를 시각적으로 유지 (모바일에서는 제한적)
+      if (savedSelection && !Platform.isMobileApp) {
+        setTimeout(() => {
+          try {
+            const selection = window.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+              selection.addRange(savedSelection!.range);
+            }
+          } catch (error) {
+            // 선택 복원 실패 시 무시 (모바일에서 흔함)
+            console.debug('Selection restoration failed (normal on mobile):', error);
+          }
+        }, 10);
+      }
+    });
+    
+    // resultItem에 헤더와 텍스트 영역 직접 추가
+    resultItem.appendChild(resultHeader);
+    resultItem.appendChild(resultText);
+    
+    return resultItem;
   }
 
 

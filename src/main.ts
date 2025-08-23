@@ -82,7 +82,7 @@ export default class SummarPlugin extends Plugin {
   // V2 설정 시스템 (통합된 클래스)
   settingsv2: PluginSettingsV2;
 
-  resultContainer: HTMLTextAreaElement;
+  // resultContainer: HTMLTextAreaElement;
   // uploadNoteToWikiButton: HTMLButtonElement;
   uploadNoteToSlackButton: HTMLButtonElement;
   newNoteButton: HTMLButtonElement;
@@ -1438,25 +1438,25 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
-  updateResultText(key: string, message: string): string {
+  updateResultText(key: string, label: string, message: string): string {
       // SummarView의 updateResultText 메서드를 호출
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
         if (summarView && typeof summarView.updateResultText === 'function') {
-          return summarView.updateResultText(key, message);
+          return summarView.updateResultText(key, label, message);
         }
       }
       return "";
   }
 
-  appendResultText(key: string, message: string): string {
+  appendResultText(key: string, label: string, message: string): string {
       // SummarView의 appendResultText 메서드를 호출
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
         if (summarView && typeof summarView.appendResultText === 'function') {
-          return summarView.appendResultText(key, message);
+          return summarView.appendResultText(key, label, message);
         }
       }
       return "";

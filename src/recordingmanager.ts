@@ -41,7 +41,8 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 	async summarize(transcripted: string, newFilePath: string): Promise<string> {
 		const resultKey = this.plugin.generateUniqueId();
-		this.updateResultText(resultKey, "Summarizing from transcripted text");
+		const label = "summarize"
+		this.updateResultText(resultKey, "summarize", "Summarizing from transcripted text");
 		this.enableNewNote(false);
 		// SummarDebug.log(2, "Fetched page content:", page_content);
 		SummarDebug.log(1, `newFilePath: ${newFilePath}`);
@@ -52,12 +53,12 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 		try {
 			const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.recording.transcriptSummaryModel, 'stt-summary');
-			if (!summarai.hasKey(true, resultKey)) return '';
+			if (!summarai.hasKey(true, resultKey, label)) return '';
 
-			this.updateResultText(resultKey,  `Generating summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...` );
+			this.updateResultText(resultKey,  label, `Generating summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...` );
 
 			this.enableNewNote(false);
-			this.timer.start(resultKey);
+			this.timer.start(resultKey, label);
 
 			const message = `${transcriptSummaryPrompt}\n\n${transcripted}`;
 			await summarai.chat([message]);
@@ -66,7 +67,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 			if (status !== 200) {
 				SummarDebug.error(1, "OpenAI API Error:", summary);
-				this.updateResultText(resultKey, `Error: ${status} - ${summary}`);
+				this.updateResultText(resultKey, label, `Error: ${status} - ${summary}`);
 				this.enableNewNote(false);
 
 				this.timer.stop();
@@ -84,7 +85,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 				const summaryNote = getAvailableFilePath(summaryCandidate, ".md", this.plugin);
 
-				this.updateResultText(resultKey, summary);
+				this.updateResultText(resultKey, label, summary);
 				this.enableNewNote(true, summaryNote);
 				
 				SummarDebug.log(1,`newFilePath = ${newFilePath}`);
@@ -110,10 +111,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 				if (this.plugin.settingsv2.recording.refineSummary)
 				{
 					this.timer.stop();
-					await this.refine(resultKey, transcripted, summary, summaryNote);
+					await this.refine(transcripted, summary, summaryNote);
 				}
 			} else {
-				this.updateResultText(resultKey, "No valid response from OpenAI API.");
+				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
 				this.enableNewNote(false);
 			}
 			this.timer.stop();
@@ -125,22 +126,25 @@ export class AudioRecordingManager extends SummarViewContainer {
 			if (error) {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
-			this.updateResultText(resultKey, msg);
+			this.updateResultText(resultKey, label, msg);
 			this.enableNewNote(false);
 			return summary;
 		}
 	}
 
-	async refine(resultKey: string, transcripted: string, summarized: string, newFilePath: string): Promise<string> {
+	async refine(transcripted: string, summarized: string, newFilePath: string): Promise<string> {
+		const resultKey = this.plugin.generateUniqueId();
+		const label = "refine";
+
 		let refined = "";
-		this.updateResultText(resultKey, "Improving the summary…");
+		this.updateResultText(resultKey, label, "Improving the summary…");
 		this.enableNewNote(false);
 
 		const refineSummaryPrompt = this.plugin.settingsv2.recording.refineSummaryPrompt;
 
 		try {
 			const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.recording.transcriptSummaryModel, 'stt-refine');
-			if (!summarai.hasKey(true, resultKey)) return '';
+			if (!summarai.hasKey(true, resultKey, label)) return '';
 			const messages: string[] = [];
 			messages.push(refineSummaryPrompt);
 			messages.push(`=====회의록 요약본 시작=====\n\n${summarized}\n\n=====회의록 요약본 끝=====\n\n=====원본 transcript 시작=====\n\n${transcripted}\n\n====원본 transcript 끝====`);
@@ -148,9 +152,9 @@ export class AudioRecordingManager extends SummarViewContainer {
 			SummarDebug.log(1, `messages1\n${messages[0]}`);
 			SummarDebug.log(1, `messages2\n${messages[1]}`);
 			
-			this.updateResultText(resultKey, `Refining summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...`);
+			this.updateResultText(resultKey, label, `Refining summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...`);
 			this.enableNewNote(false);
-			this.timer.start(resultKey);
+			this.timer.start(resultKey, label);
 
 			await summarai.chat(messages);
 			const status = summarai.response.status;
@@ -158,7 +162,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 			if (status !== 200) {
 				SummarDebug.error(1, "OpenAI API Error:", refined);
-				this.updateResultText(resultKey, `Error: ${status} - ${refined}`);
+				this.updateResultText(resultKey, label, `Error: ${status} - ${refined}`);
 				this.enableNewNote(false);
 
 				this.timer.stop();
@@ -178,7 +182,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				}
 				const refinementNote = getAvailableFilePath(refinementCandidate, ".md", this.plugin);
 
-				this.updateResultText(resultKey, refined);
+				this.updateResultText(resultKey, label, refined);
 				this.enableNewNote(true, refinementNote);
 
 				if (this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote) {
@@ -194,7 +198,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 					await this.plugin.dailyNotesHandler.addMeetingLinkToDailyNote(refinementNote, 'refinement', recordingDate);
 				}
 			} else {
-				this.updateResultText(resultKey, "No valid response from OpenAI API.");
+				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
 				this.enableNewNote(false);
 			}
 			this.timer.stop();

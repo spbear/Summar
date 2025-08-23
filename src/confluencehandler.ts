@@ -26,19 +26,20 @@ export class ConfluenceHandler extends SummarViewContainer {
 		const webPrompt = this.plugin.settingsv2.web.webPrompt;
 
 		const resultKey = this.plugin.generateUniqueId();
+		const label = "web";
 
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.web.webModel, 'web');
-		if (!summarai.hasKey(true, resultKey)) return;
+		if (!summarai.hasKey(true, resultKey, label)) return;
 
 		if (!confluenceApiToken) {
 			SummarDebug.Notice(0, "If you want to use the Confluence API, please configure the API token in the plugin settings.", 0);
 		}
 
-		this.updateResultText(resultKey, "Fetching and summarizing...");
+		this.updateResultText(resultKey, label, "Fetching and summarizing...");
 		this.enableNewNote(false);
 
 		try {
-			this.timer.start(resultKey);
+			this.timer.start(resultKey, label);
 
 			// extractConfluenceInfo 함수 호출
 			const { confluenceApiToken } = this.plugin.settingsv2.common;
@@ -82,13 +83,13 @@ export class ConfluenceHandler extends SummarViewContainer {
 				});
 				page_content = response.text;
 			}
-			this.updateResultText(resultKey, "Fedtched page content");
+			this.updateResultText(resultKey, label, "Fedtched page content");
 			this.enableNewNote(false);
 
 			SummarDebug.log(2, "Fetched page content:", page_content);
 
 
-			this.updateResultText(resultKey, `Generating summary using [${this.plugin.settingsv2.web.webModel}]...` );
+			this.updateResultText(resultKey, label, `Generating summary using [${this.plugin.settingsv2.web.webModel}]...` );
 			this.enableNewNote(false);
 
 			const message = `${webPrompt}\n\n${page_content}`;
@@ -100,17 +101,17 @@ export class ConfluenceHandler extends SummarViewContainer {
 
 			if (status !== 200) {
 				SummarDebug.error(1, "OpenAI API Error:", summary);
-				this.updateResultText(resultKey, `Error: ${status} - ${summary}`);
+				this.updateResultText(resultKey, label, `Error: ${status} - ${summary}`);
 				this.enableNewNote(false);
 
 				return;
 			}
 
 			if (summary && summary.length > 0) {
-				this.updateResultText(resultKey, summary);
+				this.updateResultText(resultKey, label, summary);
 				this.enableNewNote(true);
 			} else {
-				this.updateResultText(resultKey, "No valid response from OpenAI API.");
+				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
 				this.enableNewNote(false);
 			}
 
@@ -121,7 +122,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 			if (error) {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
-			this.updateResultText(resultKey, msg);
+			this.updateResultText(resultKey, label, msg);
 			this.enableNewNote(false);
 		}
 	}
