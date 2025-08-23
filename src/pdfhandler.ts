@@ -34,14 +34,16 @@ export class PdfHandler extends SummarViewContainer {
 	}
 
 	async convertToMarkdownFromPdf(file: any): Promise<void> {
+		const resultKey = this.plugin.generateUniqueId();		
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.pdf.pdfModel, 'pdf');
-		if (!summarai.hasKey(true)) return;
+		if (!summarai.hasKey(true, resultKey)) return;
 
 		const pdftopng = new PdfToPng(this.plugin);
+
 		try {
 			if (!(await pdftopng.isPopplerInstalled())) {
 				SummarDebug.Notice(0, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.", 0);
-				this.updateResultText("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
+				this.updateResultText(resultKey, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 				this.enableNewNote(false);
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 			}
@@ -50,18 +52,18 @@ export class PdfHandler extends SummarViewContainer {
 			const modelName = this.plugin.settingsv2.pdf.pdfModel;
 			SummarDebug.Notice(1, file.name);
 
-			this.timer.start();
+			this.timer.start(resultKey);
 
 			// 단계 1: PDF 파일 준비
-			this.updateResultText(`[10%] Preparing PDF file... (${file.name})`);
+			this.updateResultText(resultKey, `[10%] Preparing PDF file... (${file.name})`);
 			this.enableNewNote(false);
 
 			// 단계 2: 이미지 변환
-			this.updateResultText(`[15%] Converting to images... Will use [${modelName}]`);
-			const base64Values = await pdftopng.convert(file, (SummarDebug.level() < 4));
+			this.updateResultText(resultKey, `[15%] Converting to images... Will use [${modelName}]`);
+			const base64Values = await pdftopng.convert(file, resultKey, (SummarDebug.level() < 4));
 			const pageCount = base64Values.length;
 
-			this.updateResultText(`[30%] Image conversion completed (${pageCount} pages detected)`);
+			this.updateResultText(resultKey, `[30%] Image conversion completed (${pageCount} pages detected)`);
 			this.enableNewNote(false);
 
 			// JsonBuilder 인스턴스 생성
@@ -86,7 +88,7 @@ export class PdfHandler extends SummarViewContainer {
 				const base64 = base64Values[index];
 				const progress = 30 + Math.floor((index + 1) / pageCount * 25); // 30% ~ 55%
 				
-				this.updateResultText(`[${progress}%] Preparing message for page ${index + 1}/${pageCount}...`);
+				this.updateResultText(resultKey, `[${progress}%] Preparing message for page ${index + 1}/${pageCount}...`);
 				
 				SummarDebug.log(2, `${index + 1}번 파일의 Base64: ${base64}`);
 				const page_prompt = `다음은 PDF의 페이지 ${index + 1}입니다.`;
@@ -107,7 +109,7 @@ export class PdfHandler extends SummarViewContainer {
 				});
 			}
 
-			this.updateResultText(`[55%] AI request preparation completed`);
+			this.updateResultText(resultKey, `[55%] AI request preparation completed`);
 
 			jsonBuilder.addToArray("messages", {
 				role: "user",
@@ -125,7 +127,7 @@ export class PdfHandler extends SummarViewContainer {
 			// 단계 4: AI 분석 시작
 			const aiStartTime = Date.now();
 			const estimatedTime = this.formatEstimatedTime(pageCount, modelName);
-			this.updateResultText(`[60%] AI analysis in progress... [${modelName}] (${pageCount} pages, ${estimatedTime})`);
+			this.updateResultText(resultKey, `[60%] AI analysis in progress... [${modelName}] (${pageCount} pages, ${estimatedTime})`);
 
 			// AI 분석 중 진행 상태 업데이트를 위한 인터벌 설정
 			const progressInterval = setInterval(() => {
@@ -137,7 +139,7 @@ export class PdfHandler extends SummarViewContainer {
 				let currentProgress = 60 + Math.min(25, Math.floor((elapsed / estimatedTotal) * 25));
 				
 				const progressTime = this.formatProgressTime(aiStartTime, pageCount, modelName);
-				this.updateResultText(`[${currentProgress}%] AI analysis in progress... [${modelName}] (${progressTime})`);
+				this.updateResultText(resultKey, `[${currentProgress}%] AI analysis in progress... [${modelName}] (${progressTime})`);
 			}, 5000); // 5초마다 업데이트
 
 			await summarai.chatWithBody(body_content);
@@ -152,31 +154,31 @@ export class PdfHandler extends SummarViewContainer {
 
 			if (status !== 200) {
 				SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
-				this.updateResultText(`[ERROR] AI analysis failed: ${status} - ${summary}`);
+				this.updateResultText(resultKey, `[ERROR] AI analysis failed: ${status} - ${summary}`);
 				this.enableNewNote(false);
 				return;
 			}
 
 			// 단계 5: 결과 처리
-			this.updateResultText(`[90%] AI analysis completed, converting to markdown...`);
+			this.updateResultText(resultKey, `[90%] AI analysis completed, converting to markdown...`);
 
 			if (summary && summary.length > 0) {
 				const markdownContent = this.extractMarkdownContent(summary);
 				if (markdownContent) {
-					this.updateResultText(`[95%] Creating new note...`);
+					this.updateResultText(resultKey, `[95%] Creating new note...`);
 					this.enableNewNote(true);
 					// PDF 파일명 기반으로 새 노트 자동 생성
 					await this.createNewNoteFromPdf(file.name, markdownContent);
-					this.updateResultText(`[100%] Markdown conversion completed! New note has been created.`);
+					this.updateResultText(resultKey, `[100%] Markdown conversion completed! New note has been created.`);
 				} else {
-					this.updateResultText(`[95%] Creating new note...`);
+					this.updateResultText(resultKey, `[95%] Creating new note...`);
 					this.enableNewNote(true);
 					// PDF 파일명 기반으로 새 노트 자동 생성
 					await this.createNewNoteFromPdf(file.name, summary);
-					this.updateResultText(`[100%] Conversion completed! New note has been created.`);
+					this.updateResultText(resultKey, `[100%] Conversion completed! New note has been created.`);
 				}
 			} else {
-				this.updateResultText("[ERROR] No valid response received from AI API.");
+				this.updateResultText(resultKey, "[ERROR] No valid response received from AI API.");
 				this.enableNewNote(false);
 			}
 
@@ -186,7 +188,7 @@ export class PdfHandler extends SummarViewContainer {
 			this.timer.stop();
 
 			SummarDebug.error(1, "Error during PDF to PNG conversion:", error);
-			this.updateResultText(`[ERROR] Error occurred during PDF conversion: ${error}`);
+			this.updateResultText(resultKey, `[ERROR] Error occurred during PDF conversion: ${error}`);
 			this.enableNewNote(false);
 			SummarDebug.Notice(0, "Failed to convert PDF to PNG. Check console for details.");
 		}

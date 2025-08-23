@@ -20,13 +20,17 @@ export class SummarViewContainer {
    * @param resultContainer The container object to update.
    * @param message The message to set as the value.
    */
-  updateResultText(message: string): void {
-      this.plugin.resultContainer.value = message;
+  updateResultText(key: string, message: string): string {
+      return this.plugin.updateResultText(key, message);
   }
 
-  appendResultText(message: string): void {
-      this.plugin.resultContainer.value += message;
+  appendResultText(key: string, message: string): string {
+      return this.plugin.appendResultText(key, message);  
   }
+  getResultText(key: string): string {
+      return this.plugin.getResultText(key);
+  }
+
 
   enableNewNote(enabled: boolean, newNotePath?: string) {
     if (this.plugin.newNoteButton) {

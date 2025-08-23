@@ -49,12 +49,12 @@ export class SummarAI extends SummarViewContainer {
     SummarDebug.log(3, `SummarAI initialized with model: ${this.aiModel}, provider: ${this.aiProvider}, key: ${this.aiKey}`);
   }
 
-  hasKey(errDisplay?: boolean): boolean {
+  hasKey(errDisplay: boolean, resultKey: string): boolean {
     if (this.aiKey && this.aiKey.length > 0) {
       return true;
     } else if (errDisplay) {
       const errorMessage = `Please configure ${this.aiProvider} API key in the plugin settings.`;
-			this.updateResultText(errorMessage);
+			this.updateResultText(resultKey, errorMessage);
 			this.enableNewNote(false);
 
       const fragment = document.createDocumentFragment();

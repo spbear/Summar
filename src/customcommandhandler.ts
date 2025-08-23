@@ -36,6 +36,8 @@ export class CustomCommandHandler extends SummarViewContainer {
 			return;
 		}
 
+		const resultKey = this.plugin.generateUniqueId();
+		
 		const cmdModel = command.model || 'gpt-4o';
 		const cmdPrompt = command.prompt || '';
 		const appendToNote = command.appendToNote;
@@ -43,13 +45,13 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 
-		if (!summarai.hasKey(true)) return;
+		if (!summarai.hasKey(true, resultKey)) return;
 
-		this.updateResultText(`Execute prompt with selected text using [${cmdModel}]...`);
+		this.updateResultText(resultKey, `Execute prompt with selected text using [${cmdModel}]...`);
 		this.enableNewNote(false);
 
 		try {
-			this.timer.start();
+			this.timer.start(resultKey);
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
 
@@ -61,14 +63,14 @@ export class CustomCommandHandler extends SummarViewContainer {
 			if (responseStatus !== 200) {
 				const errorText = responseText || "Unknown error occurred.";
 				SummarDebug.error(1, "AI API Error:", errorText);
-				this.updateResultText(`Error: ${responseStatus} - ${errorText}`);
+				this.updateResultText(resultKey, `Error: ${responseStatus} - ${errorText}`);
 				this.enableNewNote(false);
 
 				return;
 			}
 
 			if (responseText && responseText.length > 0) {
-				this.updateResultText(responseText);
+				this.updateResultText(resultKey, responseText);
 				this.enableNewNote(true);
 
 				// 결과를 노트에 append (설정에 따라)
@@ -112,7 +114,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 					}
 				}
 			} else {
-				this.updateResultText("No valid response from OpenAI API.");
+				this.updateResultText(resultKey, "No valid response from OpenAI API.");
 				this.enableNewNote(false);
 			}
 
@@ -123,7 +125,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 			if (error) {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
-			this.updateResultText(msg);
+			this.updateResultText(resultKey, msg);
 			this.enableNewNote(false);
 		}
 	}

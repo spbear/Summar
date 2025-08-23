@@ -10,6 +10,7 @@ export class SummarView extends View {
   static VIEW_TYPE = "summar-view";
 
   plugin: SummarPlugin;
+  resultContainer: HTMLTextAreaElement;
 
   constructor(leaf: WorkspaceLeaf, plugin: SummarPlugin) {
     super(leaf);
@@ -419,8 +420,8 @@ export class SummarView extends View {
         if (!folderExists) {
           await this.plugin.app.vault.adapter.mkdir(folderPath);
         }
-        SummarDebug.log(1, `resultContainer.value===\n${this.plugin.resultContainer.value}`);
-        await this.plugin.app.vault.create(filePath, this.plugin.resultContainer.value);
+        SummarDebug.log(1, `resultContainer.value===\n${this.getResultText("")}`);
+        await this.plugin.app.vault.create(filePath, this.getResultText(""));
         await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
       }
     });
@@ -481,7 +482,10 @@ export class SummarView extends View {
     resultContainer.readOnly = true;
     resultContainer.style.color = "var(--text-normal)"; // Obsidian의 기본 텍스트 색상 변수 사용
   
+    this.resultContainer = resultContainer;
+
     this.plugin.resultContainer = resultContainer;
+
     this.plugin.recordButton = recordButton;
 
     if (!(Platform.isMacOS && Platform.isDesktopApp)) {
@@ -508,9 +512,6 @@ export class SummarView extends View {
     recordButton.onclick = async () => {
       await this.plugin.toggleRecording();
     }
-
-
-
   }
 
   getCurrentMainPaneTabType(): string {
@@ -546,5 +547,20 @@ export class SummarView extends View {
       console.error('Error updating Slack button tooltip:', error);
     }
   }
+
+  updateResultText(key: string, message: string): string {
+      this.resultContainer.value = message;
+      return key;
+  }
+
+  appendResultText(key: string, message: string): string {
+      this.resultContainer.value += message;
+      return key;
+  }
+
+  getResultText(key: string): string {
+    return this.resultContainer.value;
+  }
+
 
 }

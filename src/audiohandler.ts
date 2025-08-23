@@ -25,7 +25,8 @@ export class AudioHandler extends SummarViewContainer {
 			file.name.toLowerCase().endsWith(".webm")
 		);
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
-		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
+		const resultKey = this.plugin.generateUniqueId();
+		this.updateResultText(resultKey, `Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
 		this.enableNewNote(false);
 
 		let audioList = "";
@@ -88,7 +89,7 @@ export class AudioHandler extends SummarViewContainer {
 			}
 		}
 
-		this.timer.start();
+		this.timer.start(resultKey);
 
 		// Process files in parallel
 		const handler = this;
@@ -139,7 +140,7 @@ export class AudioHandler extends SummarViewContainer {
 							const blob = file.slice(0, file.size, file.type);
 							const duration = await getAudioDurationFromBlob(blob, fileName);
 							SummarDebug.log(1, `==========\nsendAudioData() - file: ${fileName}, duration: ${duration} seconds`);
-							const transcript = await this.callGeminiTranscription(base64, mimeType, duration) || "";
+							const transcript = await this.callGeminiTranscription(resultKey, base64, mimeType, duration) || "";
 							SummarDebug.log(3, transcript);
 							SummarDebug.log(1, 'seconds: ', seconds);
 							const strContent = this.adjustSrtTimestamps(transcript, seconds);
@@ -157,7 +158,7 @@ export class AudioHandler extends SummarViewContainer {
 
 							SummarDebug.log(1, `==========\nsendAudioData() - file: ${fileName}, duration: ${duration} seconds`);
 
-							const data = await this.callWhisperTranscription(finalBody, contentType, duration);
+							const data = await this.callWhisperTranscription(resultKey, finalBody, contentType, duration);
 							// SummarDebug.log(1, `sendAudioData() - 1st response data: ${JSON.stringify(data)}`);							
 
 							// 응답 확인
@@ -231,7 +232,7 @@ export class AudioHandler extends SummarViewContainer {
                 let errStr = f.error ? (f.error.status ? `[${f.error.status}] ` : '') + (f.error.message || f.error.toString?.() || f.error) : 'Unknown error';
                 return `- ${f.name}: ${errStr}`;
             }).join('\n');
-            this.updateResultText(errorMsg);
+            this.updateResultText(resultKey, errorMsg);
             throw new Error("One or more audio transcriptions failed. Aborting next steps.");
         }
 
@@ -535,10 +536,10 @@ export class AudioHandler extends SummarViewContainer {
 		};
 	}
 
-	async callWhisperTranscription(requestbody: Blob, contentType: string, duration: number): Promise<any> {
+	async callWhisperTranscription(resultKey: string, requestbody: Blob, contentType: string, duration: number): Promise<any> {
 		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
-		if (!summarai.hasKey(true)) return '';
+		if (!summarai.hasKey(true, resultKey)) return '';
 		
 		const json = await summarai.audioTranscription((await requestbody.arrayBuffer() as ArrayBuffer), contentType, duration);
 		return json;
@@ -672,10 +673,10 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	}
 	
-	async callGeminiTranscription(base64: string, mimeType: string, duration: number): Promise<string | null> {
+	async callGeminiTranscription(resultKey: string, base64: string, mimeType: string, duration: number): Promise<string | null> {
 		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
-		if (!summarai.hasKey(true)) return '';
+		if (!summarai.hasKey(true, resultKey)) return '';
 
 		// sttModel에 따라 적절한 prompt 선택
 		let systemInstruction = "";

@@ -1437,6 +1437,80 @@ export default class SummarPlugin extends Plugin {
       console.error('Error updating Slack button tooltip:', error);
     }
   }
+
+  updateResultText(key: string, message: string): string {
+      // SummarView의 updateResultText 메서드를 호출
+      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+      if (leaves.length > 0) {
+        const summarView = leaves[0].view as SummarView;
+        if (summarView && typeof summarView.updateResultText === 'function') {
+          return summarView.updateResultText(key, message);
+        }
+      }
+      return "";
+  }
+
+  appendResultText(key: string, message: string): string {
+      // SummarView의 appendResultText 메서드를 호출
+      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+      if (leaves.length > 0) {
+        const summarView = leaves[0].view as SummarView;
+        if (summarView && typeof summarView.appendResultText === 'function') {
+          return summarView.appendResultText(key, message);
+        }
+      }
+      return "";
+  }
+
+  getResultText(key: string): string {
+    // SummarView의 getResultText 메서드를 호출
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    if (leaves.length > 0) {
+      const summarView = leaves[0].view as SummarView;
+      if (summarView && typeof summarView.getResultText === 'function') {
+        return summarView.getResultText(key);
+      }
+    }
+    return "";
+  }
+
+  /**
+   * GUID를 생성합니다. 모바일 Obsidian에서도 동작합니다.
+   * @returns 생성된 GUID 문자열 (예: "550e8400-e29b-41d4-a716-446655440000")
+   */
+  generateUniqueId(): string {
+    // crypto.randomUUID()가 지원되는 경우 사용 (최신 브라우저/Node.js)
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    
+    // crypto.getRandomValues()가 지원되는 경우 사용 (대부분의 모던 브라우저)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      
+      // UUID v4 형식으로 변환
+      array[6] = (array[6] & 0x0f) | 0x40; // version 4
+      array[8] = (array[8] & 0x3f) | 0x80; // variant bits
+      
+      const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+      return [
+        hex.slice(0, 8),
+        hex.slice(8, 12),
+        hex.slice(12, 16),
+        hex.slice(16, 20),
+        hex.slice(20, 32)
+      ].join('-');
+    }
+    
+    // Fallback: Math.random() 기반 구현 (모든 환경에서 동작)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
 }
 
 
