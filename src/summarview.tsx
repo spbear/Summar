@@ -276,21 +276,25 @@ export class SummarView extends View {
     }
 
     // deleteAllResultItemsButton 추가 (macOS에서만 표시)
-    if (Platform.isMacOS && Platform.isDesktopApp) {
-      const deleteAllResultItemsButton = buttonContainer.createEl("button", {
-        cls: "lucide-icon-button",
-      });
-      deleteAllResultItemsButton.setAttribute("aria-label", "Delete all result items");
-      setIcon(deleteAllResultItemsButton, "trash-2");
+    // if (Platform.isMacOS && Platform.isDesktopApp) {
+    const deleteAllResultItemsButton = buttonContainer.createEl("button", {
+      cls: "lucide-icon-button",
+    });
+    deleteAllResultItemsButton.setAttribute("aria-label", "Delete all result items");
+    setIcon(deleteAllResultItemsButton, "trash-2");
 
-      deleteAllResultItemsButton.addEventListener("click", () => {
-        // 모든 resultItems 삭제
-        this.resultItems.clear();
-        this.newNoteNames.clear(); // newNoteNames Map도 정리
-        this.resultContainer.empty();
-        SummarDebug.Notice(1, "All result items have been deleted");
-      });
-    }
+    deleteAllResultItemsButton.addEventListener("click", () => {
+      // 모든 resultItems 삭제
+      this.resultItems.clear();
+      this.newNoteNames.clear(); // newNoteNames Map도 정리
+      this.resultContainer.empty();
+      SummarDebug.Notice(1, "All result items have been deleted");
+    });
+    // hide
+    deleteAllResultItemsButton.disabled = true;
+    deleteAllResultItemsButton.style.display = 'none';
+
+    // }
   
     
     // 구분선(|) 추가
@@ -580,12 +584,12 @@ export class SummarView extends View {
       if (fold) {
         // 접기
         toggleFoldButton.setAttribute('toggled', 'true');
-        setIcon(toggleFoldButton, 'unfold-vertical');
+        setIcon(toggleFoldButton, 'square-chevron-down');
         resultText.style.display = 'none';
       } else {
         // 펼치기
         toggleFoldButton.setAttribute('toggled', 'false');
-        setIcon(toggleFoldButton, 'fold-vertical');
+        setIcon(toggleFoldButton, 'square-chevron-up');
         resultText.style.display = 'block';
       }
     }
@@ -948,22 +952,42 @@ export class SummarView extends View {
     toggleFoldButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
     toggleFoldButton.style.margin = '0'; // 버튼 간격 제거
     
-    setIcon(toggleFoldButton, 'fold-vertical');
-    toggleFoldButton.addEventListener('click', () => {
+    setIcon(toggleFoldButton, 'square-chevron-up');
+    
+    // fold/unfold 기능을 수행하는 공통 함수
+    const toggleFold = () => {
       const isToggled = toggleFoldButton.getAttribute('toggled') === 'true';
       
       if (isToggled) {
         // 현재 접혀있는 상태 -> 펼치기
         toggleFoldButton.setAttribute('toggled', 'false');
-        setIcon(toggleFoldButton, 'fold-vertical');
+        setIcon(toggleFoldButton, 'square-chevron-up');
         resultText.style.display = 'block'; // resultText 보이기
       } else {
         // 현재 펼쳐져있는 상태 -> 접기
         toggleFoldButton.setAttribute('toggled', 'true');
-        setIcon(toggleFoldButton, 'unfold-vertical');
+        setIcon(toggleFoldButton, 'square-chevron-down');
         resultText.style.display = 'none'; // resultText 숨기기
       }
+    };
+    
+    // toggleFoldButton 클릭 이벤트
+    toggleFoldButton.addEventListener('click', (event) => {
+      event.stopPropagation(); // 버튼 클릭 시 부모 요소 클릭 이벤트 차단
+      toggleFold();
     });
+    
+    // resultHeader 클릭 이벤트 (toggleFoldButton과 동일한 동작)
+    resultHeader.addEventListener('click', (event) => {
+      // 버튼들을 클릭했을 때는 fold 동작을 하지 않도록 체크
+      const target = event.target as HTMLElement;
+      const isButton = target.tagName === 'BUTTON' || target.closest('button');
+      
+      if (!isButton) {
+        toggleFold();
+      }
+    });
+    
     resultHeader.appendChild(toggleFoldButton);
     
     
@@ -1005,6 +1029,10 @@ export class SummarView extends View {
       resultItem.remove();
     });
     resultHeader.appendChild(deleteResultItemButton);
+    // hide
+    deleteResultItemButton.disabled = true;
+    deleteResultItemButton.style.display = 'none';
+
     
     // resultText 영역 생성 (기존 resultItem과 합침)
     const resultText = document.createElement('div');
