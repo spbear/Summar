@@ -27,8 +27,9 @@ export class AudioHandler extends SummarViewContainer {
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "transtript";
+		this.clearAllResultItems();
 		this.updateResultText(resultKey, label, `Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
-		this.enableNewNote(false);
+		// this.enableNewNote(false, resultKey);
 
 		let audioList = "";
 		let transcriptedText = "";
@@ -371,6 +372,8 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		await this.plugin.app.vault.create(newFilePath, transcriptionContent);
+		this.updateResultText(resultKey, label, transcriptionContent);
+		this.enableNewNote(true, resultKey, newFilePath);
 		
 		// summary가 활성화되어 있지 않으면 transcript 파일을 열기
 		// summary가 활성화되어 있으면 나중에 summary나 refined 파일이 열릴 예정이므로 transcript는 열지 않음
@@ -380,7 +383,13 @@ export class AudioHandler extends SummarViewContainer {
 				"",
 				true
 			);
+			// if (this.plugin.settingsv2.recording.refineSummary) {
+			// 	this.foldResult(resultKey, true);
+			// }
+		} else {
+			// this.foldResult(resultKey, true);
 		}
+			this.foldResult(resultKey, true);
 		
 		// Daily Notes에 전사 완료 링크 추가 (녹음 날짜 기준)
 		const recordingDate = this.extractRecordingDateFromPath(folderPath, filesToSave, noteFilePath);

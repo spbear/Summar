@@ -36,6 +36,8 @@ export class PdfHandler extends SummarViewContainer {
 	async convertToMarkdownFromPdf(file: any): Promise<void> {
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "pdf";		
+		this.clearAllResultItems();
+
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.pdf.pdfModel, 'pdf');
 		if (!summarai.hasKey(true, resultKey, label)) return;
 
@@ -45,7 +47,7 @@ export class PdfHandler extends SummarViewContainer {
 			if (!(await pdftopng.isPopplerInstalled())) {
 				SummarDebug.Notice(0, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.", 0);
 				this.updateResultText(resultKey, label, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
-				this.enableNewNote(false);
+				// this.enableNewNote(false, resultKey);
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 			}
 
@@ -57,7 +59,7 @@ export class PdfHandler extends SummarViewContainer {
 
 			// 단계 1: PDF 파일 준비
 			this.updateResultText(resultKey, label, `[10%] Preparing PDF file... (${file.name})`);
-			this.enableNewNote(false);
+			// this.enableNewNote(false, resultKey);
 
 			// 단계 2: 이미지 변환
 			this.updateResultText(resultKey, label, `[15%] Converting to images... Will use [${modelName}]`);
@@ -65,7 +67,7 @@ export class PdfHandler extends SummarViewContainer {
 			const pageCount = base64Values.length;
 
 			this.updateResultText(resultKey, label, `[30%] Image conversion completed (${pageCount} pages detected)`);
-			this.enableNewNote(false);
+			// this.enableNewNote(false, resultKey);
 
 			// JsonBuilder 인스턴스 생성
 			const jsonBuilder = new JsonBuilder();
@@ -156,7 +158,7 @@ export class PdfHandler extends SummarViewContainer {
 			if (status !== 200) {
 				SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
 				this.updateResultText(resultKey, label, `[ERROR] AI analysis failed: ${status} - ${summary}`);
-				this.enableNewNote(false);
+				// this.enableNewNote(false, resultKey);
 				return;
 			}
 
@@ -167,20 +169,20 @@ export class PdfHandler extends SummarViewContainer {
 				const markdownContent = this.extractMarkdownContent(summary);
 				if (markdownContent) {
 					this.updateResultText(resultKey, label, `[95%] Creating new note...`);
-					this.enableNewNote(true);
-					// PDF 파일명 기반으로 새 노트 자동 생성
-					await this.createNewNoteFromPdf(file.name, markdownContent);
+					this.enableNewNote(true, resultKey);
 					this.updateResultText(resultKey, label, `[100%] Markdown conversion completed! New note has been created.`);
+					// PDF 파일명 기반으로 새 노트 자동 생성
+					await this.createNewNoteFromPdf(resultKey, label, file.name, markdownContent);
 				} else {
 					this.updateResultText(resultKey, label, `[95%] Creating new note...`);
-					this.enableNewNote(true);
-					// PDF 파일명 기반으로 새 노트 자동 생성
-					await this.createNewNoteFromPdf(file.name, summary);
+					this.enableNewNote(true, resultKey);
 					this.updateResultText(resultKey, label, `[100%] Conversion completed! New note has been created.`);
+					// PDF 파일명 기반으로 새 노트 자동 생성
+					await this.createNewNoteFromPdf(resultKey, label, file.name, summary);
 				}
 			} else {
 				this.updateResultText(resultKey, label, "[ERROR] No valid response received from AI API.");
-				this.enableNewNote(false);
+				// this.enableNewNote(false, resultKey);
 			}
 
 			SummarDebug.log(1, "PDF conversion to images complete.");
@@ -190,7 +192,7 @@ export class PdfHandler extends SummarViewContainer {
 
 			SummarDebug.error(1, "Error during PDF to PNG conversion:", error);
 			this.updateResultText(resultKey, label, `[ERROR] Error occurred during PDF conversion: ${error}`);
-			this.enableNewNote(false);
+			// this.enableNewNote(false, resultKey);
 			SummarDebug.Notice(0, "Failed to convert PDF to PNG. Check console for details.");
 		}
 	}
@@ -212,7 +214,7 @@ export class PdfHandler extends SummarViewContainer {
 	 * @param fileName PDF 파일명
 	 * @param content 마크다운 내용
 	 */
-	async createNewNoteFromPdf(fileName: string, content: string): Promise<void> {
+	async createNewNoteFromPdf(resultKey: string, label: string, fileName: string, content: string): Promise<void> {
 		try {
 			// PDF 파일명에서 확장자 제거하고 안전한 파일명으로 변환
 			const baseFileName = sanitizeFileName(fileName.replace(/\.pdf$/i, ''));
@@ -230,6 +232,10 @@ export class PdfHandler extends SummarViewContainer {
 			// 새 노트 생성
 			const createdFile = await this.plugin.app.vault.create(filePath, content);
 			await this.plugin.app.workspace.openLinkText(filePath, "", true);
+			this.updateResultText(resultKey, label, content);
+			this.enableNewNote(true, resultKey, filePath);
+			this.foldResult(resultKey, true);
+
 			SummarDebug.Notice(1, `Created new note: ${uniqueFileName}`, 3000);
 		} catch (error) {
 			SummarDebug.error(1, "Error creating new note:", error);

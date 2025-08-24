@@ -108,7 +108,7 @@ export default class SummarPlugin extends Plugin {
   // 자동 업데이트 관련
   private autoUpdateTimeoutId: NodeJS.Timeout | null = null;
 
-  newNoteName: string = "";
+  // newNoteName: string = "";
   
   OBSIDIAN_PLUGIN_DIR: string = "";
   PLUGIN_ID: string = ""; // 플러그인 아이디
@@ -415,6 +415,7 @@ export default class SummarPlugin extends Plugin {
                     if (files && files.length > 0) {
                       this.activateView();
                       const transcriptedText = await this.app.vault.read(file);
+                  		this.clearAllResultItems();
                       const summarized = await this.recordingManager.summarize(transcriptedText, file.path );
                     }
                   } catch (error) {
@@ -1474,6 +1475,41 @@ export default class SummarPlugin extends Plugin {
     return "";
   }
 
+  enableNewNote(enabled:boolean, key: string, newNotePath?: string) {
+    // SummarView의 enableNewNote 메서드를 호출
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    if (leaves.length > 0) {
+      const summarView = leaves[0].view as SummarView;
+      if (summarView && typeof summarView.getResultText === 'function') {
+        if (enabled) {
+          summarView.enableNewNote(key, newNotePath);
+        }
+      }
+    }
+  }
+
+  foldResult(key: string | null, fold: boolean): void {
+    // SummarView의 foldResult 메서드를 호출
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    if (leaves.length > 0) {
+      const summarView = leaves[0].view as SummarView;
+      if (summarView && typeof summarView.getResultText === 'function') {
+          summarView.foldResult(key, fold);
+      }
+    }
+  }
+
+  clearAllResultItems(): void {
+    // SummarView의 clearAllResultItems 메서드를 호출
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    if (leaves.length > 0) {
+      const summarView = leaves[0].view as SummarView;
+      if (summarView && typeof summarView.getResultText === 'function') {
+          summarView.clearAllResultItems();
+      }
+    }
+  }
+
   /**
    * GUID를 생성합니다. 모바일 Obsidian에서도 동작합니다.
    * @returns 생성된 GUID 문자열 (예: "550e8400-e29b-41d4-a716-446655440000")
@@ -1543,51 +1579,66 @@ class UrlInputModal extends Modal {
     // 모달 제목
     contentEl.createEl("h2", { text: "Enter a URL" });
 
+    // 설명 텍스트
+    contentEl.createEl("p", { 
+      text: "Please enter the URL you want to summarize.",
+      cls: "setting-item-description"
+    });
+
     // URL 입력 필드
-    let input: HTMLInputElement;
-    new Setting(contentEl)
-      .setName("URL")
-      .setDesc("Please enter the URL you want to summarize.")
-      .addText((text) => {
-        input = text.inputEl;
-        text.setPlaceholder("https://example.com");
+    const input = contentEl.createEl("input", {
+      type: "text",
+      placeholder: "https://example.com"
+    });
+    
+    // 입력창 스타일링
+    input.style.width = "100%";
+    input.style.padding = "8px 12px";
+    input.style.marginBottom = "16px";
+    input.style.border = "1px solid var(--background-modifier-border)";
+    input.style.borderRadius = "6px";
+    input.style.fontSize = "14px";
+    input.style.backgroundColor = "var(--background-primary)";
+    input.style.color = "var(--text-normal)";
 
-        // 클립보드에서 URL 가져오기
-        navigator.clipboard.readText().then((clipboardText) => {
-          input.value = clipboardText; // 클립보드 내용 입력창에 설정
-        }).catch((err) => {
-          SummarDebug.error(1, "Failed to read clipboard content: ", err);
-        });
+    // 클립보드에서 URL 가져오기
+    navigator.clipboard.readText().then((clipboardText) => {
+      input.value = clipboardText; // 클립보드 내용 입력창에 설정
+    }).catch((err) => {
+      SummarDebug.error(1, "Failed to read clipboard content: ", err);
+    });
 
-        // Enter 키를 누르면 OK 버튼 핸들러 실행 (OK 버튼을 default로 설정)
-        input.addEventListener("keydown", (evt: KeyboardEvent) => {
-          if (evt.key === "Enter") {
-            evt.preventDefault();
-            okButtonHandler();
-          }
-        });
-      });
+    // Enter 키를 누르면 OK 버튼 핸들러 실행
+    input.addEventListener("keydown", (evt: KeyboardEvent) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        okButtonHandler();
+      }
+    });
 
-    // 확인 및 취소 버튼
-    new Setting(contentEl)
-      .addButton((btn) => {
-        btn
-          .setButtonText("OK")
-          .setCta()
-          .onClick(() => {
-            okButtonHandler();
-          });
-        // OK 버튼의 배경색을 빨간색으로 설정
-        // btn.buttonEl.style.backgroundColor = "red";
-      })
-      .addButton((btn) =>
-        btn
-          .setButtonText("Cancel")
-          .onClick(() => {
-            this.callback(null); // 취소 시 null 반환
-            this.close(); // 모달 닫기
-          })
-      );
+    // 버튼 컨테이너
+    const buttonContainer = contentEl.createEl("div");
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.gap = "8px";
+    buttonContainer.style.justifyContent = "flex-end";
+
+    // OK 버튼
+    const okButton = buttonContainer.createEl("button", {
+      text: "OK",
+      cls: "mod-cta"
+    });
+    okButton.addEventListener("click", () => {
+      okButtonHandler();
+    });
+
+    // Cancel 버튼
+    const cancelButton = buttonContainer.createEl("button", {
+      text: "Cancel"
+    });
+    cancelButton.addEventListener("click", () => {
+      this.callback(null); // 취소 시 null 반환
+      this.close(); // 모달 닫기
+    });
 
     // OK 버튼 핸들러
     const okButtonHandler = () => {

@@ -27,6 +27,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "web";
+		this.clearAllResultItems();
 
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.web.webModel, 'web');
 		if (!summarai.hasKey(true, resultKey, label)) return;
@@ -36,7 +37,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 		}
 
 		this.updateResultText(resultKey, label, "Fetching and summarizing...");
-		this.enableNewNote(false);
+		// this.enableNewNote(false, resultKey);
 
 		try {
 			this.timer.start(resultKey, label);
@@ -84,13 +85,13 @@ export class ConfluenceHandler extends SummarViewContainer {
 				page_content = response.text;
 			}
 			this.updateResultText(resultKey, label, "Fedtched page content");
-			this.enableNewNote(false);
+			// this.enableNewNote(false, resultKey);
 
 			SummarDebug.log(2, "Fetched page content:", page_content);
 
 
 			this.updateResultText(resultKey, label, `Generating summary using [${this.plugin.settingsv2.web.webModel}]...` );
-			this.enableNewNote(false);
+			// this.enableNewNote(false, resultKey);
 
 			const message = `${webPrompt}\n\n${page_content}`;
 			await summarai.chat([message]);
@@ -102,17 +103,17 @@ export class ConfluenceHandler extends SummarViewContainer {
 			if (status !== 200) {
 				SummarDebug.error(1, "OpenAI API Error:", summary);
 				this.updateResultText(resultKey, label, `Error: ${status} - ${summary}`);
-				this.enableNewNote(false);
+				// this.enableNewNote(false, resultKey);
 
 				return;
 			}
 
 			if (summary && summary.length > 0) {
 				this.updateResultText(resultKey, label, summary);
-				this.enableNewNote(true);
+				this.enableNewNote(true, resultKey);
 			} else {
 				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
-				this.enableNewNote(false);
+				// this.enableNewNote(false, resultKey);
 			}
 
 		} catch (error) {
@@ -123,7 +124,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
 			this.updateResultText(resultKey, label, msg);
-			this.enableNewNote(false);
+			// this.enableNewNote(false, resultKey);
 		}
 	}
 

@@ -12,6 +12,8 @@ export class SummarView extends View {
   plugin: SummarPlugin;
   resultContainer: HTMLDivElement;
   resultItems: Map<string, HTMLDivElement> = new Map();
+  newNoteNames: Map<string, string> = new Map();
+
   markdownRenderer: MarkdownIt;
 
   constructor(leaf: WorkspaceLeaf, plugin: SummarPlugin) {
@@ -151,7 +153,9 @@ export class SummarView extends View {
     buttonContainer.style.alignItems = "center";
     buttonContainer.style.gap = "5px"; // 간격 조정
     buttonContainer.style.marginBottom = "1px";
-    buttonContainer.style.margin = "5px";
+    buttonContainer.style.marginLeft = "0px"; // inputField와 동일한 왼쪽 margin
+    buttonContainer.style.marginRight = "0px";
+    buttonContainer.style.marginTop = "0px";
   
     // uploadNoteToWikiButton 추가
     const uploadNoteToWikiButton = buttonContainer.createEl("button", {
@@ -164,108 +168,15 @@ export class SummarView extends View {
     uploadNoteToWikiButton.addEventListener("click", async() => {
       const viewType = await this.getCurrentMainPaneTabType();
       if (viewType === "markdown") {
-        if (this.plugin.settingsv2.common.confluenceParentPageUrl.length == 0 || 
-          this.plugin.settingsv2.common.confluenceParentPageSpaceKey.length == 0 || 
-          this.plugin.settingsv2.common.confluenceParentPageId.length == 0 ) {
-            const fragment = document.createDocumentFragment();
-            const message1 = document.createElement("span");
-            message1.textContent = "To publish your notes to Confluence, " +
-              "please specify the Parent Page where the content will be saved. \n";
-            fragment.appendChild(message1);
-
-            // 링크 생성 및 스타일링
-            const link = document.createElement("a");
-            link.textContent = "Set the Confluence Parent Page URL in the settings to configure the Space Key and Page ID";
-            link.href = "#";
-            link.style.cursor = "pointer";
-            link.style.color = "var(--text-accent)"; // 링크 색상 설정 (옵션)
-            link.addEventListener("click", (event) => {
-              event.preventDefault(); // 기본 동작 방지
-              showSettingsTab(this.plugin, 'common-tab');
-            });
-            fragment.appendChild(link);
-            SummarDebug.Notice(0, fragment, 0);
-            
-            // SummarDebug.Notice(0, "Please set Confluence Parent Page URL, Space Key, and ID in the settings.",0);
-            return;
-        }
-        // SummarDebug.Notice(1, "uploadNoteToWiki");
         const file = this.plugin.app.workspace.getActiveFile();
         if (file) {
           let title = file.basename;
           const content = await this.plugin.app.vault.read(file);
-          SummarDebug.log(1, `title: ${title}`);
-          SummarDebug.log(3, `content: ${content}`);
-          if (content.includes("## Confluence 문서 제목")) {
-            const match = content.match(/EN:(.*?)(?:\r?\n|$)/);
-            if (match && match[1]) {
-              if (title.includes("summary")) {
-                title = title.replace("summary", "");
-              }  
-              const entitle = match[1].trim();
-              title = `${title} - ${entitle}`;
-            }
-          }
-          const md = new MarkdownIt({
-            html: true,
-            xhtmlOut: true,  // XHTML 호환 출력 모드 활성화
-            breaks: true,
-            linkify: true
-          });
-          let html = md.render(content);
-          
-          // Confluence XHTML 호환성을 위한 후처리
-          html = html
-            .replace(/<br>/g, '<br />')  // <br>을 <br />로 변경
-            .replace(/<hr>/g, '<hr />')  // <hr>을 <hr />로 변경
-            .replace(/<img([^>]*?)>/g, '<img$1 />')  // <img>를 자동 닫힘 태그로 변경
-            .replace(/<input([^>]*?)>/g, '<input$1 />')  // <input>을 자동 닫힘 태그로 변경
-            .replace(/&(?!amp;|lt;|gt;|quot;|#\d+;|#x[\da-fA-F]+;)/g, '&amp;');  // 인코딩되지 않은 & 문자 처리
-          const confluenceApi = new ConfluenceAPI(this.plugin);
-          const { updated, statusCode, message, reason } = await confluenceApi.createPage(title, html);
-          if (statusCode === 200) {
-            // HTML 형식의 성공 메시지 생성
-            const messageFragment = document.createDocumentFragment();
-              
-            const successText = document.createElement("div");
-            if (updated) {
-              successText.textContent = "Page has been updated successfully.";
-            } else {
-              successText.textContent = "Page has been created successfully.";
-            }
-            messageFragment.appendChild(successText);
-
-            const lineBreak = document.createElement("br");
-            messageFragment.appendChild(lineBreak);
-
-            const link = document.createElement("a");
-            link.href = message;
-            link.textContent = message;
-            link.style.color = "var(--link-color)"; // Obsidian의 링크 색상 사용
-            link.style.textDecoration = "underline";
-            messageFragment.appendChild(link);
-
-            SummarDebug.Notice(0, messageFragment, 0);
-          } else {
-            const frag = document.createDocumentFragment();
-            const title = document.createElement("div");
-            title.textContent = "⚠️" + reason;
-            title.style.fontWeight = "bold";
-            title.style.marginBottom = "4px";
-
-            const messageNoti = document.createElement("div");
-            messageNoti.textContent = message as string;
-            
-            frag.appendChild(title);
-            frag.appendChild(messageNoti);
-
-            SummarDebug.Notice(0, frag, 0);
-          }
+          await this.uploadContentToWiki(title, content);
         } else {
           SummarDebug.Notice(0, "No active editor was found.");
         }
-      }
-      else {
+      } else {
         const frag = document.createDocumentFragment();
 
         const title = document.createElement("div");
@@ -325,92 +236,11 @@ export class SummarView extends View {
     uploadNoteToSlackButton.addEventListener("click", async() => {
       const viewType = await this.getCurrentMainPaneTabType();
       if (viewType === "markdown") {
-        // Slack API가 활성화되어 있는지만 확인 (토큰은 선택적)
-        if (!this.plugin.settingsv2.common.useSlackAPI) {
-            const fragment = document.createDocumentFragment();
-            const message1 = document.createElement("span");
-            
-            if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
-              message1.textContent = "To create a Canvas in Slack, " +
-                "please enable Slack API integration. Bot Token is optional " +
-                "(if not set, will attempt anonymous access). \n";
-            } else {
-              message1.textContent = "To send a message to Slack, " +
-                "please enable Slack API integration. Bot Token and Channel ID may be required. \n";
-            }
-            fragment.appendChild(message1);
-
-            // 링크 생성 및 스타일링
-            const link = document.createElement("a");
-            link.textContent = "Enable Slack API integration in the settings";
-            link.href = "#";
-            link.style.cursor = "pointer";
-            link.style.color = "var(--text-accent)";
-            link.addEventListener("click", (event) => {
-              event.preventDefault();
-              showSettingsTab(this.plugin, 'common-tab');
-            });
-            fragment.appendChild(link);
-            SummarDebug.Notice(0, fragment, 0);
-            
-            return;
-        }
-        
         const file = this.plugin.app.workspace.getActiveFile();
         if (file) {
           let title = file.basename;
           const content = await this.plugin.app.vault.read(file);
-          SummarDebug.log(1, `Slack upload - title: ${title}`);
-          SummarDebug.log(3, `Slack upload - content: ${content}`);
-
-          const slackApi = new SlackAPI(this.plugin);
-          const result = await slackApi.uploadNote(title, content);
-          
-          if (result.success) {
-            // HTML 형식의 성공 메시지 생성
-            const messageFragment = document.createDocumentFragment();
-              
-            const successText = document.createElement("div");
-            if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
-              successText.textContent = "Canvas has been created successfully in Slack.";
-            } else {
-              successText.textContent = "Message has been posted to Slack successfully.";
-            }
-            messageFragment.appendChild(successText);
-
-            if (result.canvasUrl) {
-              const lineBreak = document.createElement("br");
-              messageFragment.appendChild(lineBreak);
-
-              const link = document.createElement("a");
-              link.href = result.canvasUrl;
-              link.textContent = result.canvasUrl;
-              link.style.color = "var(--link-color)";
-              link.style.textDecoration = "underline";
-              link.target = "_blank"; // 새 창에서 열기
-              messageFragment.appendChild(link);
-            }
-
-            SummarDebug.Notice(0, messageFragment, 0);
-          } else {
-            const frag = document.createDocumentFragment();
-            const title = document.createElement("div");
-            if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
-              title.textContent = "⚠️ Slack Canvas Upload Failed";
-            } else {
-              title.textContent = "⚠️ Slack Message Send Failed";
-            }
-            title.style.fontWeight = "bold";
-            title.style.marginBottom = "4px";
-
-            const messageNoti = document.createElement("div");
-            messageNoti.textContent = result.message;
-            
-            frag.appendChild(title);
-            frag.appendChild(messageNoti);
-
-            SummarDebug.Notice(0, frag, 0);
-          }
+          await this.uploadContentToSlack(title, content);
         } else {
           SummarDebug.Notice(0, "No active editor was found.");
         }
@@ -444,58 +274,24 @@ export class SummarView extends View {
       // 초기 버튼 상태 설정
       this.plugin.updateSlackButtonState();
     }
-  
 
-    const newNoteButton = buttonContainer.createEl("button", {
-      cls: "lucide-icon-button",
-    });
-    newNoteButton.setAttribute("aria-label", "Create new note with results");
-    setIcon(newNoteButton, "file-output");
+    // deleteAllResultItemsButton 추가 (macOS에서만 표시)
+    if (Platform.isMacOS && Platform.isDesktopApp) {
+      const deleteAllResultItemsButton = buttonContainer.createEl("button", {
+        cls: "lucide-icon-button",
+      });
+      deleteAllResultItemsButton.setAttribute("aria-label", "Delete all result items");
+      setIcon(deleteAllResultItemsButton, "trash-2");
 
-    // newNoteButton 클릭 이벤트 리스너
-    newNoteButton.addEventListener("click", async() => {
-
-      let newNoteName = this.plugin.newNoteName;
-      
-      if (!newNoteName || newNoteName === "") {
-        const summarView = new SummarViewContainer(this.plugin);
-        summarView.enableNewNote(true, newNoteName);
-        newNoteName = this.plugin.newNoteName;
-      }
-
-      const filePath = normalizePath(newNoteName);
-      const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
-
-      if (existingFile) {
-        const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
-        
-        for (const leaf of leaves) {
-          const view = leaf.view;
-          if (view instanceof MarkdownView && view.file && view.file.path === filePath) {
-            this.plugin.app.workspace.setActiveLeaf(leaf);
-            return;
-          }
-        }
-        await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
-      } else {
-        SummarDebug.log(1, `file is not exist: ${filePath}`);
-        const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
-        const folderExists = await this.plugin.app.vault.adapter.exists(folderPath);
-        if (!folderExists) {
-          await this.plugin.app.vault.adapter.mkdir(folderPath);
-        }
-        SummarDebug.log(1, `resultContainer.value===\n${this.getResultText("")}`);
-        await this.plugin.app.vault.create(filePath, this.getResultText(""));
-        await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
-      }
-    });
-
-    this.plugin.newNoteButton = newNoteButton;
-
-    if (this.plugin.newNoteButton) {
-      this.plugin.newNoteButton.disabled = true;
-      this.plugin.newNoteButton.classList.toggle("disabled", true);
+      deleteAllResultItemsButton.addEventListener("click", () => {
+        // 모든 resultItems 삭제
+        this.resultItems.clear();
+        this.newNoteNames.clear(); // newNoteNames Map도 정리
+        this.resultContainer.empty();
+        SummarDebug.Notice(1, "All result items have been deleted");
+      });
     }
+  
     
     // 구분선(|) 추가
     const separator = buttonContainer.createEl("span", {
@@ -714,12 +510,282 @@ export class SummarView extends View {
     return "";
   }
 
+  enableNewNote(key: string, newNotePath?: string) {
+    const now = new Date();
+    const formattedDate = now.getFullYear().toString().slice(2) +
+      String(now.getMonth() + 1).padStart(2, "0") +
+      now.getDate().toString().padStart(2, "0") + "-" +
+      now.getHours().toString().padStart(2, "0") +
+      now.getMinutes().toString().padStart(2, "0");
+
+    let newNoteName = newNotePath ? newNotePath : formattedDate;
+    if (!newNoteName.includes(".md")) {
+      newNoteName += ".md";
+    }
+    this.newNoteNames.set(key, newNoteName);
+
+
+    // key에 해당하는 resultItem의 newNoteButton을 찾아서 enable하고 show
+    const resultItem = this.resultItems.get(key);
+    if (resultItem) {
+      const newNoteButton = resultItem.querySelector('button[button-id="new-note-button"]') as HTMLButtonElement;
+      if (newNoteButton) {
+        newNoteButton.disabled = false;
+        newNoteButton.style.display = '';
+      }
+      const uploadResultToWikiButton = resultItem.querySelector('button[button-id="upload-result-to-wiki-button"]') as HTMLButtonElement;
+      if (uploadResultToWikiButton) {
+        uploadResultToWikiButton.disabled = false;
+        uploadResultToWikiButton.style.display = '';
+      }
+      const uploadResultToSlackButton = resultItem.querySelector('button[button-id="upload-result-to-slack-button"]') as HTMLButtonElement;
+      if (uploadResultToSlackButton) {
+        uploadResultToSlackButton.disabled = false;
+        uploadResultToSlackButton.style.display = '';
+      }
+    }
+  } 
+
+  getNoteName(key: string): string {
+    let newNoteName = this.newNoteNames.get(key);
+    return (newNoteName && newNoteName.length > 0) ? newNoteName : "";
+  }
+
+  foldResult(key: string | null, fold: boolean): void {
+    if (!key || key === "") {
+      // 모든 resultItem에 대해 동일하게 적용
+      this.resultItems.forEach((resultItem, itemKey) => {
+        this.applyFoldToResultItem(resultItem, fold);
+      });
+    } else {
+      // 특정 key의 resultItem에만 적용
+      const resultItem = this.resultItems.get(key);
+      if (resultItem) {
+        this.applyFoldToResultItem(resultItem, fold);
+      }
+    }
+  }
+
+  clearAllResultItems(): void {
+    this.resultItems.clear();
+    this.newNoteNames.clear(); // newNoteNames Map도 정리
+    this.resultContainer.empty();
+  }
+
+  private applyFoldToResultItem(resultItem: HTMLDivElement, fold: boolean): void {
+    const toggleFoldButton = resultItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
+    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+    
+    if (toggleFoldButton && resultText) {
+      if (fold) {
+        // 접기
+        toggleFoldButton.setAttribute('toggled', 'true');
+        setIcon(toggleFoldButton, 'unfold-vertical');
+        resultText.style.display = 'none';
+      } else {
+        // 펼치기
+        toggleFoldButton.setAttribute('toggled', 'false');
+        setIcon(toggleFoldButton, 'fold-vertical');
+        resultText.style.display = 'block';
+      }
+    }
+  }
+
+  private async uploadContentToSlack(title: string, content: string): Promise<void> {
+    // Slack API가 활성화되어 있는지만 확인 (토큰은 선택적)
+    if (!this.plugin.settingsv2.common.useSlackAPI) {
+      const fragment = document.createDocumentFragment();
+      const message1 = document.createElement("span");
+      
+      if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+        message1.textContent = "To create a Canvas in Slack, " +
+          "please enable Slack API integration. Bot Token is optional " +
+          "(if not set, will attempt anonymous access). \n";
+      } else {
+        message1.textContent = "To send a message to Slack, " +
+          "please enable Slack API integration. Bot Token and Channel ID may be required. \n";
+      }
+      fragment.appendChild(message1);
+
+      // 링크 생성 및 스타일링
+      const link = document.createElement("a");
+      link.textContent = "Enable Slack API integration in the settings";
+      link.href = "#";
+      link.style.cursor = "pointer";
+      link.style.color = "var(--text-accent)";
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        showSettingsTab(this.plugin, 'common-tab');
+      });
+      fragment.appendChild(link);
+      SummarDebug.Notice(0, fragment, 0);
+      
+      return;
+    }
+    
+    SummarDebug.log(1, `Slack upload - title: ${title}`);
+    SummarDebug.log(3, `Slack upload - content: ${content}`);
+
+    const slackApi = new SlackAPI(this.plugin);
+    const result = await slackApi.uploadNote(title, content);
+    
+    if (result.success) {
+      // HTML 형식의 성공 메시지 생성
+      const messageFragment = document.createDocumentFragment();
+        
+      const successText = document.createElement("div");
+      if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+        successText.textContent = "Canvas has been created successfully in Slack.";
+      } else {
+        successText.textContent = "Message has been posted to Slack successfully.";
+      }
+      messageFragment.appendChild(successText);
+
+      if (result.canvasUrl) {
+        const lineBreak = document.createElement("br");
+        messageFragment.appendChild(lineBreak);
+
+        const link = document.createElement("a");
+        link.href = result.canvasUrl;
+        link.textContent = result.canvasUrl;
+        link.style.color = "var(--link-color)";
+        link.style.textDecoration = "underline";
+        link.target = "_blank"; // 새 창에서 열기
+        messageFragment.appendChild(link);
+      }
+
+      SummarDebug.Notice(0, messageFragment, 0);
+    } else {
+      const frag = document.createDocumentFragment();
+      const title = document.createElement("div");
+      if (this.plugin.SLACK_UPLOAD_TO_CANVAS) {
+        title.textContent = "⚠️ Slack Canvas Upload Failed";
+      } else {
+        title.textContent = "⚠️ Slack Message Send Failed";
+      }
+      title.style.fontWeight = "bold";
+      title.style.marginBottom = "4px";
+
+      const messageNoti = document.createElement("div");
+      messageNoti.textContent = result.message;
+      
+      frag.appendChild(title);
+      frag.appendChild(messageNoti);
+
+      SummarDebug.Notice(0, frag, 0);
+    }
+  }
+
+  private async uploadContentToWiki(title: string, content: string): Promise<void> {
+    // Confluence 설정 확인
+    if (this.plugin.settingsv2.common.confluenceParentPageUrl.length == 0 || 
+      this.plugin.settingsv2.common.confluenceParentPageSpaceKey.length == 0 || 
+      this.plugin.settingsv2.common.confluenceParentPageId.length == 0 ) {
+        const fragment = document.createDocumentFragment();
+        const message1 = document.createElement("span");
+        message1.textContent = "To publish your notes to Confluence, " +
+          "please specify the Parent Page where the content will be saved. \n";
+        fragment.appendChild(message1);
+
+        // 링크 생성 및 스타일링
+        const link = document.createElement("a");
+        link.textContent = "Set the Confluence Parent Page URL in the settings to configure the Space Key and Page ID";
+        link.href = "#";
+        link.style.cursor = "pointer";
+        link.style.color = "var(--text-accent)"; // 링크 색상 설정 (옵션)
+        link.addEventListener("click", (event) => {
+          event.preventDefault(); // 기본 동작 방지
+          showSettingsTab(this.plugin, 'common-tab');
+        });
+        fragment.appendChild(link);
+        SummarDebug.Notice(0, fragment, 0);
+        
+        return;
+    }
+
+    SummarDebug.log(1, `title: ${title}`);
+    SummarDebug.log(3, `content: ${content}`);
+    
+    // 타이틀 처리
+    if (content.includes("## Confluence 문서 제목")) {
+      const match = content.match(/EN:(.*?)(?:\r?\n|$)/);
+      if (match && match[1]) {
+        if (title.includes("summary")) {
+          title = title.replace("summary", "");
+        }  
+        const entitle = match[1].trim();
+        title = `${title} - ${entitle}`;
+      }
+    }
+    
+    // Markdown을 HTML로 변환
+    const md = new MarkdownIt({
+      html: true,
+      xhtmlOut: true,  // XHTML 호환 출력 모드 활성화
+      breaks: true,
+      linkify: true
+    });
+    let html = md.render(content);
+    
+    // Confluence XHTML 호환성을 위한 후처리
+    html = html
+      .replace(/<br>/g, '<br />')  // <br>을 <br />로 변경
+      .replace(/<hr>/g, '<hr />')  // <hr>을 <hr />로 변경
+      .replace(/<img([^>]*?)>/g, '<img$1 />')  // <img>를 자동 닫힘 태그로 변경
+      .replace(/<input([^>]*?)>/g, '<input$1 />')  // <input>을 자동 닫힘 태그로 변경
+      .replace(/&(?!amp;|lt;|gt;|quot;|#\d+;|#x[\da-fA-F]+;)/g, '&amp;');  // 인코딩되지 않은 & 문자 처리
+    
+    const confluenceApi = new ConfluenceAPI(this.plugin);
+    const { updated, statusCode, message, reason } = await confluenceApi.createPage(title, html);
+    
+    if (statusCode === 200) {
+      // HTML 형식의 성공 메시지 생성
+      const messageFragment = document.createDocumentFragment();
+        
+      const successText = document.createElement("div");
+      if (updated) {
+        successText.textContent = "Page has been updated successfully.";
+      } else {
+        successText.textContent = "Page has been created successfully.";
+      }
+      messageFragment.appendChild(successText);
+
+      const lineBreak = document.createElement("br");
+      messageFragment.appendChild(lineBreak);
+
+      const link = document.createElement("a");
+      link.href = message;
+      link.textContent = message;
+      link.style.color = "var(--link-color)"; // Obsidian의 링크 색상 사용
+      link.style.textDecoration = "underline";
+      messageFragment.appendChild(link);
+
+      SummarDebug.Notice(0, messageFragment, 0);
+    } else {
+      const frag = document.createDocumentFragment();
+      const title = document.createElement("div");
+      title.textContent = "⚠️" + reason;
+      title.style.fontWeight = "bold";
+      title.style.marginBottom = "4px";
+
+      const messageNoti = document.createElement("div");
+      messageNoti.textContent = message as string;
+      
+      frag.appendChild(title);
+      frag.appendChild(messageNoti);
+
+      SummarDebug.Notice(0, frag, 0);
+    }
+  }
+
   private createResultItem(key: string, label: string): HTMLDivElement {
     // 전체 컨테이너 생성
     const resultItem = document.createElement('div');
     resultItem.className = 'result-item';
     resultItem.style.width = '100%';
     resultItem.style.marginBottom = '8px';
+    resultItem.setAttribute('result-key', key);
+ 
     
     // resultHeader 생성
     const resultHeader = document.createElement('div');
@@ -729,9 +795,8 @@ export class SummarView extends View {
     resultHeader.style.alignItems = 'center';
     resultHeader.style.gap = '0px'; // 간격을 0으로 변경
     resultHeader.style.marginBottom = '0px'; // 4px에서 0px로 변경
-    resultHeader.style.padding = '2px';
+    resultHeader.style.padding = '0px';
     resultHeader.style.border = '1px solid var(--background-modifier-border)';
-    resultHeader.style.borderRadius = '4px';
     resultHeader.style.backgroundColor = 'var(--background-primary)';
     
     // 라벨 추가
@@ -748,54 +813,98 @@ export class SummarView extends View {
     labelElement.style.borderRadius = '3px'; // 둥근 모서리 추가
     resultHeader.appendChild(labelElement);
     
-    // uploadNoteToWikiButton 추가
-    const uploadNoteToWikiButton = document.createElement('button');
-    uploadNoteToWikiButton.className = 'lucide-icon-button';
-    uploadNoteToWikiButton.setAttribute('aria-label', 'Upload Note to Confluence');
-    uploadNoteToWikiButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    uploadNoteToWikiButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    uploadNoteToWikiButton.style.margin = '0'; // 버튼 간격 제거
-    setIcon(uploadNoteToWikiButton, 'file-up');
-    uploadNoteToWikiButton.addEventListener('click', () => {
-      SummarDebug.Notice(1, 'uploadNoteToWikiButton');
-    });
-    resultHeader.appendChild(uploadNoteToWikiButton);
+    // uploadResultToWikiButton 추가
+    const uploadResultToWikiButton = document.createElement('button');
+    uploadResultToWikiButton.className = 'lucide-icon-button';
+    uploadResultToWikiButton.setAttribute('aria-label', 'Upload this result to Confluence');
+    uploadResultToWikiButton.setAttribute('button-id', 'upload-result-to-wiki-button'); 
+    uploadResultToWikiButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    uploadResultToWikiButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    uploadResultToWikiButton.style.margin = '0'; // 버튼 간격 제거
     
-    // uploadNoteToSlackButton 추가
-    const uploadNoteToSlackButton = document.createElement('button');
-    uploadNoteToSlackButton.className = 'lucide-icon-button';
-    uploadNoteToSlackButton.setAttribute('aria-label', 'Upload Note to Slack');
-    uploadNoteToSlackButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    uploadNoteToSlackButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    uploadNoteToSlackButton.style.margin = '0'; // 버튼 간격 제거
-    setIcon(uploadNoteToSlackButton, 'hash');
-    uploadNoteToSlackButton.addEventListener('click', () => {
-      SummarDebug.Notice(1, 'uploadNoteToSlackButton');
+    // newNoteButton을 초기에는 disable하고 hide
+    uploadResultToWikiButton.disabled = true;
+    uploadResultToWikiButton.style.display = 'none';
+    
+    setIcon(uploadResultToWikiButton, 'file-up');
+    uploadResultToWikiButton.addEventListener('click', () => {
+      let title = this.getNoteName(key);
+      
+      // 맨 마지막 '/'까지 제거
+      const lastSlashIndex = title.lastIndexOf('/');
+      if (lastSlashIndex !== -1) {
+        title = title.substring(lastSlashIndex + 1);
+      }
+      
+      // 맨 뒤의 '.md' 제거
+      if (title.endsWith('.md')) {
+        title = title.substring(0, title.length - 3);
+      }
+      
+      const content = this.getResultText(key);
+      this.uploadContentToWiki(title, content)
+
+      // SummarDebug.Notice(1, 'uploadResultToWikiButton');
     });
-    resultHeader.appendChild(uploadNoteToSlackButton);
+    resultHeader.appendChild(uploadResultToWikiButton);
+    
+    // uploadResultToSlackButton 추가
+    const uploadResultToSlackButton = document.createElement('button');
+    uploadResultToSlackButton.className = 'lucide-icon-button';
+    uploadResultToSlackButton.setAttribute('aria-label', 'Upload this result to Slack');
+    uploadResultToSlackButton.setAttribute('button-id', 'upload-result-to-slack-button'); 
+    uploadResultToSlackButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    uploadResultToSlackButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    uploadResultToSlackButton.style.margin = '0'; // 버튼 간격 제거
+    
+    // newNoteButton을 초기에는 disable하고 hide
+    uploadResultToSlackButton.disabled = true;
+    uploadResultToSlackButton.style.display = 'none';
+    
+    setIcon(uploadResultToSlackButton, 'hash');
+    uploadResultToSlackButton.addEventListener('click', () => {
+      let title = this.getNoteName(key);
+      
+      // 맨 마지막 '/'까지 제거
+      const lastSlashIndex = title.lastIndexOf('/');
+      if (lastSlashIndex !== -1) {
+        title = title.substring(lastSlashIndex + 1);
+      }
+      
+      // 맨 뒤의 '.md' 제거
+      if (title.endsWith('.md')) {
+        title = title.substring(0, title.length - 3);
+      }
+      
+      const content = this.getResultText(key);
+      this.uploadContentToSlack(title, content)
+      // SummarDebug.Notice(1, 'uploadResultToSlackButton');
+    });
+    resultHeader.appendChild(uploadResultToSlackButton);
     
     // newNoteButton 추가
     const newNoteButton = document.createElement('button');
     newNoteButton.className = 'lucide-icon-button';
     newNoteButton.setAttribute('aria-label', 'Create new note with this result');
+    newNoteButton.setAttribute('button-id', 'new-note-button'); 
     newNoteButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
     newNoteButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
     newNoteButton.style.margin = '0'; // 버튼 간격 제거
+    
+    // newNoteButton을 초기에는 disable하고 hide
+    newNoteButton.disabled = true;
+    newNoteButton.style.display = 'none';
+    
     setIcon(newNoteButton, 'file-output');
     newNoteButton.addEventListener('click', async () => {
       try {
-        let newNoteName = this.plugin.newNoteName;
-        
-        if (!newNoteName || newNoteName === "") {
-          const summarView = new SummarViewContainer(this.plugin);
-          summarView.enableNewNote(true, newNoteName);
-          newNoteName = this.plugin.newNoteName;
-        }
+        let newNoteName = this.getNoteName(key);
 
         const filePath = normalizePath(newNoteName);
         const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
 
         if (existingFile) {
+          SummarDebug.log(1, `file exist: ${filePath}`);
           const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
           
           for (const leaf of leaves) {
@@ -815,7 +924,7 @@ export class SummarView extends View {
           }
           
           // resultText의 내용을 가져와서 노트 생성
-          const resultTextContent = resultText.getAttribute('data-raw-text') || resultText.textContent || '';
+          const resultTextContent = this.getResultText(key);
           SummarDebug.log(1, `resultText content===\n${resultTextContent}`);
           await this.plugin.app.vault.create(filePath, resultTextContent);
           await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
@@ -825,7 +934,60 @@ export class SummarView extends View {
         SummarDebug.Notice(1, 'Failed to create new note');
       }
     });
+    
     resultHeader.appendChild(newNoteButton);
+    
+    
+    // toggleFoldButton 추가
+    const toggleFoldButton = document.createElement('button');
+    toggleFoldButton.className = 'lucide-icon-button';
+    toggleFoldButton.setAttribute('aria-label', 'Toggle fold/unfold this result');
+    toggleFoldButton.setAttribute('button-id', 'toggle-fold-button');
+    toggleFoldButton.setAttribute('toggled', 'false');
+    toggleFoldButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    toggleFoldButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    toggleFoldButton.style.margin = '0'; // 버튼 간격 제거
+    
+    setIcon(toggleFoldButton, 'fold-vertical');
+    toggleFoldButton.addEventListener('click', () => {
+      const isToggled = toggleFoldButton.getAttribute('toggled') === 'true';
+      
+      if (isToggled) {
+        // 현재 접혀있는 상태 -> 펼치기
+        toggleFoldButton.setAttribute('toggled', 'false');
+        setIcon(toggleFoldButton, 'fold-vertical');
+        resultText.style.display = 'block'; // resultText 보이기
+      } else {
+        // 현재 펼쳐져있는 상태 -> 접기
+        toggleFoldButton.setAttribute('toggled', 'true');
+        setIcon(toggleFoldButton, 'unfold-vertical');
+        resultText.style.display = 'none'; // resultText 숨기기
+      }
+    });
+    resultHeader.appendChild(toggleFoldButton);
+    
+    
+    // copyResultButton 추가
+    const copyResultButton = document.createElement('button');
+    copyResultButton.className = 'lucide-icon-button';
+    copyResultButton.setAttribute('aria-label', 'Copy this result to clipboard');
+    copyResultButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
+    copyResultButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
+    copyResultButton.style.margin = '0'; // 버튼 간격 제거
+    
+    setIcon(copyResultButton, 'copy');
+    copyResultButton.addEventListener('click', async () => {
+      try {
+        const rawText = resultText.getAttribute('data-raw-text') || '';
+        await navigator.clipboard.writeText(rawText);
+        SummarDebug.Notice(1, 'Content copied to clipboard');
+      } catch (error) {
+        SummarDebug.log(1, `Error copying to clipboard: ${error}`);
+        SummarDebug.Notice(0, 'Failed to copy content to clipboard');
+      }
+    });
+    resultHeader.appendChild(copyResultButton);
+    
     
     // deleteResultItemButton 추가
     const deleteResultItemButton = document.createElement('button');
@@ -834,10 +996,12 @@ export class SummarView extends View {
     deleteResultItemButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
     deleteResultItemButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
     deleteResultItemButton.style.margin = '0'; // 버튼 간격 제거
+    deleteResultItemButton.style.marginLeft = 'auto'; // 오른쪽으로 정렬
     setIcon(deleteResultItemButton, 'trash-2');
     deleteResultItemButton.addEventListener('click', () => {
       // 현재 resultItem 삭제
       this.resultItems.delete(key);
+      this.newNoteNames.delete(key); // newNoteNames Map에서도 해당 key 제거
       resultItem.remove();
     });
     resultHeader.appendChild(deleteResultItemButton);
@@ -851,7 +1015,6 @@ export class SummarView extends View {
     resultText.style.width = '100%';
     resultText.style.minHeight = '10px';
     resultText.style.border = '1px solid var(--background-modifier-border)';
-    resultText.style.borderRadius = '4px';
     resultText.style.padding = '8px';
     resultText.style.marginBottom = '0px';
     resultText.style.backgroundColor = 'var(--background-secondary)';
@@ -860,7 +1023,7 @@ export class SummarView extends View {
     
     // resultText 기본 스타일 추가
     resultText.style.color = 'var(--text-normal)';
-    resultText.style.fontSize = '14px';
+    resultText.style.fontSize = '12px';
     resultText.style.lineHeight = '1.4';
     resultText.style.userSelect = 'text';
     resultText.style.cursor = 'text';

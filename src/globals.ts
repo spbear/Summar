@@ -32,32 +32,17 @@ export class SummarViewContainer {
   }
 
 
-  enableNewNote(enabled: boolean, newNotePath?: string) {
-    if (this.plugin.newNoteButton) {
-      this.plugin.newNoteButton.disabled = !enabled;
-      this.plugin.newNoteButton.classList.toggle("disabled", !enabled);
-    }
-
-    if (this.plugin.newNoteLabel) {
-      this.plugin.newNoteLabel.classList.toggle("disabled", !enabled);
-    }
-
-    if (enabled) {
-      const now = new Date();
-      const formattedDate = now.getFullYear().toString().slice(2) +
-        String(now.getMonth() + 1).padStart(2, "0") +
-        now.getDate().toString().padStart(2, "0") + "-" +
-        now.getHours().toString().padStart(2, "0") +
-        now.getMinutes().toString().padStart(2, "0");
-
-      this.plugin.newNoteName = newNotePath ? newNotePath : formattedDate;
-      if (!this.plugin.newNoteName.includes(".md")) {
-        this.plugin.newNoteName += ".md";
-      }
-    } else {
-      this.plugin.newNoteName = "";
-    }
+  enableNewNote(enabled: boolean, key: string, newNotePath?: string) {
+    this.plugin.enableNewNote(enabled, key, newNotePath);
   } 
+
+  foldResult(key: string | null, fold: boolean): void {
+    this.plugin.foldResult(key, fold);
+  }
+  
+  clearAllResultItems(): void {
+    this.plugin.clearAllResultItems();
+  }
 }
 
 export class SummarDebug {
