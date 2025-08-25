@@ -1113,6 +1113,111 @@ export class SummarView extends View {
     resultItem.appendChild(resultHeader);
     resultItem.appendChild(resultText);
     
+    ///////////////////////////////////////////////////////////////
+    return resultItem;
+    
+    // chatWithContext 영역 생성
+    const chatWithContext = document.createElement('div');
+    chatWithContext.className = 'chat-with-context';
+    chatWithContext.style.width = '100%';
+    chatWithContext.style.marginTop = '0px';
+    chatWithContext.style.border = '1px solid var(--background-modifier-border)';
+    chatWithContext.style.backgroundColor = 'var(--background-secondary)';
+    
+    // chatHeader 생성
+    const chatHeader = document.createElement('div');
+    chatHeader.className = 'chat-header';
+    chatHeader.style.width = '100%';
+    chatHeader.style.display = 'flex';
+    chatHeader.style.alignItems = 'center';
+    chatHeader.style.gap = '0px';
+    chatHeader.style.padding = '0px';
+    chatHeader.style.backgroundColor = 'var(--background-primary)';
+    chatHeader.style.border = 'none';
+    chatHeader.style.borderBottom = '1px solid var(--background-modifier-border)';
+    
+    // chatHeader Label 추가
+    const chatLabel = document.createElement('span');
+    chatLabel.textContent = 'Chat with Context';
+    chatLabel.style.fontSize = '10px';
+    chatLabel.style.color = 'var(--text-muted)';
+    chatLabel.style.fontWeight = 'bold';
+    chatLabel.style.flexGrow = '1';
+    chatLabel.style.marginLeft = '2px'; // labelElement와 동일한 왼쪽 간격 적용
+    chatLabel.style.marginRight = '0px';
+    chatLabel.style.border = '1px solid var(--background-modifier-border)';
+    chatLabel.style.padding = '2px 4px';
+    chatLabel.style.borderRadius = '3px';
+    chatLabel.style.backgroundColor = 'var(--background-secondary)';
+    chatHeader.appendChild(chatLabel);
+    
+    // chatHeader button 추가
+    const chatHeaderButton = document.createElement('button');
+    chatHeaderButton.className = 'lucide-icon-button';
+    chatHeaderButton.setAttribute('aria-label', 'Close chat area');
+    chatHeaderButton.style.transform = 'scale(0.7)';
+    chatHeaderButton.style.transformOrigin = 'center';
+    chatHeaderButton.style.margin = '0';
+    setIcon(chatHeaderButton, 'x');
+    chatHeaderButton.addEventListener('click', () => {
+      // 채팅 영역 토글 기능 (추후 구현)
+      SummarDebug.Notice(1, 'Chat header button clicked');
+    });
+    chatHeader.appendChild(chatHeaderButton);
+    
+    // chatInput 생성
+    const chatInput = document.createElement('textarea');
+    chatInput.className = 'chat-input';
+    chatInput.placeholder = 'Ask questions about this content...';
+    chatInput.style.width = '100%';
+    chatInput.style.minHeight = '60px';
+    chatInput.style.padding = '8px';
+    chatInput.style.border = 'none';
+    // chatInput.style.borderBottom = '1px solid var(--background-modifier-border)';
+    chatInput.style.backgroundColor = 'var(--background-secondary)';
+    chatInput.style.color = 'var(--text-normal)';
+    chatInput.style.fontSize = '12px';
+    // chatInput.style.resize = 'vertical';
+    chatInput.style.outline = 'none';
+    
+    // chatButtonArea 생성
+    const chatButtonArea = document.createElement('div');
+    chatButtonArea.className = 'chat-button-area';
+    chatButtonArea.style.width = '100%';
+    chatButtonArea.style.display = 'flex';
+    chatButtonArea.style.justifyContent = 'flex-end';
+    chatButtonArea.style.padding = '4px 8px'; // 8px에서 4px로 줄임
+    chatButtonArea.style.minHeight = '32px'; // 최소 높이 설정
+    chatButtonArea.style.backgroundColor = 'var(--background-primary)';
+    
+    // chatButtonArea의 send button 추가
+    const chatSendButton = document.createElement('button');
+    chatSendButton.className = 'lucide-icon-button';
+    chatSendButton.setAttribute('aria-label', 'Send message');
+    chatSendButton.style.transform = 'scale(0.7)'; // 0.7에서 0.6으로 더 축소
+    chatSendButton.style.transformOrigin = 'center';
+    chatSendButton.style.margin = '0';
+    chatSendButton.style.height = '24px'; // 명시적 높이 설정
+    chatSendButton.style.width = '24px'; // 명시적 너비 설정
+    setIcon(chatSendButton, 'message-circle-plus');
+    chatSendButton.addEventListener('click', () => {
+      const message = chatInput.value.trim();
+      if (message) {
+        // 메시지 전송 기능 (추후 구현)
+        SummarDebug.Notice(1, `Chat message: ${message}`);
+        chatInput.value = '';
+      }
+    });
+    chatButtonArea.appendChild(chatSendButton);
+    
+    // chatWithContext에 모든 요소 추가
+    chatWithContext.appendChild(chatHeader);
+    chatWithContext.appendChild(chatInput);
+    chatWithContext.appendChild(chatButtonArea);
+    
+    // resultItem에 chatWithContext 추가
+    resultItem.appendChild(chatWithContext);
+    
     return resultItem;
   }
 
