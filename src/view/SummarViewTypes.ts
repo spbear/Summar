@@ -1,0 +1,71 @@
+import { WorkspaceLeaf } from "obsidian";
+import SummarPlugin from "../main";
+import MarkdownIt from "markdown-it";
+
+// 공통 인터페이스
+export interface ISummarViewContext {
+  plugin: SummarPlugin;
+  leaf: WorkspaceLeaf;
+  containerEl: HTMLElement;
+  resultContainer: HTMLDivElement;
+  resultItems: Map<string, HTMLDivElement>;
+  newNoteNames: Map<string, string>;
+  markdownRenderer: MarkdownIt;
+  abortController: AbortController;
+  timeoutRefs: Set<NodeJS.Timeout>;
+}
+
+// 매니저 인터페이스들
+export interface ISummarStyleManager {
+  injectStyles(): void;
+  removeStyles(): void;
+}
+
+export interface ISummarUIRenderer {
+  renderInputContainer(container: HTMLElement): HTMLDivElement;
+  renderButtonContainer(container: HTMLElement): HTMLDivElement;
+  renderResultContainer(container: HTMLElement): HTMLDivElement;
+  setupContainerStyles(container: HTMLElement): void;
+}
+
+export interface ISummarResultManager {
+  createResultItem(key: string, label: string): HTMLDivElement;
+  appendResultText(key: string, label: string, message: string): string;
+  updateResultText(key: string, label: string, message: string): string;
+  getResultText(key: string): string;
+  foldResult(key: string | null, fold: boolean): void;
+  clearAllResultItems(): void;
+  enableNewNote(key: string, newNotePath?: string): void;
+  getNoteName(key: string): string;
+  cleanupMarkdownOutput(html: string): string;
+  setEventHandlers(events: SummarViewEvents): void;
+}
+
+export interface ISummarStickyHeaderManager {
+  setupStickyHeader(container: HTMLElement): void;
+  setupHeaderObserver(): void;
+  setupResizeObserver(): void;
+  updateStickyHeaderVisibility(): void;
+  cleanup(): void;
+  observeHeader(resultHeader: HTMLDivElement): void;
+  unobserveHeader(resultHeader: HTMLDivElement): void;
+}
+
+export interface ISummarEventHandler {
+  setupEventListeners(): void;
+  cleanup(): void;
+}
+
+export interface ISummarUploadManager {
+  uploadContentToWiki(title: string, content: string): Promise<void>;
+  uploadContentToSlack(title: string, content: string): Promise<void>;
+  getCurrentMainPaneTabType(): string;
+  updateSlackButtonTooltip(): void;
+}
+
+// 이벤트 타입
+export interface SummarViewEvents {
+  onResultItemCreated?: (key: string, element: HTMLDivElement) => void;
+  onResultItemRemoved?: (key: string) => void;
+  onToggleStateChanged?: (key: string, folded: boolean) => void;
+}
