@@ -1454,11 +1454,17 @@ export default class SummarPlugin extends Plugin {
   appendResultText(key: string, label: string, message: string): string {
       // SummarView의 appendResultText 메서드를 호출
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+      // SummarDebug.log(2, `appendResultText: Found ${leaves.length} SummarView leaves`);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
         if (summarView && typeof summarView.appendResultText === 'function') {
+          // SummarDebug.log(2, `appendResultText: Calling SummarView.appendResultText for key: ${key}, message: "${message}"`);
           return summarView.appendResultText(key, label, message);
+        } else {
+          // SummarDebug.log(1, `appendResultText: SummarView or appendResultText method not found`);
         }
+      } else {
+        // SummarDebug.log(1, `appendResultText: No SummarView leaves found`);
       }
       return "";
   }

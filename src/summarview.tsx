@@ -16,6 +16,16 @@ export class SummarView extends View {
 
   markdownRenderer: MarkdownIt;
 
+  // Sticky header 관련 프로퍼티
+  private stickyHeaderContainer: HTMLDivElement | null = null;
+  private currentStickyKey: string | null = null;
+  private headerObserver: IntersectionObserver | null = null;
+  private visibleHeaders: Set<string> = new Set();
+  private resizeObserver: ResizeObserver | null = null;
+  
+  // Toggle 중복 실행 방지용 플래그
+  private isToggling: boolean = false;
+
   constructor(leaf: WorkspaceLeaf, plugin: SummarPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -26,6 +36,10 @@ export class SummarView extends View {
       // breaks: false, // 자동 줄바꿈 변환 비활성화
       // xhtmlOut: false, // XHTML 출력 비활성화
     });
+    
+    // 생략 부호(ellipsis) 변환만 비활성화 (점 애니메이션 보존)
+    // 다른 타이포그래피(따옴표, 대시 등)는 유지
+    this.markdownRenderer.disable(['replacements']);
   }
 
   getViewType(): string {
@@ -43,10 +57,21 @@ export class SummarView extends View {
   async onOpen(): Promise<void> {
     SummarDebug.log(1, "Summar View opened");
     this.renderView();
+    this.setupResizeObserver();
   }
 
   async onClose(): Promise<void> {
     SummarDebug.log(1, "Summar View closed");
+    // Intersection Observer 정리
+    if (this.headerObserver) {
+      this.headerObserver.disconnect();
+      this.headerObserver = null;
+    }
+    // Resize Observer 정리
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
   }
 
   private async renderView(): Promise<void> {
@@ -104,6 +129,30 @@ export class SummarView extends View {
         -moz-user-select: text !important;
         -ms-user-select: text !important;
         user-select: text !important;
+      }
+      
+      /* Sticky header 스타일 - resultContainer 위쪽 별도 레이어 */
+      .sticky-header-container {
+        position: absolute !important;
+        z-index: 10000 !important;
+        background-color: var(--background-primary) !important;
+        border: 1px solid var(--background-modifier-border) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+        display: none !important;
+        border-radius: 0px !important;
+        padding: 0px !important;
+        margin: 0 !important;
+        pointer-events: auto !important;
+      }
+      
+      .sticky-header-container.visible {
+        display: block;
+      }
+      
+      .sticky-header-container .result-header {
+        border: none !important;
+        background-color: var(--background-primary) !important;
+        margin: 0 !important;
       }
     `;
     document.head.appendChild(style);
@@ -333,6 +382,7 @@ export class SummarView extends View {
     const resultContainer: HTMLDivElement = container.createEl("div", {
       cls: "summarview-result",
     });
+    resultContainer.style.position = "relative"; // sticky header positioning을 위해 추가
     resultContainer.style.width = "calc(100% - 10px)";
     resultContainer.style.height = "calc(100% - 120px)"; // status bar 높이(30px) 추가로 고려하여 80px에서 110px로 조정
     resultContainer.style.border = "1px solid var(--background-modifier-border)";
@@ -342,8 +392,15 @@ export class SummarView extends View {
     resultContainer.style.overflowX = "hidden";
     resultContainer.style.backgroundColor = "var(--background-primary)";
     resultContainer.style.color = "var(--text-normal)"; // Obsidian의 기본 텍스트 색상 변수 사용
+    
+    // sticky header positioning을 확실히 하기 위해 강제 설정
+    resultContainer.style.position = "relative !important" as any;
   
     this.resultContainer = resultContainer;
+
+    // Sticky header 초기화 (최상위 container에 별도 레이어로 생성)
+    this.setupStickyHeader(container); // resultContainer 위쪽 레이어에 생성
+    this.setupHeaderObserver();
 
     this.plugin.recordButton = recordButton;
 
@@ -439,6 +496,13 @@ export class SummarView extends View {
       this.resultItems.set(key, resultItem);
       this.resultContainer.appendChild(resultItem);
       isNewItem = true;
+      
+      // 새 resultItem의 resultHeader를 observer에 등록
+      const resultHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
+      if (resultHeader && this.headerObserver) {
+        this.headerObserver.observe(resultHeader);
+        SummarDebug.log(1, `Observer registered for header with key: ${key}`);
+      }
     }
     
     // resultText 영역 업데이트
@@ -464,22 +528,34 @@ export class SummarView extends View {
   }
 
   appendResultText(key: string, label: string, message: string): string {
+    // SummarDebug.log(2, `SummarView.appendResultText: key=${key}, label=${label}, message="${message}"`);
     let resultItem = this.resultItems.get(key);
     
     if (!resultItem) {
       // 존재하지 않으면 updateResultText 호출
+      // SummarDebug.log(2, `SummarView.appendResultText: No existing resultItem for key ${key}, calling updateResultText`);
       return this.updateResultText(key, label, message);
     }
+    
+    // SummarDebug.log(2, `SummarView.appendResultText: Found existing resultItem for key ${key}`);
     
     // 기존 텍스트에 추가
     const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
     if (resultText) {
       const currentText = resultText.getAttribute('data-raw-text') || '';
       const newText = currentText + message;
+      // SummarDebug.log(2, `SummarView.appendResultText: Current text length: ${currentText.length}, New text length: ${newText.length}`);
+      // SummarDebug.log(3, `SummarView.appendResultText: Current text: "${currentText}", New text: "${newText}"`);
+      
       resultText.setAttribute('data-raw-text', newText);
       const renderedHtml = this.markdownRenderer.render(newText);
       const cleanedHtml = this.cleanupMarkdownOutput(renderedHtml);
+      // SummarDebug.log(3, `SummarView.appendResultText: Rendered HTML: "${cleanedHtml}"`);
       resultText.innerHTML = cleanedHtml;
+      
+      // SummarDebug.log(2, `SummarView.appendResultText: Updated resultText innerHTML, new length: ${resultText.innerHTML.length}`);
+    } else {
+      // SummarDebug.log(1, `SummarView.appendResultText: No resultText element found for key ${key}`);
     }
     
     return key;
@@ -574,6 +650,10 @@ export class SummarView extends View {
     this.resultItems.clear();
     this.newNoteNames.clear(); // newNoteNames Map도 정리
     this.resultContainer.empty();
+    
+    // Observer 관련 정리
+    this.visibleHeaders.clear();
+    this.hideStickyHeader();
   }
 
   private applyFoldToResultItem(resultItem: HTMLDivElement, fold: boolean): void {
@@ -592,6 +672,9 @@ export class SummarView extends View {
         setIcon(toggleFoldButton, 'square-chevron-up');
         resultText.style.display = 'block';
       }
+      
+      // fold/unfold 상태 변경 시 sticky header 가시성 재평가
+      this.updateStickyHeaderVisibility();
     }
   }
 
@@ -791,248 +874,8 @@ export class SummarView extends View {
     resultItem.setAttribute('result-key', key);
  
     
-    // resultHeader 생성
-    const resultHeader = document.createElement('div');
-    resultHeader.className = 'result-header';
-    resultHeader.style.width = '100%';
-    resultHeader.style.display = 'flex';
-    resultHeader.style.alignItems = 'center';
-    resultHeader.style.gap = '0px'; // 간격을 0으로 변경
-    resultHeader.style.marginBottom = '0px'; // 4px에서 0px로 변경
-    resultHeader.style.padding = '0px';
-    resultHeader.style.border = '1px solid var(--background-modifier-border)';
-    resultHeader.style.backgroundColor = 'var(--background-primary)';
-    
-    // 라벨 추가
-    const labelElement = document.createElement('span');
-    labelElement.textContent = label;
-    labelElement.style.fontSize = '10px';
-    labelElement.style.color = 'var(--text-muted)';
-    labelElement.style.marginLeft = '2px'; // 상하단 간격(1px)만큼 왼쪽 간격 추가
-    labelElement.style.marginRight = '0px'; // 버튼과 붙이기 위해 0으로 변경
-    labelElement.style.fontWeight = 'bold';
-    labelElement.style.flexShrink = '0'; // 라벨이 축소되지 않도록 설정
-    labelElement.style.backgroundColor = 'var(--interactive-normal)'; // lucide icon button과 동일한 바탕색
-    labelElement.style.padding = '2px 4px'; // 패딩 추가로 바탕색이 잘 보이도록
-    labelElement.style.borderRadius = '3px'; // 둥근 모서리 추가
-    resultHeader.appendChild(labelElement);
-    
-    // uploadResultToWikiButton 추가
-    const uploadResultToWikiButton = document.createElement('button');
-    uploadResultToWikiButton.className = 'lucide-icon-button';
-    uploadResultToWikiButton.setAttribute('aria-label', 'Upload this result to Confluence');
-    uploadResultToWikiButton.setAttribute('button-id', 'upload-result-to-wiki-button'); 
-    uploadResultToWikiButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    uploadResultToWikiButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    uploadResultToWikiButton.style.margin = '0'; // 버튼 간격 제거
-    
-    // newNoteButton을 초기에는 disable하고 hide
-    uploadResultToWikiButton.disabled = true;
-    uploadResultToWikiButton.style.display = 'none';
-    
-    setIcon(uploadResultToWikiButton, 'file-up');
-    uploadResultToWikiButton.addEventListener('click', () => {
-      let title = this.getNoteName(key);
-      
-      // 맨 마지막 '/'까지 제거
-      const lastSlashIndex = title.lastIndexOf('/');
-      if (lastSlashIndex !== -1) {
-        title = title.substring(lastSlashIndex + 1);
-      }
-      
-      // 맨 뒤의 '.md' 제거
-      if (title.endsWith('.md')) {
-        title = title.substring(0, title.length - 3);
-      }
-      
-      const content = this.getResultText(key);
-      this.uploadContentToWiki(title, content)
-
-      // SummarDebug.Notice(1, 'uploadResultToWikiButton');
-    });
-    resultHeader.appendChild(uploadResultToWikiButton);
-    
-    // uploadResultToSlackButton 추가
-    const uploadResultToSlackButton = document.createElement('button');
-    uploadResultToSlackButton.className = 'lucide-icon-button';
-    uploadResultToSlackButton.setAttribute('aria-label', 'Upload this result to Slack');
-    uploadResultToSlackButton.setAttribute('button-id', 'upload-result-to-slack-button'); 
-    uploadResultToSlackButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    uploadResultToSlackButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    uploadResultToSlackButton.style.margin = '0'; // 버튼 간격 제거
-    
-    // newNoteButton을 초기에는 disable하고 hide
-    uploadResultToSlackButton.disabled = true;
-    uploadResultToSlackButton.style.display = 'none';
-    
-    setIcon(uploadResultToSlackButton, 'hash');
-    uploadResultToSlackButton.addEventListener('click', () => {
-      let title = this.getNoteName(key);
-      
-      // 맨 마지막 '/'까지 제거
-      const lastSlashIndex = title.lastIndexOf('/');
-      if (lastSlashIndex !== -1) {
-        title = title.substring(lastSlashIndex + 1);
-      }
-      
-      // 맨 뒤의 '.md' 제거
-      if (title.endsWith('.md')) {
-        title = title.substring(0, title.length - 3);
-      }
-      
-      const content = this.getResultText(key);
-      this.uploadContentToSlack(title, content)
-      // SummarDebug.Notice(1, 'uploadResultToSlackButton');
-    });
-    resultHeader.appendChild(uploadResultToSlackButton);
-    
-    // newNoteButton 추가
-    const newNoteButton = document.createElement('button');
-    newNoteButton.className = 'lucide-icon-button';
-    newNoteButton.setAttribute('aria-label', 'Create new note with this result');
-    newNoteButton.setAttribute('button-id', 'new-note-button'); 
-    newNoteButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    newNoteButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    newNoteButton.style.margin = '0'; // 버튼 간격 제거
-    
-    // newNoteButton을 초기에는 disable하고 hide
-    newNoteButton.disabled = true;
-    newNoteButton.style.display = 'none';
-    
-    setIcon(newNoteButton, 'file-output');
-    newNoteButton.addEventListener('click', async () => {
-      try {
-        let newNoteName = this.getNoteName(key);
-
-        const filePath = normalizePath(newNoteName);
-        const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
-
-        if (existingFile) {
-          SummarDebug.log(1, `file exist: ${filePath}`);
-          const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
-          
-          for (const leaf of leaves) {
-            const view = leaf.view;
-            if (view instanceof MarkdownView && view.file && view.file.path === filePath) {
-              this.plugin.app.workspace.setActiveLeaf(leaf);
-              return;
-            }
-          }
-          await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
-        } else {
-          SummarDebug.log(1, `file is not exist: ${filePath}`);
-          const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
-          const folderExists = await this.plugin.app.vault.adapter.exists(folderPath);
-          if (!folderExists) {
-            await this.plugin.app.vault.adapter.mkdir(folderPath);
-          }
-          
-          // resultText의 내용을 가져와서 노트 생성
-          const resultTextContent = this.getResultText(key);
-          SummarDebug.log(1, `resultText content===\n${resultTextContent}`);
-          await this.plugin.app.vault.create(filePath, resultTextContent);
-          await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
-        }
-      } catch (error) {
-        SummarDebug.log(1, `Error creating new note: ${error}`);
-        SummarDebug.Notice(1, 'Failed to create new note');
-      }
-    });
-    
-    resultHeader.appendChild(newNoteButton);
-    
-    
-    // toggleFoldButton 추가
-    const toggleFoldButton = document.createElement('button');
-    toggleFoldButton.className = 'lucide-icon-button';
-    toggleFoldButton.setAttribute('aria-label', 'Toggle fold/unfold this result');
-    toggleFoldButton.setAttribute('button-id', 'toggle-fold-button');
-    toggleFoldButton.setAttribute('toggled', 'false');
-    toggleFoldButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    toggleFoldButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    toggleFoldButton.style.margin = '0'; // 버튼 간격 제거
-    
-    setIcon(toggleFoldButton, 'square-chevron-up');
-    
-    // fold/unfold 기능을 수행하는 공통 함수
-    const toggleFold = () => {
-      const isToggled = toggleFoldButton.getAttribute('toggled') === 'true';
-      
-      if (isToggled) {
-        // 현재 접혀있는 상태 -> 펼치기
-        toggleFoldButton.setAttribute('toggled', 'false');
-        setIcon(toggleFoldButton, 'square-chevron-up');
-        resultText.style.display = 'block'; // resultText 보이기
-      } else {
-        // 현재 펼쳐져있는 상태 -> 접기
-        toggleFoldButton.setAttribute('toggled', 'true');
-        setIcon(toggleFoldButton, 'square-chevron-down');
-        resultText.style.display = 'none'; // resultText 숨기기
-      }
-    };
-    
-    // toggleFoldButton 클릭 이벤트
-    toggleFoldButton.addEventListener('click', (event) => {
-      event.stopPropagation(); // 버튼 클릭 시 부모 요소 클릭 이벤트 차단
-      toggleFold();
-    });
-    
-    // resultHeader 클릭 이벤트 (toggleFoldButton과 동일한 동작)
-    resultHeader.addEventListener('click', (event) => {
-      // 버튼들을 클릭했을 때는 fold 동작을 하지 않도록 체크
-      const target = event.target as HTMLElement;
-      const isButton = target.tagName === 'BUTTON' || target.closest('button');
-      
-      if (!isButton) {
-        toggleFold();
-      }
-    });
-    
-    resultHeader.appendChild(toggleFoldButton);
-    
-    
-    // copyResultButton 추가
-    const copyResultButton = document.createElement('button');
-    copyResultButton.className = 'lucide-icon-button';
-    copyResultButton.setAttribute('aria-label', 'Copy this result to clipboard');
-    copyResultButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    copyResultButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    copyResultButton.style.margin = '0'; // 버튼 간격 제거
-    
-    setIcon(copyResultButton, 'copy');
-    copyResultButton.addEventListener('click', async () => {
-      try {
-        const rawText = resultText.getAttribute('data-raw-text') || '';
-        await navigator.clipboard.writeText(rawText);
-        SummarDebug.Notice(1, 'Content copied to clipboard');
-      } catch (error) {
-        SummarDebug.log(1, `Error copying to clipboard: ${error}`);
-        SummarDebug.Notice(0, 'Failed to copy content to clipboard');
-      }
-    });
-    resultHeader.appendChild(copyResultButton);
-    
-    
-    // deleteResultItemButton 추가
-    const deleteResultItemButton = document.createElement('button');
-    deleteResultItemButton.className = 'lucide-icon-button';
-    deleteResultItemButton.setAttribute('aria-label', 'Delete this result item');
-    deleteResultItemButton.style.transform = 'scale(0.7)'; // 70% 크기로 변경
-    deleteResultItemButton.style.transformOrigin = 'center'; // 중앙 기준으로 축소
-    deleteResultItemButton.style.margin = '0'; // 버튼 간격 제거
-    deleteResultItemButton.style.marginLeft = 'auto'; // 오른쪽으로 정렬
-    setIcon(deleteResultItemButton, 'trash-2');
-    deleteResultItemButton.addEventListener('click', () => {
-      // 현재 resultItem 삭제
-      this.resultItems.delete(key);
-      this.newNoteNames.delete(key); // newNoteNames Map에서도 해당 key 제거
-      resultItem.remove();
-    });
-    resultHeader.appendChild(deleteResultItemButton);
-    // hide
-    deleteResultItemButton.disabled = true;
-    deleteResultItemButton.style.display = 'none';
-
+    // resultHeader 생성 (공통 메서드 사용)
+    const resultHeader = this.createResultHeader(key, label);
     
     // resultText 영역 생성 (기존 resultItem과 합침)
     const resultText = document.createElement('div');
@@ -1112,6 +955,58 @@ export class SummarView extends View {
     // resultItem에 헤더와 텍스트 영역 직접 추가
     resultItem.appendChild(resultHeader);
     resultItem.appendChild(resultText);
+    
+    // 원본 resultItem의 toggle button에 event listener 추가
+    const toggleButton = resultHeader.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
+    if (toggleButton) {
+      toggleButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        
+        // 중복 실행 방지
+        if (this.isToggling) {
+          SummarDebug.log(1, `Toggle already in progress for key: ${key}, skipping`);
+          return;
+        }
+        
+        this.isToggling = true;
+        SummarDebug.log(1, `Original toggle clicked for key: ${key}`);
+        
+        try {
+          const currentToggled = toggleButton.getAttribute('toggled') === 'true';
+          const newToggled = !currentToggled;
+          
+          // 버튼 상태 업데이트
+          toggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
+          setIcon(toggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
+          
+          // resultText 표시/숨김
+          if (newToggled) {
+            resultText.style.display = 'none';
+          } else {
+            resultText.style.display = 'block';
+          }
+          
+          SummarDebug.log(1, `Original toggle state changed to: ${newToggled ? 'folded' : 'unfolded'}`);
+          
+          // sticky header의 버튼 상태도 동기화
+          if (this.stickyHeaderContainer && this.currentStickyKey === key) {
+            const stickyToggleButton = this.stickyHeaderContainer.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
+            if (stickyToggleButton) {
+              stickyToggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
+              setIcon(stickyToggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
+            }
+          }
+          
+          // fold/unfold 상태 변경 시 sticky header 가시성 재평가
+          this.updateStickyHeaderVisibility();
+        } finally {
+          // 플래그 해제
+          setTimeout(() => {
+            this.isToggling = false;
+          }, 100);
+        }
+      });
+    }
     
     ///////////////////////////////////////////////////////////////
     return resultItem;
@@ -1219,6 +1114,687 @@ export class SummarView extends View {
     resultItem.appendChild(chatWithContext);
     
     return resultItem;
+  }
+
+  // ==================== Sticky Header 관련 메서드들 ====================
+
+  /**
+   * sticky header 컨테이너를 초기화합니다.
+   * resultContainer 위쪽에 별도의 floating 레이어로 생성합니다.
+   */
+  private setupStickyHeader(container: HTMLElement): void {
+    this.stickyHeaderContainer = document.createElement('div');
+    this.stickyHeaderContainer.className = 'sticky-header-container';
+    
+    // 초기 스타일 설정 (위치는 showStickyHeader에서 동적으로 계산)
+    this.stickyHeaderContainer.style.position = 'absolute';
+    this.stickyHeaderContainer.style.zIndex = '10000';
+    this.stickyHeaderContainer.style.backgroundColor = 'var(--background-primary)';
+    this.stickyHeaderContainer.style.border = '2px solid #ff6b35';
+    this.stickyHeaderContainer.style.borderRadius = '6px';
+    this.stickyHeaderContainer.style.padding = '2px';
+    this.stickyHeaderContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+    this.stickyHeaderContainer.style.display = 'none';
+    this.stickyHeaderContainer.style.pointerEvents = 'auto';
+    
+    // 최상위 container(containerEl)에 추가하여 resultContainer와 독립적인 레이어 생성
+    container.appendChild(this.stickyHeaderContainer);
+    
+    SummarDebug.log(1, `Sticky header container created as independent layer above resultContainer`);
+    SummarDebug.log(1, `Container parent: ${this.stickyHeaderContainer.parentElement?.className || 'no parent'}`);
+  }
+
+  /**
+   * resultHeader들의 가시성을 감지하는 Intersection Observer를 설정합니다.
+   */
+  private setupHeaderObserver(): void {
+    this.headerObserver = new IntersectionObserver((entries) => {
+      SummarDebug.log(2, `Observer entries: ${entries.length}`);
+      
+      entries.forEach(entry => {
+        const resultItem = entry.target.closest('.result-item') as HTMLDivElement;
+        if (resultItem) {
+          const key = resultItem.getAttribute('result-key');
+          if (key) {
+            if (entry.isIntersecting) {
+              this.visibleHeaders.add(key);
+              SummarDebug.log(2, `Header visible: ${key}`);
+            } else {
+              this.visibleHeaders.delete(key);
+              SummarDebug.log(2, `Header hidden: ${key}`);
+            }
+          }
+        }
+      });
+      
+      SummarDebug.log(2, `Visible headers: [${Array.from(this.visibleHeaders).join(', ')}]`);
+      this.updateStickyHeaderVisibility();
+    }, {
+      root: this.resultContainer,
+      threshold: 0,
+      rootMargin: '0px'
+    });
+    
+    SummarDebug.log(1, 'Header observer created');
+  }
+
+  /**
+   * 컨테이너 크기 변화를 감지하는 ResizeObserver를 설정합니다.
+   */
+  private setupResizeObserver(): void {
+    this.resizeObserver = new ResizeObserver((entries) => {
+      SummarDebug.log(2, `Resize observer entries: ${entries.length}`);
+      
+      // sticky header가 현재 표시되고 있다면 크기 업데이트
+      if (this.stickyHeaderContainer && this.currentStickyKey && 
+          this.stickyHeaderContainer.style.display !== 'none') {
+        SummarDebug.log(1, `Container resized, updating sticky header size for key: ${this.currentStickyKey}`);
+        this.updateStickyHeaderSize();
+      }
+    });
+    
+    // containerEl과 resultContainer 모두 감시
+    this.resizeObserver.observe(this.containerEl);
+    if (this.resultContainer) {
+      this.resizeObserver.observe(this.resultContainer);
+    }
+    
+    SummarDebug.log(1, 'Resize observer created');
+  }
+
+  /**
+   * 현재 보이는 resultItem들 중에서 첫 번째 항목을 찾습니다.
+   */
+  private getFirstVisibleResultItem(): HTMLDivElement | null {
+    const resultItems = Array.from(this.resultContainer.querySelectorAll('.result-item')) as HTMLDivElement[];
+    const containerRect = this.resultContainer.getBoundingClientRect();
+    
+    for (const item of resultItems) {
+      const rect = item.getBoundingClientRect();
+      // resultContainer 영역과 겹치는 첫 번째 item 찾기
+      if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * sticky header의 표시/숨김을 업데이트합니다.
+   */
+  private updateStickyHeaderVisibility(): void {
+    const firstVisibleItem = this.getFirstVisibleResultItem();
+    
+    SummarDebug.log(2, `First visible item: ${firstVisibleItem?.getAttribute('result-key') || 'none'}`);
+    
+    if (firstVisibleItem) {
+      const key = firstVisibleItem.getAttribute('result-key');
+      if (key) {
+        const headerIsVisible = this.visibleHeaders.has(key);
+        
+        // resultText가 펼쳐져 있는지 확인
+        const resultText = firstVisibleItem.querySelector('.result-text') as HTMLDivElement;
+        const isTextExpanded = resultText && resultText.style.display !== 'none';
+        
+        SummarDebug.log(2, `Key: ${key}, Header visible: ${headerIsVisible}, Text expanded: ${isTextExpanded}`);
+        
+        // sticky header 표시 조건 (간단하고 명확한 로직):
+        // 1. text가 펼쳐져 있고
+        // 2. header가 안 보이면 → sticky header 표시
+        const shouldShowSticky = isTextExpanded && !headerIsVisible;
+        
+        if (shouldShowSticky) {
+          SummarDebug.log(1, `Showing sticky header for key: ${key} (header hidden, text expanded)`);
+          this.showStickyHeader(key);
+        } else {
+          const reason = !isTextExpanded ? 'text folded' : 'header visible';
+          SummarDebug.log(1, `Hiding sticky header (${reason} for key: ${key})`);
+          this.hideStickyHeader();
+        }
+      }
+    } else {
+      // 보이는 resultItem이 없으면 sticky header 숨김
+      SummarDebug.log(1, 'No visible items, hiding sticky header');
+      this.hideStickyHeader();
+    }
+  }
+
+  /**
+   * sticky header를 표시합니다.
+   * resultContainer의 위치를 계산하여 그 위쪽에 floating layer로 표시합니다.
+   */
+  private showStickyHeader(key: string): void {
+    if (!this.stickyHeaderContainer) {
+      SummarDebug.log(1, 'No sticky header container');
+      return;
+    }
+    
+    SummarDebug.log(1, `showStickyHeader called for key: ${key}`);
+    
+    // 부모 요소 확인 및 복구
+    const currentParent = this.stickyHeaderContainer.parentElement;
+    if (!currentParent) {
+      SummarDebug.log(1, 'Sticky container lost parent, attempting to re-attach to main container');
+      try {
+        this.containerEl.appendChild(this.stickyHeaderContainer);
+        const newParent = this.stickyHeaderContainer.parentElement;
+        SummarDebug.log(1, `Re-attach result: ${newParent?.className || 'still no parent'}`);
+        
+        if (!newParent) {
+          SummarDebug.log(1, 'Failed to re-attach sticky container to DOM');
+          return;
+        }
+      } catch (error) {
+        SummarDebug.log(1, `Failed to re-attach sticky container: ${error}`);
+        return;
+      }
+    }
+    
+    // 이미 같은 key의 sticky header가 표시되고 있으면 스킵
+    if (this.currentStickyKey === key) {
+      SummarDebug.log(2, `Sticky header already showing for key: ${key}`);
+      return;
+    }
+    
+    const resultItem = this.resultItems.get(key);
+    if (!resultItem) {
+      SummarDebug.log(1, `No result item found for key: ${key}`);
+      return;
+    }
+    
+    const originalHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
+    const labelElement = originalHeader?.querySelector('span') as HTMLSpanElement;
+    
+    if (!originalHeader || !labelElement) {
+      SummarDebug.log(1, `No header or label found for key: ${key}`);
+      return;
+    }
+    
+    // resultContainer의 실제 위치 계산
+    const resultContainerRect = this.resultContainer.getBoundingClientRect();
+    const containerRect = this.containerEl.getBoundingClientRect();
+    
+    // resultContainer 기준으로 상대 위치 계산
+    const relativeTop = resultContainerRect.top - containerRect.top;
+    const relativeLeft = resultContainerRect.left - containerRect.left;
+    
+    // 원본 resultHeader의 실제 크기 계산
+    const originalHeaderRect = originalHeader.getBoundingClientRect();
+    
+    // 원본 header의 computed styles 확인
+    const originalComputedStyle = window.getComputedStyle(originalHeader);
+    const originalBoxSizing = originalComputedStyle.boxSizing;
+    const originalPadding = originalComputedStyle.padding;
+    const originalBorder = originalComputedStyle.border;
+    
+    SummarDebug.log(1, `ResultContainer position: top=${relativeTop}, left=${relativeLeft}, width=${resultContainerRect.width}`);
+    SummarDebug.log(1, `Original header size: width=${originalHeaderRect.width}, height=${originalHeaderRect.height}`);
+    SummarDebug.log(1, `Original header computed: boxSizing=${originalBoxSizing}, padding=${originalPadding}, border=${originalBorder}`);
+    
+    // 기존 sticky header 내용 제거
+    this.stickyHeaderContainer.innerHTML = '';
+    
+    // 새로운 sticky header 생성
+    const stickyHeader = this.createResultHeader(key, labelElement.textContent || '');
+    stickyHeader.style.borderRadius = '0';
+    stickyHeader.style.border = 'none'; // sticky header 내부의 header는 border 제거
+    
+    this.stickyHeaderContainer.appendChild(stickyHeader);
+    
+    // resultContainer 위쪽에 위치하도록 절대 좌표 설정 - 원본 header와 정확히 동일한 크기
+    const styles = {
+      position: 'absolute',
+      top: `${relativeTop + 5}px`,
+      left: `${relativeLeft + 10}px`, // resultText와 동일한 left 위치 (padding 고려)
+      width: `${originalHeaderRect.width}px`, // 원본 resultHeader와 정확히 동일한 width
+      height: `${originalHeaderRect.height}px`, // 원본 resultHeader와 정확히 동일한 height
+      maxHeight: `${originalHeaderRect.height}px`, // height 고정
+      minHeight: `${originalHeaderRect.height}px`, // height 고정
+      boxSizing: 'border-box', // 원본과 동일한 box-sizing
+      zIndex: '10000',
+      display: 'block',
+      visibility: 'visible',
+      opacity: '1',
+      backgroundColor: 'var(--background-primary)', // resultHeader와 동일한 배경색
+      border: '1px solid var(--background-modifier-border)', // resultHeader와 동일한 border
+      borderRadius: '0px', // resultHeader와 동일하게 둥글지 않게
+      padding: '0px', // resultHeader와 동일한 padding
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)', // 더 자연스러운 그림자
+      pointerEvents: 'auto',
+      overflow: 'hidden' // 내용이 넘치지 않도록
+    };
+    
+    // 각 스타일을 개별적으로 강제 적용
+    Object.entries(styles).forEach(([property, value]) => {
+      this.stickyHeaderContainer!.style.setProperty(property, value, 'important');
+    });
+    
+    this.stickyHeaderContainer.classList.add('visible');
+    
+    SummarDebug.log(1, `Sticky header positioned at: top=${relativeTop + 5}px, left=${relativeLeft + 10}px, width=${originalHeaderRect.width}px, height=${originalHeaderRect.height}px`);
+    
+    // DOM 강제 리플로우 유발
+    this.stickyHeaderContainer.offsetHeight;
+    
+    // 위치 확인 (약간의 지연 후)
+    setTimeout(() => {
+      if (this.stickyHeaderContainer) {
+        const rect = this.stickyHeaderContainer.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(this.stickyHeaderContainer);
+        
+        SummarDebug.log(1, `Sticky header final rect after timeout: top=${rect.top}, left=${rect.left}, width=${rect.width}, height=${rect.height}`);
+        SummarDebug.log(1, `Sticky header computed: boxSizing=${computedStyle.boxSizing}, padding=${computedStyle.padding}, border=${computedStyle.border}, minHeight=${computedStyle.minHeight}, maxHeight=${computedStyle.maxHeight}`);
+        SummarDebug.log(1, `Original vs Sticky height: ${originalHeaderRect.height} vs ${rect.height} (diff: ${rect.height - originalHeaderRect.height})`);
+        
+        // 여전히 크기가 0이면 추가 강제 설정
+        if (rect.width === 0 || rect.height === 0) {
+          SummarDebug.log(1, 'Still zero dimensions, applying emergency fix');
+          this.stickyHeaderContainer.style.cssText = `
+            position: absolute !important;
+            top: ${relativeTop + 5}px !important;
+            left: ${relativeLeft + 10}px !important;
+            width: ${originalHeaderRect.width}px !important;
+            height: ${originalHeaderRect.height}px !important;
+            max-height: ${originalHeaderRect.height}px !important;
+            min-height: ${originalHeaderRect.height}px !important;
+            box-sizing: border-box !important;
+            z-index: 10000 !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background-color: var(--background-primary) !important;
+            border: 1px solid var(--background-modifier-border) !important;
+            border-radius: 0px !important;
+            padding: 0px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+            pointer-events: auto !important;
+            overflow: hidden !important;
+          `;
+          
+          // 다시 확인
+          setTimeout(() => {
+            if (this.stickyHeaderContainer) {
+              const finalRect = this.stickyHeaderContainer.getBoundingClientRect();
+              SummarDebug.log(1, `Emergency fix result: top=${finalRect.top}, left=${finalRect.left}, width=${finalRect.width}, height=${finalRect.height}`);
+            }
+          }, 50);
+        }
+      }
+    }, 10);
+    
+    this.currentStickyKey = key;
+    SummarDebug.log(1, `Sticky header shown as floating layer above resultContainer for key: ${key}`);
+  }
+
+  /**
+   * 현재 표시중인 sticky header의 크기를 업데이트합니다.
+   * 컨테이너 리사이징 시 호출됩니다.
+   */
+  private updateStickyHeaderSize(): void {
+    if (!this.stickyHeaderContainer || !this.currentStickyKey) {
+      SummarDebug.log(2, 'No sticky header to update');
+      return;
+    }
+
+    const resultItem = this.resultItems.get(this.currentStickyKey);
+    if (!resultItem) {
+      SummarDebug.log(1, `No result item found for sticky update, key: ${this.currentStickyKey}`);
+      return;
+    }
+
+    const originalHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
+    if (!originalHeader) {
+      SummarDebug.log(1, `No original header found for sticky update, key: ${this.currentStickyKey}`);
+      return;
+    }
+
+    // 현재 위치와 크기 다시 계산
+    const resultContainerRect = this.resultContainer.getBoundingClientRect();
+    const containerRect = this.containerEl.getBoundingClientRect();
+    const originalHeaderRect = originalHeader.getBoundingClientRect();
+
+    // 새로운 위치와 크기 계산
+    const relativeTop = resultContainerRect.top - containerRect.top;
+    const relativeLeft = resultContainerRect.left - containerRect.left;
+
+    SummarDebug.log(1, `Updating sticky header size: width=${originalHeaderRect.width}, height=${originalHeaderRect.height}`);
+
+    // 위치와 크기를 다시 설정
+    const styles = {
+      top: `${relativeTop + 5}px`,
+      left: `${relativeLeft + 10}px`,
+      width: `${originalHeaderRect.width}px`,
+      height: `${originalHeaderRect.height}px`,
+      maxHeight: `${originalHeaderRect.height}px`,
+      minHeight: `${originalHeaderRect.height}px`,
+      boxSizing: 'border-box'
+    };
+
+    // 스타일 업데이트
+    Object.entries(styles).forEach(([property, value]) => {
+      this.stickyHeaderContainer!.style.setProperty(property, value, 'important');
+    });
+
+    SummarDebug.log(1, `Sticky header size updated to: width=${originalHeaderRect.width}px, height=${originalHeaderRect.height}px`);
+  }
+
+  /**
+   * sticky header를 숨깁니다.
+   */
+  private hideStickyHeader(): void {
+    if (!this.stickyHeaderContainer) return;
+    
+    // 강제로 숨김
+    this.stickyHeaderContainer.style.display = 'none';
+    this.stickyHeaderContainer.classList.remove('visible');
+    this.currentStickyKey = null;
+    SummarDebug.log(1, 'Sticky header hidden');
+  }
+
+  /**
+   * resultHeader를 생성하는 공통 메서드입니다.
+   */
+  private createResultHeader(key: string, label: string): HTMLDivElement {
+    const resultHeader = document.createElement('div');
+    resultHeader.className = 'result-header';
+    resultHeader.style.width = '100%';
+    resultHeader.style.display = 'flex';
+    resultHeader.style.alignItems = 'center';
+    resultHeader.style.gap = '0px';
+    resultHeader.style.marginBottom = '0px';
+    resultHeader.style.padding = '0px';
+    resultHeader.style.border = '1px solid var(--background-modifier-border)';
+    resultHeader.style.backgroundColor = 'var(--background-primary)';
+    
+    // 라벨 추가
+    const labelElement = document.createElement('span');
+    labelElement.textContent = label;
+    labelElement.style.fontSize = '10px';
+    labelElement.style.color = 'var(--text-muted)';
+    labelElement.style.marginLeft = '2px';
+    labelElement.style.marginRight = '0px';
+    labelElement.style.fontWeight = 'bold';
+    labelElement.style.flexShrink = '0';
+    labelElement.style.backgroundColor = 'var(--interactive-normal)';
+    labelElement.style.padding = '2px 4px';
+    labelElement.style.borderRadius = '3px';
+    resultHeader.appendChild(labelElement);
+    
+    // 버튼들 추가
+    this.addHeaderButtons(resultHeader, key);
+    
+    return resultHeader;
+  }
+
+  /**
+   * resultHeader에 버튼들을 추가합니다.
+   */
+  private addHeaderButtons(resultHeader: HTMLDivElement, key: string): void {
+    // uploadResultToWikiButton 추가
+    const uploadResultToWikiButton = document.createElement('button');
+    uploadResultToWikiButton.className = 'lucide-icon-button';
+    uploadResultToWikiButton.setAttribute('aria-label', 'Upload this result to Confluence');
+    uploadResultToWikiButton.setAttribute('button-id', 'upload-result-to-wiki-button'); 
+    uploadResultToWikiButton.style.transform = 'scale(0.7)';
+    uploadResultToWikiButton.style.transformOrigin = 'center';
+    uploadResultToWikiButton.style.margin = '0';
+    
+    // 버튼 상태 동기화
+    const originalButton = this.getOriginalButton(key, 'upload-result-to-wiki-button');
+    if (originalButton) {
+      uploadResultToWikiButton.disabled = originalButton.disabled;
+      uploadResultToWikiButton.style.display = originalButton.style.display;
+    } else {
+      uploadResultToWikiButton.disabled = true;
+      uploadResultToWikiButton.style.display = 'none';
+    }
+    
+    setIcon(uploadResultToWikiButton, 'file-up');
+    uploadResultToWikiButton.addEventListener('click', () => {
+      let title = this.getNoteName(key);
+      
+      const lastSlashIndex = title.lastIndexOf('/');
+      if (lastSlashIndex !== -1) {
+        title = title.substring(lastSlashIndex + 1);
+      }
+      
+      if (title.endsWith('.md')) {
+        title = title.substring(0, title.length - 3);
+      }
+      
+      const content = this.getResultText(key);
+      this.uploadContentToWiki(title, content);
+    });
+    resultHeader.appendChild(uploadResultToWikiButton);
+    
+    // uploadResultToSlackButton 추가
+    const uploadResultToSlackButton = document.createElement('button');
+    uploadResultToSlackButton.className = 'lucide-icon-button';
+    uploadResultToSlackButton.setAttribute('aria-label', 'Upload this result to Slack');
+    uploadResultToSlackButton.setAttribute('button-id', 'upload-result-to-slack-button'); 
+    uploadResultToSlackButton.style.transform = 'scale(0.7)';
+    uploadResultToSlackButton.style.transformOrigin = 'center';
+    uploadResultToSlackButton.style.margin = '0';
+    
+    // 버튼 상태 동기화
+    const originalSlackButton = this.getOriginalButton(key, 'upload-result-to-slack-button');
+    if (originalSlackButton) {
+      uploadResultToSlackButton.disabled = originalSlackButton.disabled;
+      uploadResultToSlackButton.style.display = originalSlackButton.style.display;
+    } else {
+      uploadResultToSlackButton.disabled = true;
+      uploadResultToSlackButton.style.display = 'none';
+    }
+    
+    setIcon(uploadResultToSlackButton, 'hash');
+    uploadResultToSlackButton.addEventListener('click', () => {
+      let title = this.getNoteName(key);
+      
+      const lastSlashIndex = title.lastIndexOf('/');
+      if (lastSlashIndex !== -1) {
+        title = title.substring(lastSlashIndex + 1);
+      }
+      
+      if (title.endsWith('.md')) {
+        title = title.substring(0, title.length - 3);
+      }
+      
+      const content = this.getResultText(key);
+      this.uploadContentToSlack(title, content);
+    });
+    resultHeader.appendChild(uploadResultToSlackButton);
+    
+    // newNoteButton 추가
+    const newNoteButton = document.createElement('button');
+    newNoteButton.className = 'lucide-icon-button';
+    newNoteButton.setAttribute('aria-label', 'Create new note with this result');
+    newNoteButton.setAttribute('button-id', 'new-note-button'); 
+    newNoteButton.style.transform = 'scale(0.7)';
+    newNoteButton.style.transformOrigin = 'center';
+    newNoteButton.style.margin = '0';
+    
+    // 버튼 상태 동기화
+    const originalNewNoteButton = this.getOriginalButton(key, 'new-note-button');
+    if (originalNewNoteButton) {
+      newNoteButton.disabled = originalNewNoteButton.disabled;
+      newNoteButton.style.display = originalNewNoteButton.style.display;
+    } else {
+      newNoteButton.disabled = true;
+      newNoteButton.style.display = 'none';
+    }
+    
+    setIcon(newNoteButton, 'file-output');
+    newNoteButton.addEventListener('click', async () => {
+      try {
+        let newNoteName = this.getNoteName(key);
+
+        const filePath = normalizePath(newNoteName);
+        const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
+
+        if (existingFile) {
+          SummarDebug.log(1, `file exist: ${filePath}`);
+          const leaves = this.plugin.app.workspace.getLeavesOfType("markdown");
+          
+          for (const leaf of leaves) {
+            const view = leaf.view;
+            if (view instanceof MarkdownView && view.file && view.file.path === filePath) {
+              this.plugin.app.workspace.setActiveLeaf(leaf);
+              return;
+            }
+          }
+          await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
+        } else {
+          SummarDebug.log(1, `file is not exist: ${filePath}`);
+          const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
+          const folderExists = await this.plugin.app.vault.adapter.exists(folderPath);
+          if (!folderExists) {
+            await this.plugin.app.vault.adapter.mkdir(folderPath);
+          }
+          
+          const resultTextContent = this.getResultText(key);
+          SummarDebug.log(1, `resultText content===\n${resultTextContent}`);
+          await this.plugin.app.vault.create(filePath, resultTextContent);
+          await this.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
+        }
+      } catch (error) {
+        SummarDebug.log(1, `Error creating new note: ${error}`);
+        SummarDebug.Notice(1, 'Failed to create new note');
+      }
+    });
+    resultHeader.appendChild(newNoteButton);
+    
+    // toggleFoldButton 추가
+    const toggleFoldButton = document.createElement('button');
+    toggleFoldButton.className = 'lucide-icon-button';
+    toggleFoldButton.setAttribute('aria-label', 'Toggle fold/unfold this result');
+    toggleFoldButton.setAttribute('button-id', 'toggle-fold-button');
+    toggleFoldButton.setAttribute('toggled', 'false');
+    toggleFoldButton.style.transform = 'scale(0.7)';
+    toggleFoldButton.style.transformOrigin = 'center';
+    toggleFoldButton.style.margin = '0';
+    
+    // 원본 버튼의 상태를 가져와서 동기화
+    const originalToggleButton = this.getOriginalButton(key, 'toggle-fold-button');
+    if (originalToggleButton) {
+      const isToggled = originalToggleButton.getAttribute('toggled') === 'true';
+      toggleFoldButton.setAttribute('toggled', isToggled ? 'true' : 'false');
+      setIcon(toggleFoldButton, isToggled ? 'square-chevron-down' : 'square-chevron-up');
+    } else {
+      setIcon(toggleFoldButton, 'square-chevron-up');
+    }
+    
+    toggleFoldButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      
+      // 중복 실행 방지
+      if (this.isToggling) {
+        SummarDebug.log(1, `Toggle already in progress for key: ${key}, skipping sticky header click`);
+        return;
+      }
+      
+      this.isToggling = true;
+      SummarDebug.log(1, `Sticky header toggle clicked for key: ${key}`);
+      
+      try {
+        // 직접 fold 상태 토글 (원본 버튼 클릭 대신)
+        const resultItem = this.resultItems.get(key);
+        if (resultItem) {
+          const originalToggleButton = resultItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
+          const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+          
+          if (originalToggleButton && resultText) {
+            const currentToggled = originalToggleButton.getAttribute('toggled') === 'true';
+            const newToggled = !currentToggled;
+            
+            // 원본 버튼 상태 업데이트
+            originalToggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
+            setIcon(originalToggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
+            
+            // sticky 버튼 상태 업데이트
+            toggleFoldButton.setAttribute('toggled', newToggled ? 'true' : 'false');
+            setIcon(toggleFoldButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
+            
+            // resultText 표시/숨김
+            if (newToggled) {
+              resultText.style.display = 'none';
+            } else {
+              resultText.style.display = 'block';
+            }
+            
+            SummarDebug.log(1, `Sticky toggle state changed to: ${newToggled ? 'folded' : 'unfolded'}`);
+            
+            // fold/unfold 상태 변경 시 sticky header 가시성 재평가
+            this.updateStickyHeaderVisibility();
+          }
+        }
+      } finally {
+        // 플래그 해제
+        setTimeout(() => {
+          this.isToggling = false;
+        }, 100);
+      }
+    });
+    
+    resultHeader.appendChild(toggleFoldButton);
+    
+    // copyResultButton 추가
+    const copyResultButton = document.createElement('button');
+    copyResultButton.className = 'lucide-icon-button';
+    copyResultButton.setAttribute('aria-label', 'Copy this result to clipboard');
+    copyResultButton.style.transform = 'scale(0.7)';
+    copyResultButton.style.transformOrigin = 'center';
+    copyResultButton.style.margin = '0';
+    
+    setIcon(copyResultButton, 'copy');
+    copyResultButton.addEventListener('click', async () => {
+      try {
+        const resultItem = this.resultItems.get(key);
+        if (resultItem) {
+          const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+          if (resultText) {
+            const rawText = resultText.getAttribute('data-raw-text') || '';
+            await navigator.clipboard.writeText(rawText);
+            SummarDebug.Notice(1, 'Content copied to clipboard');
+          }
+        }
+      } catch (error) {
+        SummarDebug.log(1, `Error copying to clipboard: ${error}`);
+        SummarDebug.Notice(0, 'Failed to copy content to clipboard');
+      }
+    });
+    resultHeader.appendChild(copyResultButton);
+    
+    // deleteResultItemButton 추가
+    const deleteResultItemButton = document.createElement('button');
+    deleteResultItemButton.className = 'lucide-icon-button';
+    deleteResultItemButton.setAttribute('aria-label', 'Delete this result item');
+    deleteResultItemButton.style.transform = 'scale(0.7)';
+    deleteResultItemButton.style.transformOrigin = 'center';
+    deleteResultItemButton.style.margin = '0';
+    deleteResultItemButton.style.marginLeft = 'auto';
+    deleteResultItemButton.disabled = true;
+    deleteResultItemButton.style.display = 'none';
+    
+    setIcon(deleteResultItemButton, 'trash-2');
+    deleteResultItemButton.addEventListener('click', () => {
+      this.resultItems.delete(key);
+      this.newNoteNames.delete(key);
+      const resultItem = this.resultItems.get(key);
+      if (resultItem) {
+        resultItem.remove();
+      }
+    });
+    resultHeader.appendChild(deleteResultItemButton);
+  }
+
+  /**
+   * 원본 resultItem에서 특정 버튼을 찾습니다.
+   */
+  private getOriginalButton(key: string, buttonId: string): HTMLButtonElement | null {
+    const resultItem = this.resultItems.get(key);
+    if (!resultItem) return null;
+    
+    return resultItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
   }
 
 
