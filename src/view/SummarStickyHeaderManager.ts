@@ -9,6 +9,10 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private visibleHeaders: Set<string> = new Set();
   private resizeObserver: ResizeObserver | null = null;
   private isToggling: boolean = false;
+  
+  // 스크롤 이벤트 throttling용
+  private scrollThrottleTimeout: NodeJS.Timeout | null = null;
+  private readonly SCROLL_THROTTLE_DELAY = 100; // 100ms 간격으로 체크
 
   constructor(private context: ISummarViewContext) {}
 
@@ -62,6 +66,33 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     });
     
     SummarDebug.log(1, 'Header observer created');
+    
+    // 스크롤 이벤트 리스너 추가 (IntersectionObserver 보완용)
+    this.setupScrollListener();
+  }
+
+  setupScrollListener(): void {
+    if (this.context.resultContainer) {
+      // throttled 스크롤 이벤트 리스너 추가
+      this.context.resultContainer.addEventListener('scroll', () => {
+        // 이미 스케줄된 작업이 있으면 취소
+        if (this.scrollThrottleTimeout) {
+          clearTimeout(this.scrollThrottleTimeout);
+        }
+        
+        // 새로운 작업을 스케줄
+        this.scrollThrottleTimeout = setTimeout(() => {
+          // SummarDebug.log(2, `Throttled scroll event processed, updating sticky header visibility`);
+          this.updateStickyHeaderVisibility();
+          this.scrollThrottleTimeout = null;
+        }, this.SCROLL_THROTTLE_DELAY);
+      }, { 
+        signal: this.context.abortController.signal,
+        passive: true // 성능 최적화
+      });
+      
+      SummarDebug.log(1, `Scroll listener added to resultContainer with ${this.SCROLL_THROTTLE_DELAY}ms throttle`);
+    }
   }
 
   setupResizeObserver(): void {
@@ -88,35 +119,50 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   updateStickyHeaderVisibility(): void {
     const firstVisibleItem = this.getFirstVisibleResultItem();
     
-    SummarDebug.log(2, `First visible item: ${firstVisibleItem?.getAttribute('result-key') || 'none'}`);
-    
-    if (firstVisibleItem) {
-      const key = firstVisibleItem.getAttribute('result-key');
-      if (key) {
-        const headerIsVisible = this.visibleHeaders.has(key);
-        
-        // resultText가 펼쳐져 있는지 확인
-        const resultText = firstVisibleItem.querySelector('.result-text') as HTMLDivElement;
-        const isTextExpanded = resultText && resultText.style.display !== 'none';
-        
-        SummarDebug.log(2, `Key: ${key}, Header visible: ${headerIsVisible}, Text expanded: ${isTextExpanded}`);
-        
-        // sticky header 표시 조건
-        const shouldShowSticky = isTextExpanded && !headerIsVisible;
-        
-        if (shouldShowSticky) {
-          SummarDebug.log(1, `Showing sticky header for key: ${key} (header hidden, text expanded)`);
-          this.showStickyHeader(key);
-        } else {
-          const reason = !isTextExpanded ? 'text folded' : 'header visible';
-          SummarDebug.log(1, `Hiding sticky header (${reason} for key: ${key})`);
-          this.hideStickyHeader();
-        }
-      }
-    } else {
+    if (!firstVisibleItem) {
       // 보이는 resultItem이 없으면 sticky header 숨김
-      SummarDebug.log(1, 'No visible items, hiding sticky header');
+      SummarDebug.log(2, `No visible items found, hiding sticky header`);
       this.hideStickyHeader();
+      return;
+    }
+
+    const key = firstVisibleItem.getAttribute('result-key');
+    if (!key) {
+      SummarDebug.log(2, `No key found for visible item, hiding sticky header`);
+      this.hideStickyHeader();
+      return;
+    }
+
+    // DOM에서 실제로 존재하는지 확인 (IntersectionObserver 지연 이벤트 대응)
+    const actualResultItem = this.context.resultItems.get(key);
+    if (!actualResultItem || !actualResultItem.isConnected) {
+      SummarDebug.log(1, `Result item ${key} is not connected to DOM, hiding sticky header`);
+      this.hideStickyHeader();
+      return;
+    }
+
+    const headerIsVisible = this.visibleHeaders.has(key);
+    const resultText = firstVisibleItem.querySelector('.result-text') as HTMLDivElement;
+    const isTextExpanded = resultText && resultText.style.display !== 'none';
+    
+    // sticky header 표시 조건: 텍스트는 펼쳐져 있지만 헤더는 숨겨진 상태
+    const shouldShowSticky = isTextExpanded && !headerIsVisible;
+    
+    SummarDebug.log(2, `Key: ${key}, shouldShow: ${shouldShowSticky} (textExpanded: ${isTextExpanded}, headerVisible: ${headerIsVisible})`);
+    
+    if (shouldShowSticky) {
+      // 이미 같은 key로 표시중이면 스킵
+      if (this.currentStickyKey === key && this.stickyHeaderContainer?.style.display !== 'none') {
+        SummarDebug.log(2, `Sticky header already showing for ${key}, skipping`);
+        return; // 이미 올바른 상태
+      }
+      SummarDebug.log(1, `Showing sticky header for ${key}`);
+      this.showStickyHeader(key);
+    } else {
+      // sticky header가 표시중이면 숨김
+      if (this.currentStickyKey !== null && this.stickyHeaderContainer?.style.display !== 'none') {
+        this.hideStickyHeader();
+      }
     }
   }
 
@@ -145,6 +191,12 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     this.visibleHeaders.clear();
     this.currentStickyKey = null;
     this.isToggling = false;
+    
+    // 스크롤 throttle timeout 정리
+    if (this.scrollThrottleTimeout) {
+      clearTimeout(this.scrollThrottleTimeout);
+      this.scrollThrottleTimeout = null;
+    }
   }
 
   // Observer에 resultHeader 등록
@@ -161,17 +213,30 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     }
   }
 
+
   private getFirstVisibleResultItem(): HTMLDivElement | null {
     const resultItems = Array.from(this.context.resultContainer.querySelectorAll('.result-item')) as HTMLDivElement[];
     const containerRect = this.context.resultContainer.getBoundingClientRect();
     
-    for (const item of resultItems) {
+    // SummarDebug.log(2, `[DEBUG] getFirstVisibleResultItem: Found ${resultItems.length} result items`);
+    // SummarDebug.log(2, `[DEBUG] Container rect: top=${containerRect.top}, bottom=${containerRect.bottom}`);
+    
+    for (let i = 0; i < resultItems.length; i++) {
+      const item = resultItems[i];
       const rect = item.getBoundingClientRect();
+      const key = item.getAttribute('result-key');
+      const isVisible = rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+      
+      // SummarDebug.log(2, `[DEBUG] Item ${i} (key: ${key}): top=${rect.top}, bottom=${rect.bottom}, visible=${isVisible}`);
+      
       // resultContainer 영역과 겹치는 첫 번째 item 찾기
-      if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
+      if (isVisible) {
+        // SummarDebug.log(1, `[DEBUG] First visible item found: key=${key}`);
         return item;
       }
     }
+    
+    // SummarDebug.log(1, `[DEBUG] No visible items found`);
     return null;
   }
 
@@ -181,31 +246,11 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       return;
     }
     
-    SummarDebug.log(1, `showStickyHeader called for key: ${key}`);
+    SummarDebug.log(1, `Showing sticky header for key: ${key}`);
     
-    // 부모 요소 확인 및 복구
-    const currentParent = this.stickyHeaderContainer.parentElement;
-    if (!currentParent) {
-      SummarDebug.log(1, 'Sticky container lost parent, attempting to re-attach to main container');
-      try {
-        this.context.containerEl.appendChild(this.stickyHeaderContainer);
-        const newParent = this.stickyHeaderContainer.parentElement;
-        SummarDebug.log(1, `Re-attach result: ${newParent?.className || 'still no parent'}`);
-        
-        if (!newParent) {
-          SummarDebug.log(1, 'Failed to re-attach sticky container to DOM');
-          return;
-        }
-      } catch (error) {
-        SummarDebug.log(1, `Failed to re-attach sticky container: ${error}`);
-        return;
-      }
-    }
-    
-    // 이미 같은 key의 sticky header가 표시되고 있으면 스킵
-    if (this.currentStickyKey === key) {
-      SummarDebug.log(2, `Sticky header already showing for key: ${key}`);
-      return;
+    // 부모 요소 확인 및 복구 (안전장치)
+    if (!this.stickyHeaderContainer.parentElement) {
+      this.context.containerEl.appendChild(this.stickyHeaderContainer);
     }
     
     const resultItem = this.context.resultItems.get(key);
@@ -222,6 +267,14 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       return;
     }
     
+    // sticky header 생성 및 위치 설정
+    this.createAndPositionStickyHeader(key, labelElement.textContent || '', originalHeader);
+    
+    this.currentStickyKey = key;
+    SummarDebug.log(1, `Sticky header shown for key: ${key}`);
+  }
+
+  private createAndPositionStickyHeader(key: string, label: string, originalHeader: HTMLDivElement): void {
     // resultContainer의 실제 위치 계산
     const resultContainerRect = this.context.resultContainer.getBoundingClientRect();
     const containerRect = this.context.containerEl.getBoundingClientRect();
@@ -244,14 +297,14 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     SummarDebug.log(1, `Original header computed: boxSizing=${originalBoxSizing}, padding=${originalPadding}, border=${originalBorder}`);
     
     // 기존 sticky header 내용 제거
-    this.stickyHeaderContainer.innerHTML = '';
+    this.stickyHeaderContainer!.innerHTML = '';
     
     // 새로운 sticky header 생성
-    const stickyHeader = this.createResultHeader(key, labelElement.textContent || '');
+    const stickyHeader = this.createResultHeader(key, label);
     stickyHeader.style.borderRadius = '0';
     stickyHeader.style.border = 'none'; // sticky header 내부의 header는 border 제거
     
-    this.stickyHeaderContainer.appendChild(stickyHeader);
+    this.stickyHeaderContainer!.appendChild(stickyHeader);
     
     // resultContainer 위쪽에 위치하도록 절대 좌표 설정 - 원본 header와 정확히 동일한 크기
     const styles = {
@@ -281,12 +334,12 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       this.stickyHeaderContainer!.style.setProperty(property, value, 'important');
     });
     
-    this.stickyHeaderContainer.classList.add('visible');
+    this.stickyHeaderContainer!.classList.add('visible');
     
     SummarDebug.log(1, `Sticky header positioned at: top=${relativeTop + 5}px, left=${relativeLeft + 10}px, width=${originalHeaderRect.width}px, height=${originalHeaderRect.height}px`);
     
     // DOM 강제 리플로우 유발
-    this.stickyHeaderContainer.offsetHeight;
+    this.stickyHeaderContainer!.offsetHeight;
     
     // 위치 확인 (약간의 지연 후)
     const timeoutId = setTimeout(() => {
