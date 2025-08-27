@@ -26,6 +26,12 @@ export class SummarView extends View {
   // Toggle 중복 실행 방지용 플래그
   private isToggling: boolean = false;
 
+  // Event listener 정리를 위한 AbortController
+  private abortController: AbortController = new AbortController();
+
+  // setTimeout 참조 관리
+  private timeoutRefs: Set<NodeJS.Timeout> = new Set();
+
   constructor(leaf: WorkspaceLeaf, plugin: SummarPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -50,36 +56,15 @@ export class SummarView extends View {
     return "Summar: AI-Powered Summarizer";
   }
 
-  getIcon(): string {
-    return "scroll-text"; // 사용할 아이콘 이름 (Lucide 아이콘)
-  }
-
-  async onOpen(): Promise<void> {
-    SummarDebug.log(1, "Summar View opened");
-    this.renderView();
-    this.setupResizeObserver();
-  }
-
-  async onClose(): Promise<void> {
-    SummarDebug.log(1, "Summar View closed");
-    // Intersection Observer 정리
-    if (this.headerObserver) {
-      this.headerObserver.disconnect();
-      this.headerObserver = null;
+  private injectStyles(): void {
+    // 기존 스타일 태그 확인 및 제거 (완전한 중복 방지)
+    const existingStyle = document.getElementById('summar-view-styles');
+    if (existingStyle) {
+      existingStyle.remove();
     }
-    // Resize Observer 정리
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
-  }
-
-  private async renderView(): Promise<void> {
-    const container: HTMLElement = this.containerEl;
-    container.empty();
-
-    // CSS 스타일 추가 (텍스트 선택 유지 및 상하단 간격 제거)
+    
     const style = document.createElement('style');
+    style.id = 'summar-view-styles';
     style.textContent = `
       .result-text {
         -webkit-touch-callout: text;
@@ -156,6 +141,64 @@ export class SummarView extends View {
       }
     `;
     document.head.appendChild(style);
+  }
+
+  getIcon(): string {
+    return "scroll-text"; // 사용할 아이콘 이름 (Lucide 아이콘)
+  }
+
+  async onOpen(): Promise<void> {
+    SummarDebug.log(1, "Summar View opened");
+    this.renderView();
+    this.setupResizeObserver();
+  }
+
+  async onClose(): Promise<void> {
+    SummarDebug.log(1, "Summar View closed");
+    
+    // 모든 이벤트 리스너 한 번에 정리
+    this.abortController.abort();
+    
+    // 모든 setTimeout 정리
+    this.timeoutRefs.forEach(timeoutId => clearTimeout(timeoutId));
+    this.timeoutRefs.clear();
+    
+    // Intersection Observer 정리
+    if (this.headerObserver) {
+      this.headerObserver.disconnect();
+      this.headerObserver = null;
+    }
+    
+    // Resize Observer 정리
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    
+    // Sticky header 정리
+    if (this.stickyHeaderContainer) {
+      if (this.stickyHeaderContainer.parentElement) {
+        this.stickyHeaderContainer.parentElement.removeChild(this.stickyHeaderContainer);
+      }
+      this.stickyHeaderContainer = null;
+    }
+    
+    // 데이터 정리
+    this.resultItems.clear();
+    this.newNoteNames.clear();
+    this.visibleHeaders.clear();
+    this.currentStickyKey = null;
+    this.isToggling = false;
+    
+    // 새 AbortController 생성 (재사용을 위해)
+    this.abortController = new AbortController();
+  }
+
+  private async renderView(): Promise<void> {
+    const container: HTMLElement = this.containerEl;
+    container.empty();
+
+    this.injectStyles();
 
     // Input Container
     const inputContainer: HTMLDivElement = container.createEl("div", {
@@ -241,7 +284,7 @@ export class SummarView extends View {
         
         SummarDebug.Notice(0, frag);
       } 
-    });
+    }, { signal: this.abortController.signal });
 
     if (!(Platform.isMacOS && Platform.isDesktopApp)) {
       // 버튼을 안보이게 하고 비활성화
@@ -313,7 +356,7 @@ export class SummarView extends View {
         
         SummarDebug.Notice(0, frag);
       } 
-    });
+    }, { signal: this.abortController.signal });
 
     if (!(Platform.isMacOS && Platform.isDesktopApp)) {
       // Slack 버튼도 플랫폼 제한
@@ -338,7 +381,7 @@ export class SummarView extends View {
       this.newNoteNames.clear(); // newNoteNames Map도 정리
       this.resultContainer.empty();
       SummarDebug.Notice(1, "All result items have been deleted");
-    });
+    }, { signal: this.abortController.signal });
     // hide
     deleteAllResultItemsButton.disabled = true;
     deleteAllResultItemsButton.style.display = 'none';
@@ -647,13 +690,57 @@ export class SummarView extends View {
   }
 
   clearAllResultItems(): void {
+    // Observer에서 모든 resultHeader unobserve
+    if (this.headerObserver) {
+      this.resultItems.forEach((resultItem) => {
+        const resultHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
+        if (resultHeader) {
+          this.headerObserver!.unobserve(resultHeader);
+        }
+      });
+    }
+    
+    // 데이터 정리
     this.resultItems.clear();
-    this.newNoteNames.clear(); // newNoteNames Map도 정리
+    this.newNoteNames.clear();
     this.resultContainer.empty();
     
     // Observer 관련 정리
     this.visibleHeaders.clear();
     this.hideStickyHeader();
+  }
+
+  /**
+   * 개별 resultItem을 안전하게 삭제합니다.
+   */
+  private removeResultItem(key: string): void {
+    const resultItem = this.resultItems.get(key);
+    if (resultItem) {
+      // Observer에서 해당 resultHeader unobserve
+      if (this.headerObserver) {
+        const resultHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
+        if (resultHeader) {
+          this.headerObserver.unobserve(resultHeader);
+        }
+      }
+      
+      // DOM에서 제거
+      resultItem.remove();
+      
+      // Map에서 제거
+      this.resultItems.delete(key);
+      this.newNoteNames.delete(key);
+      
+      // visibleHeaders에서도 제거
+      this.visibleHeaders.delete(key);
+      
+      // 현재 sticky header가 삭제된 item의 것이면 숨김
+      if (this.currentStickyKey === key) {
+        this.hideStickyHeader();
+      }
+      
+      SummarDebug.log(1, `ResultItem with key ${key} safely removed`);
+    }
   }
 
   private applyFoldToResultItem(resultItem: HTMLDivElement, fold: boolean): void {
@@ -703,7 +790,7 @@ export class SummarView extends View {
       link.addEventListener("click", (event) => {
         event.preventDefault();
         showSettingsTab(this.plugin, 'common-tab');
-      });
+      }, { signal: this.abortController.signal });
       fragment.appendChild(link);
       SummarDebug.Notice(0, fragment, 0);
       
@@ -783,7 +870,7 @@ export class SummarView extends View {
         link.addEventListener("click", (event) => {
           event.preventDefault(); // 기본 동작 방지
           showSettingsTab(this.plugin, 'common-tab');
-        });
+        }, { signal: this.abortController.signal });
         fragment.appendChild(link);
         SummarDebug.Notice(0, fragment, 0);
         
@@ -928,16 +1015,19 @@ export class SummarView extends View {
       }
     };
     
+    // AbortController signal 사용하여 이벤트 리스너 등록
+    const signal = this.abortController.signal;
+    
     // 데스크톱용 mouseup 이벤트
-    resultText.addEventListener('mouseup', handleSelectionEnd);
+    resultText.addEventListener('mouseup', handleSelectionEnd, { signal });
     
     // 모바일용 touchend 이벤트
-    resultText.addEventListener('touchend', handleSelectionEnd);
+    resultText.addEventListener('touchend', handleSelectionEnd, { signal });
     
     resultText.addEventListener('blur', (e) => {
       // 포커스를 잃어도 선택 상태를 시각적으로 유지 (모바일에서는 제한적)
       if (savedSelection && !Platform.isMobileApp) {
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           try {
             const selection = window.getSelection();
             if (selection) {
@@ -949,8 +1039,11 @@ export class SummarView extends View {
             console.debug('Selection restoration failed (normal on mobile):', error);
           }
         }, 10);
+        
+        // setTimeout 참조 저장
+        this.timeoutRefs.add(timeoutId);
       }
-    });
+    }, { signal });
     
     // resultItem에 헤더와 텍스트 영역 직접 추가
     resultItem.appendChild(resultHeader);
@@ -1000,12 +1093,13 @@ export class SummarView extends View {
           // fold/unfold 상태 변경 시 sticky header 가시성 재평가
           this.updateStickyHeaderVisibility();
         } finally {
-          // 플래그 해제
-          setTimeout(() => {
+          // 플래그 해제 - setTimeout 참조 관리
+          const timeoutId = setTimeout(() => {
             this.isToggling = false;
           }, 100);
+          this.timeoutRefs.add(timeoutId);
         }
-      });
+      }, { signal });
     }
     
     ///////////////////////////////////////////////////////////////
