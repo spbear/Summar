@@ -1481,6 +1481,16 @@ export default class SummarPlugin extends Plugin {
     return "";
   }
 
+  updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    if (leaves.length > 0) {
+      const summarView = leaves[0].view as SummarView;
+      if (summarView && typeof summarView.getResultText === 'function') {
+          summarView.enableNewNote(key, newNotePath);
+      }
+    }
+  }
+
   enableNewNote(enabled:boolean, key: string, newNotePath?: string) {
     // SummarView의 enableNewNote 메서드를 호출
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);

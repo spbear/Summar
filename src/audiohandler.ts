@@ -27,7 +27,9 @@ export class AudioHandler extends SummarViewContainer {
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "transtript";
-		this.clearAllResultItems();
+		if (this.plugin.settingsv2.system.debugLevel<3) {
+			this.clearAllResultItems();
+		}
 		this.updateResultText(resultKey, label, `Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
 		// this.enableNewNote(false, resultKey);
 
@@ -373,6 +375,7 @@ export class AudioHandler extends SummarViewContainer {
 
 		await this.plugin.app.vault.create(newFilePath, transcriptionContent);
 		this.updateResultText(resultKey, label, transcriptionContent);
+
 		this.enableNewNote(true, resultKey, newFilePath);
 		
 		// summary가 활성화되어 있지 않으면 transcript 파일을 열기
@@ -383,13 +386,8 @@ export class AudioHandler extends SummarViewContainer {
 				"",
 				true
 			);
-			// if (this.plugin.settingsv2.recording.refineSummary) {
-			// 	this.foldResult(resultKey, true);
-			// }
-		} else {
-			// this.foldResult(resultKey, true);
 		}
-			this.foldResult(resultKey, true);
+		this.foldResult(resultKey, true);
 		
 		// Daily Notes에 전사 완료 링크 추가 (녹음 날짜 기준)
 		const recordingDate = this.extractRecordingDateFromPath(folderPath, filesToSave, noteFilePath);
@@ -553,22 +551,6 @@ export class AudioHandler extends SummarViewContainer {
 		
 		const json = await summarai.audioTranscription((await requestbody.arrayBuffer() as ArrayBuffer), contentType, duration);
 		return json;
-
-        // 엔드포인트 설정 (비어있으면 기본값)
-        // const endpoint = this.plugin.settings.openaiApiEndpoint?.trim() || "https://api.openai.com";
-        // const url = `${endpoint.replace(/\/$/, "")}/v1/audio/transcriptions`;
-
-		// const response = await SummarRequestUrl(this.plugin, {
-		// 	url: url,
-		// 	method: "POST",
-		// 	headers: {
-		// 		Authorization: `Bearer ${this.plugin.settings.openaiApiKey}`,
-		// 		"Content-Type": contentType,
-		// 	},
-        //     body: await requestbody.arrayBuffer(),
-		// 	throw: false
-		// });
-		// return response.json;
     }
 
 	////////////////////////////

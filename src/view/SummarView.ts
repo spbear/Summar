@@ -191,6 +191,9 @@ export class SummarView extends View {
     return this.resultManager.getResultText(key);
   }
 
+  updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
+  }
+
   enableNewNote(key: string, newNotePath?: string): void {
     this.resultManager.enableNewNote(key, newNotePath);
   }

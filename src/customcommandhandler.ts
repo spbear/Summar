@@ -38,7 +38,9 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "custom";
-		this.clearAllResultItems();
+		if (this.plugin.settingsv2.system.debugLevel<3) {
+			this.clearAllResultItems();
+		}
 		
 		const cmdModel = command.model || 'gpt-4o';
 		const cmdPrompt = command.prompt || '';

@@ -31,6 +31,10 @@ export class SummarViewContainer {
       return this.plugin.getResultText(key);
   }
 
+  updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
+    // this.plugin.enableNewNote(true, key, newNotePath);
+    this.plugin.updateResultInfo(key, statId, prompt, newNotePath);
+  }
 
   enableNewNote(enabled: boolean, key: string, newNotePath?: string) {
     this.plugin.enableNewNote(enabled, key, newNotePath);

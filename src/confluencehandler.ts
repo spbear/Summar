@@ -27,7 +27,9 @@ export class ConfluenceHandler extends SummarViewContainer {
 
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "web";
-		this.clearAllResultItems();
+		if (this.plugin.settingsv2.system.debugLevel<3) {
+			this.clearAllResultItems();
+		}
 
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.web.webModel, 'web');
 		if (!summarai.hasKey(true, resultKey, label)) return;

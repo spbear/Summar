@@ -353,11 +353,21 @@ export class SummarResultManager implements ISummarResultManager {
     // Copy 버튼 (다섯 번째)
     const copyButton = this.createCopyButton(key);
     
+    // 우측 정렬용 spacer
+    const rightSpacer = document.createElement('div');
+    rightSpacer.style.flex = '1';
+    rightSpacer.style.minWidth = '8px';
+    
+    // Show Menu 버튼 (맨 오른쪽)
+    const showMenuButton = this.createShowMenuButton(key);
+    
     resultHeader.appendChild(uploadWikiButton);
     resultHeader.appendChild(uploadSlackButton);
     resultHeader.appendChild(newNoteButton);
     resultHeader.appendChild(toggleButton);
     resultHeader.appendChild(copyButton);
+    resultHeader.appendChild(rightSpacer);
+    resultHeader.appendChild(showMenuButton);
   }
 
   private createToggleButton(): HTMLButtonElement {
@@ -435,6 +445,30 @@ export class SummarResultManager implements ISummarResultManager {
     button.style.margin = '0';
     
     setIcon(button, 'copy');
+    
+    return button;
+  }
+  
+  private createShowMenuButton(key: string): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.className = 'lucide-icon-button';
+    button.setAttribute('button-id', 'show-menu-button');
+    button.setAttribute('aria-label', 'Show menu');
+    button.style.transform = 'scale(0.7)';
+    button.style.transformOrigin = 'center';
+    button.style.margin = '0';
+    
+    setIcon(button, 'menu');
+    
+    // 클릭 시 Notice 호출
+    button.addEventListener('click', () => {
+      try {
+        SummarDebug.Notice(1, `Show menu clicked: ${key}`);
+      } catch (e) {
+        // 안전하게 무시
+        console.debug('Notice call failed', e);
+      }
+    }, { signal: this.context.abortController.signal });
     
     return button;
   }

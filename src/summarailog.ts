@@ -90,8 +90,8 @@ export class IndexedDBManager {
         });
     }
 
-    async addLog(log: APICallLog, update: boolean = false): Promise<void> {
-        return new Promise((resolve, reject) => {
+    async addLog(log: APICallLog, update: boolean = false): Promise<boolean> {
+        return new Promise((resolve) => {
             const transaction = this.db!.transaction(['api_logs', 'daily_stats'], 'readwrite');
             const logsStore = transaction.objectStore('api_logs');
             const statsStore = transaction.objectStore('daily_stats');
@@ -101,11 +101,15 @@ export class IndexedDBManager {
             
             addRequest.onsuccess = async () => {
                 // 일별 통계 업데이트
-                await this.updateDailyStats(log, statsStore);
-                resolve();
+                try {
+                    await this.updateDailyStats(log, statsStore);
+                    resolve(true);
+                } catch (e) {
+                    resolve(false);
+                }
             };
             
-            addRequest.onerror = () => reject(addRequest.error);
+            addRequest.onerror = () => resolve(false);
         });
     }
 
@@ -207,6 +211,35 @@ export class IndexedDBManager {
             };
             
             request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * 단일 로그를 statsId(id)로 조회합니다.
+     * @param statsId addLog 시 생성된 고유 id
+     * @returns APICallLog 또는 null (없거나 에러 시)
+     */
+    async getLog(statsId: string): Promise<APICallLog | null> {
+        return new Promise((resolve, reject) => {
+            try {
+                if (!this.db) {
+                    resolve(null);
+                    return;
+                }
+                const transaction = this.db.transaction(['api_logs'], 'readonly');
+                const store = transaction.objectStore('api_logs');
+                const request = store.get(statsId);
+
+                request.onsuccess = () => {
+                    const result = request.result as APICallLog | undefined;
+                    resolve(result ?? null);
+                };
+                request.onerror = () => {
+                    reject(request.error);
+                };
+            } catch (e) {
+                reject(e);
+            }
         });
     }
 
@@ -492,7 +525,7 @@ export class TrackedAPIClient {
             errorMessage?: string;
             duration?: number;
         }
-    ) {
+    ): Promise<string | null> {
 // if (this.plugin.settings.debugLevel < 1) {
 //     return;
 // }
@@ -535,9 +568,11 @@ export class TrackedAPIClient {
         };
 
         try {
-            await this.dbManager.addLog(logEntry);
+            const ok = await this.dbManager.addLog(logEntry);
+            return ok ? logEntry.id : null;
         } catch (error) {
             console.error('Failed to save log to IndexedDB:', error);
+            return null;
         }
     }
 
