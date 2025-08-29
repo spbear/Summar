@@ -117,7 +117,7 @@ export class SummarView extends View {
   }
 
   getIcon(): string {
-    return "zap";
+    return "scroll-text";
   }
 
   async onOpen(): Promise<void> {

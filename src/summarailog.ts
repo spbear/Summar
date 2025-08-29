@@ -43,7 +43,7 @@ export class IndexedDBManager {
      * 현재 데이터베이스의 스키마 버전을 나타냅니다.
      * 데이터베이스 구조가 변경될 때마다 이 값을 증가시켜 마이그레이션을 관리합니다.
      */
-    private dbVersion = 3;
+    private dbVersion = 4;
 
 
 
@@ -86,8 +86,78 @@ export class IndexedDBManager {
                 if (!db.objectStoreNames.contains('settings')) {
                     db.createObjectStore('settings', { keyPath: 'key' });
                 }
+
+                // 상위 레벨 대화 로그 저장소
+                if (!db.objectStoreNames.contains('chat_logs')) {
+                    const chatStore = db.createObjectStore('chat_logs', { keyPath: 'statsId' });
+                    // 검색 편의를 위한 보조 인덱스 (옵션)
+                    chatStore.createIndex('prompt', 'prompt', { unique: false });
+                }
             };
         });
+    }
+
+    /**
+     * chat_logs에 대화 상위 데이터를 저장합니다.
+     */
+    async addChat(statsId: string, prompt: string, response: string): Promise<boolean> {
+        return new Promise((resolve) => {
+            if (!this.db) { resolve(false); return; }
+            const tx = this.db.transaction(['chat_logs'], 'readwrite');
+            const store = tx.objectStore('chat_logs');
+            const req = store.put({ statsId, prompt, response_text: response });
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => resolve(false);
+        });
+    }
+
+    /** 내부용: chat_logs에서 statsId로 조회 */
+    async getChat(statsId: string): Promise<{ statsId: string; prompt: string; response_text: string } | null> {
+        return new Promise((resolve, reject) => {
+            try {
+                if (!this.db) { resolve(null); return; }
+                const tx = this.db.transaction(['chat_logs'], 'readonly');
+                const store = tx.objectStore('chat_logs');
+                const req = store.get(statsId);
+                req.onsuccess = () => resolve(req.result ?? null);
+                req.onerror = () => reject(req.error);
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    /**
+     * getChatInfo(statsId)
+     * - chat_logs에서 prompt/response_text 읽기
+     * - api_logs에서 requestTokens/responseTokens/model/actualModelUsed/timestamp 읽기
+     * - 단일 오브젝트로 합쳐 반환
+     */
+    async getChatInfo(statsId: string): Promise<{
+        prompt: string;
+        response: string;
+        requestToken?: number;
+        responseToken?: number;
+        model?: string;
+        actualModelUsed?: string;
+        timestamp?: number;
+        timestampISO?: string;
+    } | null> {
+        const [chat, api] = await Promise.all([
+            this.getChat(statsId),
+            this.getLog(statsId)
+        ]);
+        if (!chat && !api) return null;
+        return {
+            prompt: chat?.prompt ?? '',
+            response: chat?.response_text ?? '',
+            requestToken: api?.requestTokens,
+            responseToken: api?.responseTokens,
+            model: api?.model,
+            actualModelUsed: api?.actualModelUsed,
+            timestamp: api?.timestamp,
+            timestampISO: api?.timestampISO,
+        };
     }
 
     async addLog(log: APICallLog, update: boolean = false): Promise<boolean> {
@@ -485,6 +555,18 @@ export class TrackedAPIClient {
         this.dbManager = plugin.dbManager;
         this.sessionId = Date.now().toString(36) + Math.random().toString(36).substr(2);
         this.startTime = Date.now();
+    }
+
+    /**
+     * 대화 상위 로그를 저장합니다. (chat_logs)
+     */
+    async logChat(statsId: string, prompt: string, response: string): Promise<boolean> {
+        try {
+            return await this.dbManager.addChat(statsId, prompt, response);
+        } catch (e) {
+            console.error('Failed to save chat to IndexedDB:', e);
+            return false;
+        }
     }
 
     start() {

@@ -75,3 +75,6 @@ jspm_packages/
 
 # Claude-related files
 .claude/
+
+# Project requirements docs (ignored)
+requirements/

@@ -335,8 +335,8 @@ export default class SummarPlugin extends Plugin {
       throw error;
     }
 
-    const trackapi = new TrackedAPIClient(this);
-    const updated = await trackapi.fixDB();
+    // const trackapi = new TrackedAPIClient(this);
+    // const updated = await trackapi.fixDB();
 
 
     if (Platform.isDesktopApp) {

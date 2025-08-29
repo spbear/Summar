@@ -138,7 +138,9 @@ export class SummarAI extends SummarViewContainer {
               duration: duration,
             })) || '';
             this.response.statsId = statsid;
-            
+            if (statsid) {
+              await trackapi.logChat(statsid, bodyContent, this.response.text);
+            }
             return true;
           } else {
             // SummarDebug.log(1, `OpenAI chat/completion response without content: \n${JSON.stringify(response.json)}`);
@@ -157,6 +159,9 @@ export class SummarAI extends SummarViewContainer {
                 errorMessage: this.response.text,
             })) || '';
             this.response.statsId = statsid;
+            if (statsid) {
+              await trackapi.logChat(statsid, bodyContent, this.response.text);
+            }
             return false
           }
         }
@@ -187,6 +192,9 @@ export class SummarAI extends SummarViewContainer {
               responseData: response.json, 
             })) || '';
             this.response.statsId = statsid;
+            if (statsid) {
+              await trackapi.logChat(statsid, bodyContent, this.response.text);
+            }
             return true;
           } else {
             // SummarDebug.log(1, `Gemini generateContent response without content: \n${JSON.stringify(response.json)}`);
@@ -205,6 +213,9 @@ export class SummarAI extends SummarViewContainer {
               errorMessage: this.response.text,
             })) || '';
             this.response.statsId = statsid;
+            if (statsid) {
+              await trackapi.logChat(statsid, bodyContent, this.response.text);
+            }
             return false
           }
           SummarDebug.log(1, `API responses error: \n${JSON.stringify(response.json)}`);
@@ -262,6 +273,10 @@ export class SummarAI extends SummarViewContainer {
                 duration: duration,
               })) || '';
               this.response.statsId = statsid;
+              if (statsid) {
+                const promptSummary = `[audio] duration=${duration}s, model=${this.aiModel}, feature=${this.feature}`;
+                await trackapi.logChat(statsid, promptSummary, this.response.text);
+              }
             }
             else {
               this.response.text = response.json.error ? response.json.error.message : 'No content available';
@@ -278,6 +293,10 @@ export class SummarAI extends SummarViewContainer {
                 duration: duration,
               })) || '';
               this.response.statsId = statsid;
+              if (statsid) {
+                const promptSummary = `[audio] duration=${duration}s, model=${this.aiModel}, feature=${this.feature}`;
+                await trackapi.logChat(statsid, promptSummary, this.response.text);
+              }
             }
           }
 //          trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true);
