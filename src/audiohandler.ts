@@ -22,13 +22,9 @@ export class AudioHandler extends SummarViewContainer {
 			file.name.toLowerCase().endsWith(".webm")
 		);
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
-		const resultKey = this.plugin.generateUniqueId();
-		const label = "transtript";
 		this.initResultRecord("transcript");
-		if (this.plugin.settingsv2.system.debugLevel<3) {
-			this.clearAllResultItems();
-		}
-		this.updateResultText(resultKey, label, `Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
+
+		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
 		// this.enableNewNote(false, resultKey);
 
 		let audioList = "";
@@ -91,7 +87,7 @@ export class AudioHandler extends SummarViewContainer {
 			}
 		}
 
-		this.startTimer(resultKey,label)
+		this.startTimer()
 
 		// Process files in parallel
 		const handler = this;
@@ -142,7 +138,7 @@ export class AudioHandler extends SummarViewContainer {
 							const blob = file.slice(0, file.size, file.type);
 							const duration = await getAudioDurationFromBlob(blob, fileName);
 							SummarDebug.log(1, `==========\nsendAudioData() - file: ${fileName}, duration: ${duration} seconds`);
-							const transcript = await this.callGeminiTranscription(resultKey, label, base64, mimeType, duration) || "";
+							const transcript = await this.callGeminiTranscription(base64, mimeType, duration) || "";
 							SummarDebug.log(3, transcript);
 							SummarDebug.log(1, 'seconds: ', seconds);
 							const strContent = this.adjustSrtTimestamps(transcript, seconds);
@@ -160,7 +156,7 @@ export class AudioHandler extends SummarViewContainer {
 
 							SummarDebug.log(1, `==========\nsendAudioData() - file: ${fileName}, duration: ${duration} seconds`);
 
-							const data = await this.callWhisperTranscription(resultKey, label, finalBody, contentType, duration);
+							const data = await this.callWhisperTranscription(finalBody, contentType, duration);
 							// SummarDebug.log(1, `sendAudioData() - 1st response data: ${JSON.stringify(data)}`);							
 
 							// 응답 확인
@@ -235,7 +231,7 @@ export class AudioHandler extends SummarViewContainer {
                 let errStr = f.error ? (f.error.status ? `[${f.error.status}] ` : '') + (f.error.message || f.error.toString?.() || f.error) : 'Unknown error';
                 return `- ${f.name}: ${errStr}`;
             }).join('\n');
-            this.updateResultText(resultKey, label, errorMsg);
+            this.updateResultText(errorMsg);
             throw new Error("One or more audio transcriptions failed. Aborting next steps.");
         }
 
@@ -373,9 +369,9 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		await this.plugin.app.vault.create(newFilePath, transcriptionContent);
-		this.updateResultText(resultKey, label, transcriptionContent);
+		this.updateResultText(transcriptionContent);
 
-		this.enableNewNote(true, resultKey, newFilePath);
+		this.enableNewNote(true, newFilePath);
 		
 		// summary가 활성화되어 있지 않으면 transcript 파일을 열기
 		// summary가 활성화되어 있으면 나중에 summary나 refined 파일이 열릴 예정이므로 transcript는 열지 않음
@@ -386,7 +382,7 @@ export class AudioHandler extends SummarViewContainer {
 				true
 			);
 		}
-		this.foldResult(resultKey, true);
+		this.foldResult(true);
 		
 		// Daily Notes에 전사 완료 링크 추가 (녹음 날짜 기준)
 		const recordingDate = this.extractRecordingDateFromPath(folderPath, filesToSave, noteFilePath);
@@ -543,10 +539,11 @@ export class AudioHandler extends SummarViewContainer {
 		};
 	}
 
-	async callWhisperTranscription(resultKey: string, label: string, requestbody: Blob, contentType: string, duration: number): Promise<any> {
+	async callWhisperTranscription(requestbody: Blob, contentType: string, duration: number): Promise<any> {
 		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
-		if (!summarai.hasKey(true, resultKey, label)) return '';
+		if (!summarai.hasKey(true, this.resultRecord.key, this.resultRecord.label as string)) return '';			
+
 		
 		const json = await summarai.audioTranscription((await requestbody.arrayBuffer() as ArrayBuffer), contentType, duration);
 		return json;
@@ -664,10 +661,10 @@ export class AudioHandler extends SummarViewContainer {
 		}
 	}
 	
-	async callGeminiTranscription(resultKey: string, label: string, base64: string, mimeType: string, duration: number): Promise<string | null> {
+	async callGeminiTranscription(base64: string, mimeType: string, duration: number): Promise<string | null> {
 		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
-		if (!summarai.hasKey(true, resultKey, label)) return '';
+		if (!summarai.hasKey(true, this.resultRecord.key, this.resultRecord.label as string)) return '';			
 
 		// sttModel에 따라 적절한 prompt 선택
 		let systemInstruction = "";

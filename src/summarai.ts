@@ -55,7 +55,8 @@ export class SummarAI extends SummarViewContainer {
       return true;
     } else if (errDisplay) {
       const errorMessage = `Please configure ${this.aiProvider} API key in the plugin settings.`;
-			this.updateResultText(resultKey, label, errorMessage);
+      this.setResultRecord(resultKey, label)
+			this.updateResultText(errorMessage);
 			// this.enableNewNote(false, resultKey);
 
       const fragment = document.createDocumentFragment();

@@ -413,7 +413,6 @@ export default class SummarPlugin extends Plugin {
                     if (files && files.length > 0) {
                       this.activateView();
                       const transcriptedText = await this.app.vault.read(file);
-                  		this.clearAllResultItems();
                       const summarized = await this.recordingManager.summarize(transcriptedText, file.path );
                     }
                   } catch (error) {
@@ -1483,8 +1482,9 @@ export default class SummarPlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.getResultText === 'function') {
-          summarView.enableNewNote(key, newNotePath);
+      if (summarView && typeof summarView.updateResultInfo === 'function') {
+
+          summarView.updateResultInfo(key, statId, prompt, newNotePath);
       }
     }
   }
@@ -1494,7 +1494,7 @@ export default class SummarPlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.getResultText === 'function') {
+      if (summarView && typeof summarView.enableNewNote === 'function') {
         if (enabled) {
           summarView.enableNewNote(key, newNotePath);
         }
@@ -1507,7 +1507,7 @@ export default class SummarPlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.getResultText === 'function') {
+      if (summarView && typeof summarView.foldResult === 'function') {
           summarView.foldResult(key, fold);
       }
     }
@@ -1518,7 +1518,7 @@ export default class SummarPlugin extends Plugin {
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.getResultText === 'function') {
+      if (summarView && typeof summarView.clearAllResultItems === 'function') {
           summarView.clearAllResultItems();
       }
     }

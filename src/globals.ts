@@ -23,7 +23,7 @@ export class SummarViewContainer {
     this.resultRecord = this.createResultRecord();
   }
 
-  private createResultRecord(label: string = "", icon: string = "tag"): SummarResultRecord {
+  private createResultRecord(label: string = "chat", icon: string = "message-square-more"): SummarResultRecord {
     return {
       key: this.plugin.generateUniqueId(),
       itemEl: null,
@@ -38,6 +38,9 @@ export class SummarViewContainer {
 
   initResultRecord(label: string = "", icon: string = "tag"): void {
     this.resultRecord = this.createResultRecord(label, icon);
+		if (this.plugin.settingsv2.system.debugLevel<3) {
+			this.clearAllResultItems();
+		}
   }
 
   setResultRecord(key: string, label: string) {
@@ -50,26 +53,21 @@ export class SummarViewContainer {
    * @param resultContainer The container object to update.
    * @param message The message to set as the value.
    */
-  updateResultText(key: string, label: string, message: string): string {
-      this.resultRecord.label = label;
+  updateResultText(message: string): string {
       this.resultRecord.result = message;
       return this.plugin.updateResultText(this.resultRecord.key, 
-                                          this.resultRecord.label, 
+                                          this.resultRecord.label as string, 
                                           this.resultRecord.result);
-      // return this.plugin.updateResultText(key, label, message);
   }
 
-  appendResultText(key: string, label: string, message: string): string {
-      this.resultRecord.label = label;
+  appendResultText(message: string): string {
       this.resultRecord.result = message;
-      // return this.plugin.appendResultText(key, label, message);
       return this.plugin.appendResultText(this.resultRecord.key, 
-                                          this.resultRecord.label, 
+                                          this.resultRecord.label as string, 
                                           this.resultRecord.result);
   }
-  getResultText(key: string): string {
+  getResultText(): string {
       return this.plugin.getResultText(this.resultRecord.key);
-      // return this.plugin.getResultText(key);
   }
 
   updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
@@ -81,18 +79,15 @@ export class SummarViewContainer {
                                  this.resultRecord.statId, 
                                  this.resultRecord.prompt, 
                                  this.resultRecord.noteName);
-    // this.plugin.updateResultInfo(key, statId, prompt, newNotePath);
   }
 
-  enableNewNote(enabled: boolean, key: string, newNotePath?: string) {
+  enableNewNote(enabled: boolean, newNotePath?: string) {
     this.resultRecord.noteName = newNotePath;
     this.plugin.enableNewNote(enabled, this.resultRecord.key, this.resultRecord.noteName);
-    // this.plugin.enableNewNote(enabled, key, newNotePath);
   } 
 
-  foldResult(key: string | null, fold: boolean): void {
+  foldResult(fold: boolean): void {
     this.plugin.foldResult(this.resultRecord.key, fold);
-    // this.plugin.foldResult(key, fold);
   }
   
   clearAllResultItems(): void {
@@ -100,9 +95,7 @@ export class SummarViewContainer {
   }
 
   // 타이머 시작 함수
-  startTimer(resultKey: string, label: string): void {
-    this.setResultRecord(this.resultRecord.key, label);
-
+  startTimer(): void {
     if (this.started) {
       return;
     }
@@ -110,7 +103,7 @@ export class SummarViewContainer {
     this.started = true; // 시작 여부 변경
     this.dotCount = 0; // 초기화
     this.timerInterval = window.setInterval(() => {
-      const result = this.appendResultText(this.resultRecord.key, this.resultRecord.label as string, ".");      
+      const result = this.appendResultText(".");      
       this.dotCount++;
     }, 500); // 500ms마다 실행
   }

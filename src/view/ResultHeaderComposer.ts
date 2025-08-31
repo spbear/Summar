@@ -24,9 +24,11 @@ export function getDefaultLabelIcon(label: string): string {
   if (/(web|url|link|http|https)/.test(l)) return 'globe';
   if (/(note|memo)/.test(l)) return 'file';
   if (/(wiki|confluence)/.test(l)) return 'book';
-  if (/(slack|chat)/.test(l)) return 'hash';
+  if (/(slack)/.test(l)) return 'hash';
+  if (/(chat)/.test(l)) return 'message-square-more';
   if (/(summary)/.test(l)) return 'clipboard-list';
   if (/(refinement)/.test(l)) return 'clipboard-check';
+  if (/(custom)/.test(l)) return 'pocket-knife';
   
   return 'tag';
 }

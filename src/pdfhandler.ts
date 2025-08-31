@@ -31,22 +31,18 @@ export class PdfHandler extends SummarViewContainer {
 	}
 
 	async convertToMarkdownFromPdf(file: any): Promise<void> {
-		const resultKey = this.plugin.generateUniqueId();
-		const label = "pdf";	
 		this.initResultRecord("pdf");
-		if (this.plugin.settingsv2.system.debugLevel<3) {	
-			this.clearAllResultItems();
-		}
 
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.pdf.pdfModel, 'pdf');
-		if (!summarai.hasKey(true, resultKey, label)) return;
+		if (!summarai.hasKey(true, this.resultRecord.key, this.resultRecord.label as string)) return;
+		// if (!summarai.hasKey(true, resultKey, label)) return;
 
 		const pdftopng = new PdfToPng(this.plugin);
 
 		try {
 			if (!(await pdftopng.isPopplerInstalled())) {
 				SummarDebug.Notice(0, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.", 0);
-				this.updateResultText(resultKey, label, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
+				this.updateResultText("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 				// this.enableNewNote(false, resultKey);
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 			}
@@ -55,19 +51,19 @@ export class PdfHandler extends SummarViewContainer {
 			const modelName = this.plugin.settingsv2.pdf.pdfModel;
 			SummarDebug.Notice(1, file.name);
 
-			this.startTimer(resultKey, label);
+			this.startTimer();
 
 			// 단계 1: PDF 파일 준비
-			this.updateResultText(resultKey, label, `[10%] Preparing PDF file... (${file.name})`);
+			this.updateResultText(`[10%] Preparing PDF file... (${file.name})`);
 			// this.enableNewNote(false, resultKey);
 
 			// 단계 2: 이미지 변환
-			this.updateResultText(resultKey, label, `[15%] Converting to images... Will use [${modelName}]`);
+			this.updateResultText(`[15%] Converting to images... Will use [${modelName}]`);
 			// const base64Values = await pdftopng.convert(file, resultKey, label, (SummarDebug.level() < 4));
 			const base64Values = await pdftopng.convert(file, this.resultRecord.key, this.resultRecord.label as string, (SummarDebug.level() < 4));
 			const pageCount = base64Values.length;
 
-			this.updateResultText(resultKey, label, `[30%] Image conversion completed (${pageCount} pages detected)`);
+			this.updateResultText(`[30%] Image conversion completed (${pageCount} pages detected)`);
 			// this.enableNewNote(false, resultKey);
 
 			// JsonBuilder 인스턴스 생성
@@ -92,7 +88,7 @@ export class PdfHandler extends SummarViewContainer {
 				const base64 = base64Values[index];
 				const progress = 30 + Math.floor((index + 1) / pageCount * 25); // 30% ~ 55%
 				
-				this.updateResultText(resultKey, label, `[${progress}%] Preparing message for page ${index + 1}/${pageCount}...`);
+				this.updateResultText(`[${progress}%] Preparing message for page ${index + 1}/${pageCount}...`);
 				
 				SummarDebug.log(2, `${index + 1}번 파일의 Base64: ${base64}`);
 				const page_prompt = `다음은 PDF의 페이지 ${index + 1}입니다.`;
@@ -113,7 +109,7 @@ export class PdfHandler extends SummarViewContainer {
 				});
 			}
 
-			this.updateResultText(resultKey, label, `[55%] AI request preparation completed`);
+			this.updateResultText(`[55%] AI request preparation completed`);
 
 			jsonBuilder.addToArray("messages", {
 				role: "user",
@@ -131,7 +127,7 @@ export class PdfHandler extends SummarViewContainer {
 			// 단계 4: AI 분석 시작
 			const aiStartTime = Date.now();
 			const estimatedTime = this.formatEstimatedTime(pageCount, modelName);
-			this.updateResultText(resultKey, label, `[60%] AI analysis in progress... [${modelName}] (${pageCount} pages, ${estimatedTime})`);
+			this.updateResultText(`[60%] AI analysis in progress... [${modelName}] (${pageCount} pages, ${estimatedTime})`);
 
 			// AI 분석 중 진행 상태 업데이트를 위한 인터벌 설정
 			const progressInterval = setInterval(() => {
@@ -143,7 +139,7 @@ export class PdfHandler extends SummarViewContainer {
 				let currentProgress = 60 + Math.min(25, Math.floor((elapsed / estimatedTotal) * 25));
 				
 				const progressTime = this.formatProgressTime(aiStartTime, pageCount, modelName);
-				this.updateResultText(resultKey, label, `[${currentProgress}%] AI analysis in progress... [${modelName}] (${progressTime})`);
+				this.updateResultText(`[${currentProgress}%] AI analysis in progress... [${modelName}] (${progressTime})`);
 			}, 5000); // 5초마다 업데이트
 
 			await summarai.chatWithBody(body_content);
@@ -158,31 +154,31 @@ export class PdfHandler extends SummarViewContainer {
 
 			if (status !== 200) {
 				SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
-				this.updateResultText(resultKey, label, `[ERROR] AI analysis failed: ${status} - ${summary}`);
+				this.updateResultText(`[ERROR] AI analysis failed: ${status} - ${summary}`);
 				// this.enableNewNote(false, resultKey);
 				return;
 			}
 
 			// 단계 5: 결과 처리
-			this.updateResultText(resultKey, label, `[90%] AI analysis completed, converting to markdown...`);
+			this.updateResultText(`[90%] AI analysis completed, converting to markdown...`);
 
 			if (summary && summary.length > 0) {
 				const markdownContent = this.extractMarkdownContent(summary);
 				if (markdownContent) {
-					this.updateResultText(resultKey, label, `[95%] Creating new note...`);
-					this.enableNewNote(true, resultKey);
-					this.updateResultText(resultKey, label, `[100%] Markdown conversion completed! New note has been created.`);
+					this.updateResultText(`[95%] Creating new note...`);
+					this.enableNewNote(true);
+					this.updateResultText(`[100%] Markdown conversion completed! New note has been created.`);
 					// PDF 파일명 기반으로 새 노트 자동 생성
-					await this.createNewNoteFromPdf(resultKey, label, file.name, markdownContent);
+					await this.createNewNoteFromPdf(file.name, markdownContent);
 				} else {
-					this.updateResultText(resultKey, label, `[95%] Creating new note...`);
-					this.enableNewNote(true, resultKey);
-					this.updateResultText(resultKey, label, `[100%] Conversion completed! New note has been created.`);
+					this.updateResultText(`[95%] Creating new note...`);
+					this.enableNewNote(true);
+					this.updateResultText(`[100%] Conversion completed! New note has been created.`);
 					// PDF 파일명 기반으로 새 노트 자동 생성
-					await this.createNewNoteFromPdf(resultKey, label, file.name, summary);
+					await this.createNewNoteFromPdf(file.name, summary);
 				}
 			} else {
-				this.updateResultText(resultKey, label, "[ERROR] No valid response received from AI API.");
+				this.updateResultText("[ERROR] No valid response received from AI API.");
 				// this.enableNewNote(false, resultKey);
 			}
 
@@ -192,7 +188,7 @@ export class PdfHandler extends SummarViewContainer {
 			this.stopTimer();
 
 			SummarDebug.error(1, "Error during PDF to PNG conversion:", error);
-			this.updateResultText(resultKey, label, `[ERROR] Error occurred during PDF conversion: ${error}`);
+			this.updateResultText(`[ERROR] Error occurred during PDF conversion: ${error}`);
 			// this.enableNewNote(false, resultKey);
 			SummarDebug.Notice(0, "Failed to convert PDF to PNG. Check console for details.");
 		}
@@ -215,7 +211,7 @@ export class PdfHandler extends SummarViewContainer {
 	 * @param fileName PDF 파일명
 	 * @param content 마크다운 내용
 	 */
-	async createNewNoteFromPdf(resultKey: string, label: string, fileName: string, content: string): Promise<void> {
+	async createNewNoteFromPdf(fileName: string, content: string): Promise<void> {
 		try {
 			// PDF 파일명에서 확장자 제거하고 안전한 파일명으로 변환
 			const baseFileName = sanitizeFileName(fileName.replace(/\.pdf$/i, ''));
@@ -233,9 +229,9 @@ export class PdfHandler extends SummarViewContainer {
 			// 새 노트 생성
 			const createdFile = await this.plugin.app.vault.create(filePath, content);
 			await this.plugin.app.workspace.openLinkText(filePath, "", true);
-			this.updateResultText(resultKey, label, content);
-			this.enableNewNote(true, resultKey, filePath);
-			this.foldResult(resultKey, true);
+			this.updateResultText(content);
+			this.enableNewNote(true, filePath);
+			this.foldResult(true);
 
 			SummarDebug.Notice(1, `Created new note: ${uniqueFileName}`, 3000);
 		} catch (error) {
