@@ -64,8 +64,7 @@ export class SummarEventHandler implements ISummarEventHandler {
     const deleteAllButton = this.context.containerEl.querySelector('button[aria-label*="Delete all result items"]') as HTMLButtonElement;
     if (deleteAllButton) {
       deleteAllButton.addEventListener("click", () => {
-        this.context.resultItems.clear();
-        this.context.newNoteNames.clear();
+        this.context.resultRecords.clear();
         this.context.resultContainer.empty();
         SummarDebug.Notice(1, "All result items have been deleted");
       }, { signal: this.context.abortController.signal });
@@ -106,8 +105,8 @@ export class SummarEventHandler implements ISummarEventHandler {
 
   private async handleNewNoteClick(key: string): Promise<void> {
     try {
-      let newNoteName = this.getNoteName(key);
-      const filePath = normalizePath(newNoteName);
+      let noteName = this.getNoteName(key);
+      const filePath = normalizePath(noteName);
       const existingFile = this.context.plugin.app.vault.getAbstractFileByPath(filePath);
 
       if (existingFile) {
@@ -186,15 +185,11 @@ export class SummarEventHandler implements ISummarEventHandler {
 
   private async handleCopyResult(key: string): Promise<void> {
     try {
-      const resultItem = this.context.resultItems.get(key);
-      if (resultItem) {
-        const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
-        if (resultText) {
-          const rawText = resultText.getAttribute('data-raw-text') || '';
-          await navigator.clipboard.writeText(rawText);
-          SummarDebug.Notice(1, 'Content copied to clipboard');
-        }
-      }
+      // Map 기반 저장소 사용 → resultManager 경유로 원문 취득
+      const resultManager = (this.context as any).resultManager as { getResultText: (k: string) => string } | undefined;
+      const result = resultManager?.getResultText(key) || '';
+      await navigator.clipboard.writeText(result || '');
+      SummarDebug.Notice(1, 'Content copied to clipboard');
     } catch (error) {
       SummarDebug.error(1, "Error copying to clipboard:", error);
       SummarDebug.Notice(0, 'Failed to copy content to clipboard');
@@ -208,20 +203,17 @@ export class SummarEventHandler implements ISummarEventHandler {
   }
 
   private getResultText(key: string): string {
-    const resultItem = this.context.resultItems.get(key);
-    if (!resultItem) return "";
-    
-    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
-    if (resultText) {
-      return resultText.getAttribute('data-raw-text') || '';
-    }
-    
-    return "";
+    // Manager 경유(MAP) → attribute fallback 순서
+    const resultManager = (this.context as any).resultManager as { getResultText: (k: string) => string } | undefined;
+    return resultManager?.getResultText(key) || '';
   }
 
   private getNoteName(key: string): string {
-    let newNoteName = this.context.newNoteNames.get(key);
-    return (newNoteName && newNoteName.length > 0) ? newNoteName : "";
+    // ResultManager 경유해 통합 레코드 우선 사용
+    const resultManager = (this.context as any).resultManager as { getNoteName: (k: string) => string } | undefined;
+    if (resultManager) return resultManager.getNoteName(key);
+    const rec = this.context.resultRecords.get(key);
+    return rec?.noteName || "";
   }
 
   private showUploadFailedMessage(title: string, message: string): void {

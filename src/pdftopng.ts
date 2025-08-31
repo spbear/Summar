@@ -5,10 +5,8 @@ import fss from "fs/promises";
 import { spawn } from "child_process";
 import SummarPlugin from "./main";
 import { SummarViewContainer, SummarDebug } from "./globals";
-import { SummarTimer } from "./summartimer";
 
 export class PdfToPng extends SummarViewContainer {
-  private timer: SummarTimer;  
   private file: File;
 
   private tempDir: string;
@@ -27,7 +25,6 @@ export class PdfToPng extends SummarViewContainer {
   constructor(plugin: SummarPlugin) {
     super(plugin);
     this.pdftocairoPath = normalizePath("/opt/homebrew/bin/pdftocairo");
-    this.timer = new SummarTimer(plugin);
   }
 
   async isPopplerInstalled(): Promise<boolean> {
@@ -46,6 +43,7 @@ export class PdfToPng extends SummarViewContainer {
     let result: string[] = [];
 
     SummarDebug.log(1, "Starting PDF to PNG conversion...");
+    this.setResultRecord(resultKey, label);
     this.updateResultText(resultKey, label, "Initial rendering...");
     // this.enableNewNote(false, resultKey);
 
@@ -81,7 +79,6 @@ export class PdfToPng extends SummarViewContainer {
 
     SummarDebug.log(1, this.pdfName);
 
-    // this.timer.start();
     await this.convertPdfToPng();//this.pdfName, options);
     if (removeflag) {
       await this.deleteIfExists(this.pdfName);
@@ -93,7 +90,6 @@ export class PdfToPng extends SummarViewContainer {
     if (removeflag) {
       await this.deleteIfExists(this.outputDir);
     }
-    // this.timer.stop();
 
     return result;
   }

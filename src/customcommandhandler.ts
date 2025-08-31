@@ -1,17 +1,14 @@
 import SummarPlugin from "./main";
 import { SummarViewContainer, SummarDebug } from "./globals";
 import { SummarAI } from "./summarai";
-import { SummarTimer } from "./summartimer";
 import { MarkdownView } from "obsidian";
 import { text } from "stream/consumers";
 
 
 export class CustomCommandHandler extends SummarViewContainer {
-	private timer: SummarTimer;
 
 	constructor(plugin: SummarPlugin) {
 		super(plugin);
-		this.timer = new SummarTimer(plugin);
 	}
 
 	/*
@@ -38,6 +35,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "custom";
+		this.initResultRecord("custom");
 		if (this.plugin.settingsv2.system.debugLevel<3) {
 			this.clearAllResultItems();
 		}
@@ -55,14 +53,14 @@ export class CustomCommandHandler extends SummarViewContainer {
 		// this.enableNewNote(false, resultKey);
 
 		try {
-			this.timer.start(resultKey, label);
+			this.startTimer(resultKey, label);
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
 
 			await summarai.chat([message]);
 			const responseStatus = summarai.response.status;
 			const responseText = summarai.response.text;
-			this.timer.stop();
+			this.stopTimer();
 
 			if (responseStatus !== 200) {
 				const errorText = responseText || "Unknown error occurred.";
@@ -123,7 +121,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 			}
 
 		} catch (error) {
-			this.timer.stop();
+			this.stopTimer();
 			SummarDebug.error(1, "Error:", error);
 			let msg = "An error occurred while processing the request.";
 			if (error) {

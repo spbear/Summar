@@ -3,16 +3,46 @@ import * as os from 'os';
 import { Device } from '@capacitor/device';
 
 import SummarPlugin from "./main";
+import { SummarResultRecord } from "./view/SummarViewTypes";
+
 // import { PluginSettings } from "./types";
 // import exp from "constants";
 
 // SWIFT_SCRIPT_TEMPLATE 삭제됨. 이제 외부 Swift 파일을 사용하세요.
 
 export class SummarViewContainer {
-   plugin: SummarPlugin;
+  plugin: SummarPlugin;
+  resultRecord: SummarResultRecord;
+
+  timerInterval: number | undefined; // 타이머 ID
+  dotCount = 0; // 점(.)의 개수
+  started = false; // 시작 여부
 
   constructor(plugin: SummarPlugin) {
     this.plugin = plugin;
+    this.resultRecord = this.createResultRecord();
+  }
+
+  private createResultRecord(label: string = "", icon: string = "tag"): SummarResultRecord {
+    return {
+      key: this.plugin.generateUniqueId(),
+      itemEl: null,
+      result: "",
+      noteName: undefined,
+      label,
+      icon,
+      folded: false,
+      prompt: "",
+    };
+  }
+
+  initResultRecord(label: string = "", icon: string = "tag"): void {
+    this.resultRecord = this.createResultRecord(label, icon);
+  }
+
+  setResultRecord(key: string, label: string) {
+    this.resultRecord.key = key;
+    this.resultRecord.label = label;
   }
 
   /**
@@ -21,32 +51,80 @@ export class SummarViewContainer {
    * @param message The message to set as the value.
    */
   updateResultText(key: string, label: string, message: string): string {
-      return this.plugin.updateResultText(key, label, message);
+      this.resultRecord.label = label;
+      this.resultRecord.result = message;
+      return this.plugin.updateResultText(this.resultRecord.key, 
+                                          this.resultRecord.label, 
+                                          this.resultRecord.result);
+      // return this.plugin.updateResultText(key, label, message);
   }
 
   appendResultText(key: string, label: string, message: string): string {
-      return this.plugin.appendResultText(key, label, message);  
+      this.resultRecord.label = label;
+      this.resultRecord.result = message;
+      // return this.plugin.appendResultText(key, label, message);
+      return this.plugin.appendResultText(this.resultRecord.key, 
+                                          this.resultRecord.label, 
+                                          this.resultRecord.result);
   }
   getResultText(key: string): string {
-      return this.plugin.getResultText(key);
+      return this.plugin.getResultText(this.resultRecord.key);
+      // return this.plugin.getResultText(key);
   }
 
   updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
-    // this.plugin.enableNewNote(true, key, newNotePath);
-    this.plugin.updateResultInfo(key, statId, prompt, newNotePath);
+    this.plugin.enableNewNote(true, key, newNotePath);
+    this.resultRecord.statId = statId;
+    this.resultRecord.prompt = prompt;
+    this.resultRecord.noteName = newNotePath;
+    this.plugin.updateResultInfo(this.resultRecord.key, 
+                                 this.resultRecord.statId, 
+                                 this.resultRecord.prompt, 
+                                 this.resultRecord.noteName);
+    // this.plugin.updateResultInfo(key, statId, prompt, newNotePath);
   }
 
   enableNewNote(enabled: boolean, key: string, newNotePath?: string) {
-    this.plugin.enableNewNote(enabled, key, newNotePath);
+    this.resultRecord.noteName = newNotePath;
+    this.plugin.enableNewNote(enabled, this.resultRecord.key, this.resultRecord.noteName);
+    // this.plugin.enableNewNote(enabled, key, newNotePath);
   } 
 
   foldResult(key: string | null, fold: boolean): void {
-    this.plugin.foldResult(key, fold);
+    this.plugin.foldResult(this.resultRecord.key, fold);
+    // this.plugin.foldResult(key, fold);
   }
   
   clearAllResultItems(): void {
     this.plugin.clearAllResultItems();
   }
+
+  // 타이머 시작 함수
+  startTimer(resultKey: string, label: string): void {
+    this.setResultRecord(this.resultRecord.key, label);
+
+    if (this.started) {
+      return;
+    }
+
+    this.started = true; // 시작 여부 변경
+    this.dotCount = 0; // 초기화
+    this.timerInterval = window.setInterval(() => {
+      const result = this.appendResultText(this.resultRecord.key, this.resultRecord.label as string, ".");      
+      this.dotCount++;
+    }, 500); // 500ms마다 실행
+  }
+
+  // 타이머 정지 함수
+  stopTimer(): void {
+    if (this.timerInterval !== undefined) {
+      clearInterval(this.timerInterval); // 타이머 종료
+      this.started = false; // 시작 여부 변경
+      this.timerInterval = undefined;
+    } else {
+    }
+  }
+
 }
 
 export class SummarDebug {

@@ -4,12 +4,10 @@ import { SummarDebug, SummarViewContainer, getDeviceId, getDeviceIdFromLabel, ge
 import { SummarAI } from "./summarai";
 import { NativeAudioRecorder } from "./audiorecorder";
 import { RecordingTimer } from "./recordingtimer";
-import { SummarTimer } from "./summartimer";
 import { JsonBuilder } from "./jsonbuilder";
 import { exec } from "child_process";
 
 export class AudioRecordingManager extends SummarViewContainer {
-	private timer: SummarTimer;
 
 	private recorder: NativeAudioRecorder;
 	private recordingInterval: number | null = null; // Use `number` for browser environment
@@ -31,7 +29,6 @@ export class AudioRecordingManager extends SummarViewContainer {
 		super(plugin);
 		this.recorder = new NativeAudioRecorder();
 		this.recordingTimer = new RecordingTimer(plugin);
-		this.timer = new SummarTimer(plugin);
 
 		// 비동기 초기화 (가독성이 떨어짐)
 		getDeviceId(plugin).then(deviceId => {
@@ -42,6 +39,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 	async summarize(transcripted: string, newFilePath: string): Promise<string> {
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "summary"
+		this.initResultRecord("summary");
 		this.updateResultText(resultKey, label, "Summarizing from transcripted text");
 		// this.enableNewNote(false, resultKey);
 		// SummarDebug.log(2, "Fetched page content:", page_content);
@@ -58,7 +56,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			this.updateResultText(resultKey,  label, `Generating summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...` );
 
 			// this.enableNewNote(false, resultKey);
-			this.timer.start(resultKey, label);
+			this.startTimer(resultKey, label);
 
 			const message = `${transcriptSummaryPrompt}\n\n${transcripted}`;
 			await summarai.chat([message]);
@@ -70,7 +68,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				this.updateResultText(resultKey, label, `Error: ${status} - ${summary}`);
 				// this.enableNewNote(false, resultKey);
 
-				this.timer.stop();
+				this.stopTimer();
 				return summary;
 			}
 
@@ -110,7 +108,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 				if (this.plugin.settingsv2.recording.refineSummary)
 				{
-					this.timer.stop();
+					this.stopTimer();
 					this.foldResult(resultKey, true);
 					await this.refine(transcripted, summary, summaryNote);
 				}
@@ -118,10 +116,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
 				// this.enableNewNote(false, resultKey);
 			}
-			this.timer.stop();
+			this.stopTimer();
 			return summary;
 		} catch (error) {
-			this.timer.stop();
+			this.stopTimer();
 			SummarDebug.error(1, "Error:", error);
 			let msg = "An error occurred while processing the request.";
 			if (error) {
@@ -136,6 +134,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 	async refine(transcripted: string, summarized: string, newFilePath: string): Promise<string> {
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "refinement";
+		this.initResultRecord("refinement");
 
 		let refined = "";
 		this.updateResultText(resultKey, label, "Improving the summary…");
@@ -155,7 +154,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			
 			this.updateResultText(resultKey, label, `Refining summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...`);
 			// this.enableNewNote(false, resultKey);
-			this.timer.start(resultKey, label);
+			this.startTimer(resultKey, label);
 
 			await summarai.chat(messages);
 			const status = summarai.response.status;
@@ -166,7 +165,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				this.updateResultText(resultKey, label, `Error: ${status} - ${refined}`);
 				// this.enableNewNote(false, resultKey);
 
-				this.timer.stop();
+				this.stopTimer();
 				return refined;
 			}
 
@@ -202,10 +201,10 @@ export class AudioRecordingManager extends SummarViewContainer {
 				this.updateResultText(resultKey, label, "No valid response from OpenAI API.");
 				// this.enableNewNote(false, resultKey);
 			}
-			this.timer.stop();
+			this.stopTimer();
 			return refined;
 		} catch (error) {
-			this.timer.stop()
+			this.stopTimer();
 			// this.enableNewNote(false, resultKey);			
 		}
 
@@ -521,9 +520,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			}
 
 			// Timer들 정리
-			if (this.timer) {
-				this.timer.stop();
-			}
+			this.stopTimer();
 			if (this.recordingTimer) {
 				// RecordingTimer에 stop 메서드가 있는지 확인 필요
 				SummarDebug.log(2, "RecordingTimer cleanup completed");

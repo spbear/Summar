@@ -20,7 +20,8 @@ import {
   ISummarStickyHeaderManager,
   ISummarEventHandler,
   ISummarUploadManager,
-  SummarViewEvents
+  SummarViewEvents,
+  SummarResultRecord
 } from "./SummarViewTypes";
 
 export class SummarView extends View {
@@ -29,8 +30,7 @@ export class SummarView extends View {
   // Core properties
   plugin: SummarPlugin;
   resultContainer: HTMLDivElement;
-  resultItems: Map<string, HTMLDivElement> = new Map();
-  newNoteNames: Map<string, string> = new Map();
+  // 통합 레코드로 전환: 개별 Map 제거
   markdownRenderer: MarkdownIt;
 
   // Resource management
@@ -66,8 +66,7 @@ export class SummarView extends View {
       leaf: leaf,
       containerEl: this.containerEl,
       resultContainer: this.resultContainer, // Will be set in renderView
-      resultItems: this.resultItems,
-      newNoteNames: this.newNoteNames,
+      resultRecords: new Map<string, SummarResultRecord>(),
       markdownRenderer: this.markdownRenderer,
       abortController: this.abortController,
       timeoutRefs: this.timeoutRefs
@@ -106,6 +105,8 @@ export class SummarView extends View {
 
     // Add upload manager reference to context for event handler
     (this.context as any).uploadManager = this.uploadManager;
+    // Add result manager reference for event handler to fetch raw text via Map
+    (this.context as any).resultManager = this.resultManager;
   }
 
   getViewType(): string {
@@ -130,6 +131,7 @@ export class SummarView extends View {
     SummarDebug.log(1, "Summar View closed");
     
     // Cleanup all managers
+    this.resultManager.cleanup();
     this.stickyHeaderManager.cleanup();
     this.eventHandler.cleanup();
     
@@ -139,8 +141,8 @@ export class SummarView extends View {
     this.timeoutRefs.clear();
     
     // Clear data
-    this.resultItems.clear();
-    this.newNoteNames.clear();
+    this.context.resultRecords.clear();
+    this.context.resultRecords.clear();
     
     // Create new AbortController for potential reuse
     this.abortController = new AbortController();
@@ -241,7 +243,8 @@ export class SummarView extends View {
    * 개별 resultItem을 안전하게 삭제합니다.
    */
   private removeResultItem(key: string): void {
-    const resultItem = this.resultItems.get(key);
+    const rec = this.context.resultRecords.get(key);
+    const resultItem = rec?.itemEl || null;
     if (resultItem) {
       // Observer에서 제거
       const resultHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
@@ -255,8 +258,7 @@ export class SummarView extends View {
       }
       
       // Map에서 제거
-      this.resultItems.delete(key);
-      this.newNoteNames.delete(key);
+      this.context.resultRecords.delete(key);
       
       SummarDebug.log(1, `Result item ${key} removed successfully`);
     }

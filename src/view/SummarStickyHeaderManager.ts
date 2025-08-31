@@ -1,6 +1,7 @@
 import { ISummarStickyHeaderManager, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { setIcon } from "obsidian";
+import { composeStandardResultHeader, getDefaultLabelIcon } from "./ResultHeaderComposer";
 
 export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private stickyHeaderContainer: HTMLDivElement | null = null;
@@ -134,7 +135,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     }
 
     // DOM에서 실제로 존재하는지 확인 (IntersectionObserver 지연 이벤트 대응)
-    const actualResultItem = this.context.resultItems.get(key);
+    const actualResultItem = this.context.resultRecords.get(key)?.itemEl || null;
     if (!actualResultItem || !actualResultItem.isConnected) {
       SummarDebug.log(1, `Result item ${key} is not connected to DOM, hiding sticky header`);
       this.hideStickyHeader();
@@ -253,22 +254,31 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       this.context.containerEl.appendChild(this.stickyHeaderContainer);
     }
     
-    const resultItem = this.context.resultItems.get(key);
+    const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
     if (!resultItem) {
       SummarDebug.log(1, `No result item found for key: ${key}`);
       return;
     }
     
     const originalHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
-    const labelElement = originalHeader?.querySelector('span') as HTMLSpanElement;
+    if (!originalHeader) {
+      SummarDebug.log(1, `No original header found for key: ${key}`);
+      return;
+    }
+    // 우선 data-label을 사용하고, 없으면 chip 내부의 텍스트 span을 조회
+    const labelFromData = originalHeader.getAttribute('data-label');
+    const chipTextEl = originalHeader.querySelector('.result-label-text') as HTMLSpanElement | null;
+    const resolvedLabel = (labelFromData && labelFromData.length > 0)
+      ? labelFromData
+      : (chipTextEl?.textContent || '');
     
-    if (!originalHeader || !labelElement) {
+    if (!resolvedLabel) {
       SummarDebug.log(1, `No original header or label found for key: ${key}`);
       return;
     }
     
     // sticky header 생성 및 위치 설정
-    this.createAndPositionStickyHeader(key, labelElement.textContent || '', originalHeader);
+    this.createAndPositionStickyHeader(key, resolvedLabel, originalHeader);
     
     this.currentStickyKey = key;
     SummarDebug.log(1, `Sticky header shown for key: ${key}`);
@@ -409,7 +419,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private updateStickyHeaderPosition(): void {
     if (!this.stickyHeaderContainer || !this.context.resultContainer || !this.currentStickyKey) return;
     
-    const resultItem = this.context.resultItems.get(this.currentStickyKey);
+    const resultItem = this.context.resultRecords.get(this.currentStickyKey)?.itemEl || null;
     if (!resultItem) return;
     
     const originalHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
@@ -465,59 +475,32 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   }
 
   private createResultHeader(key: string, label: string): HTMLDivElement {
-    const resultHeader = document.createElement('div');
-    resultHeader.className = 'result-header';
-    resultHeader.style.width = '100%';
-    resultHeader.style.display = 'flex';
-    resultHeader.style.alignItems = 'center';
-    resultHeader.style.gap = '0px';
-    resultHeader.style.marginBottom = '0px';
-    resultHeader.style.padding = '0px';
-    resultHeader.style.border = '1px solid var(--background-modifier-border)';
-    resultHeader.style.backgroundColor = 'var(--background-primary)';
-    
-    // 라벨 추가
-    const labelElement = document.createElement('span');
-    labelElement.textContent = label;
-    labelElement.style.fontSize = '10px';
-    labelElement.style.color = 'var(--text-muted)';
-    labelElement.style.marginLeft = '2px';
-    labelElement.style.marginRight = '0px';
-    labelElement.style.fontWeight = 'bold';
-    labelElement.style.flexShrink = '0';
-    labelElement.style.backgroundColor = 'var(--interactive-normal)';
-    labelElement.style.padding = '2px 4px';
-    labelElement.style.borderRadius = '3px';
-    resultHeader.appendChild(labelElement);
-    
-    // 헤더 버튼들 추가
-    this.addStickyHeaderButtons(resultHeader, key);
-    
-    return resultHeader;
+    const uploadWikiButton = this.createStickyButton('upload-result-to-wiki-button', 'Upload this result to Confluence', 'file-up', key);
+    const uploadSlackButton = this.createStickyButton('upload-result-to-slack-button', 'Upload this result to Slack', 'hash', key);
+    const newNoteButton = this.createStickyButton('new-note-button', 'Create new note with this result', 'file-output', key);
+    const toggleButton = this.createStickyToggleButton(key);
+    const copyButton = this.createStickyButton('copy-result-button', 'Copy this result to clipboard', 'copy', key);
+    const rightSpacer = document.createElement('div');
+    rightSpacer.style.flex = '1';
+    rightSpacer.style.minWidth = '8px';
+    const showMenuButton = this.createStickyButton('show-menu-button', 'Show menu', 'menu', key);
+
+    // Use unified record if present to keep header consistent
+    const rec = this.context.resultRecords.get(key);
+    const icon = rec?.icon || getDefaultLabelIcon(label);
+    const stickyLabel = rec?.label || label;
+    return composeStandardResultHeader(stickyLabel, {
+      uploadWiki: uploadWikiButton,
+      uploadSlack: uploadSlackButton,
+      newNote: newNoteButton,
+      toggle: toggleButton,
+      copy: copyButton,
+      spacer: rightSpacer,
+      menu: showMenuButton,
+    }, { icon });
   }
 
-  private addStickyHeaderButtons(resultHeader: HTMLDivElement, key: string): void {
-    // Upload Wiki 버튼
-    const uploadWikiButton = this.createStickyButton('upload-result-to-wiki-button', 'Upload this result to Confluence', 'file-up', key);
-    
-    // Upload Slack 버튼
-    const uploadSlackButton = this.createStickyButton('upload-result-to-slack-button', 'Upload this result to Slack', 'hash', key);
-    
-    // New Note 버튼
-    const newNoteButton = this.createStickyButton('new-note-button', 'Create new note with this result', 'file-output', key);
-    
-    // Toggle 버튼
-    const toggleButton = this.createStickyToggleButton(key);
-    
-    // Copy 버튼
-    const copyButton = this.createStickyButton('copy-result-button', 'Copy this result to clipboard', 'copy', key);
-    
-    resultHeader.appendChild(uploadWikiButton);
-    resultHeader.appendChild(uploadSlackButton);
-    resultHeader.appendChild(newNoteButton);
-    resultHeader.appendChild(toggleButton);
-    resultHeader.appendChild(copyButton);
-  }
+  private addStickyHeaderButtons(_: HTMLDivElement, __: string): void { /* deprecated by composer */ }
 
   private createStickyButton(buttonId: string, ariaLabel: string, iconName: string, key: string): HTMLButtonElement {
     const button = document.createElement('button');
@@ -529,7 +512,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     button.style.margin = '0';
     
     // 원본 버튼 상태 동기화
-    const originalItem = this.context.resultItems.get(key);
+    const originalItem = this.context.resultRecords.get(key)?.itemEl || null;
     if (originalItem) {
       const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
       if (originalButton) {
@@ -565,7 +548,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     button.style.margin = '0';
     
     // 원본 토글 버튼 상태 동기화
-    const originalItem = this.context.resultItems.get(key);
+    const originalItem = this.context.resultRecords.get(key)?.itemEl || null;
     if (originalItem) {
       const originalToggleButton = originalItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
       if (originalToggleButton) {
@@ -606,7 +589,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       setIcon(stickyToggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
       
       // 원본 버튼과 resultText 상태 동기화
-      const originalItem = this.context.resultItems.get(key);
+    const originalItem = this.context.resultRecords.get(key)?.itemEl || null;
       if (originalItem) {
         const originalToggleButton = originalItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
         const resultText = originalItem.querySelector('.result-text') as HTMLDivElement;

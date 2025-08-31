@@ -8,11 +8,24 @@ export interface ISummarViewContext {
   leaf: WorkspaceLeaf;
   containerEl: HTMLElement;
   resultContainer: HTMLDivElement;
-  resultItems: Map<string, HTMLDivElement>;
-  newNoteNames: Map<string, string>;
+  // 통합 레코드 저장소 (단계적 도입)
+  resultRecords: Map<string, SummarResultRecord>;
   markdownRenderer: MarkdownIt;
   abortController: AbortController;
   timeoutRefs: Set<NodeJS.Timeout>;
+}
+
+// 결과 아이템에 대한 통합 상태 레코드
+export class SummarResultRecord {
+  key: string;
+  itemEl: HTMLDivElement | null;
+  result: string;
+  label?: string;
+  statId?: string;
+  noteName?: string;
+  icon?: string;
+  folded?: boolean;
+  prompt?: string;
 }
 
 // 매니저 인터페이스들
@@ -39,6 +52,7 @@ export interface ISummarResultManager {
   getNoteName(key: string): string;
   cleanupMarkdownOutput(html: string): string;
   setEventHandlers(events: SummarViewEvents): void;
+  cleanup(): void;
 }
 
 export interface ISummarStickyHeaderManager {

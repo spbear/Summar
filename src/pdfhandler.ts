@@ -1,18 +1,15 @@
 import SummarPlugin from "./main";
 import { SummarViewContainer, SummarDebug, sanitizeFileName } from "./globals";
 import { SummarAI } from "./summarai";
-import { SummarTimer } from "./summartimer";
 import { PdfToPng } from "./pdftopng";
 import { JsonBuilder } from "./jsonbuilder";
 import { normalizePath } from "obsidian";
 
 
 export class PdfHandler extends SummarViewContainer {
-	private timer: SummarTimer;
 
 	constructor(plugin: SummarPlugin) {
 		super(plugin);
-		this.timer = new SummarTimer(plugin);
 	}
 
 	/*
@@ -36,6 +33,7 @@ export class PdfHandler extends SummarViewContainer {
 	async convertToMarkdownFromPdf(file: any): Promise<void> {
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "pdf";	
+		this.initResultRecord("pdf");
 		if (this.plugin.settingsv2.system.debugLevel<3) {	
 			this.clearAllResultItems();
 		}
@@ -57,7 +55,7 @@ export class PdfHandler extends SummarViewContainer {
 			const modelName = this.plugin.settingsv2.pdf.pdfModel;
 			SummarDebug.Notice(1, file.name);
 
-			this.timer.start(resultKey, label);
+			this.startTimer(resultKey, label);
 
 			// 단계 1: PDF 파일 준비
 			this.updateResultText(resultKey, label, `[10%] Preparing PDF file... (${file.name})`);
@@ -65,7 +63,8 @@ export class PdfHandler extends SummarViewContainer {
 
 			// 단계 2: 이미지 변환
 			this.updateResultText(resultKey, label, `[15%] Converting to images... Will use [${modelName}]`);
-			const base64Values = await pdftopng.convert(file, resultKey, label, (SummarDebug.level() < 4));
+			// const base64Values = await pdftopng.convert(file, resultKey, label, (SummarDebug.level() < 4));
+			const base64Values = await pdftopng.convert(file, this.resultRecord.key, this.resultRecord.label as string, (SummarDebug.level() < 4));
 			const pageCount = base64Values.length;
 
 			this.updateResultText(resultKey, label, `[30%] Image conversion completed (${pageCount} pages detected)`);
@@ -155,7 +154,7 @@ export class PdfHandler extends SummarViewContainer {
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
 
-			this.timer.stop();
+			this.stopTimer();
 
 			if (status !== 200) {
 				SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
@@ -190,7 +189,7 @@ export class PdfHandler extends SummarViewContainer {
 			SummarDebug.log(1, "PDF conversion to images complete.");
 		
 		} catch (error) {
-			this.timer.stop();
+			this.stopTimer();
 
 			SummarDebug.error(1, "Error during PDF to PNG conversion:", error);
 			this.updateResultText(resultKey, label, `[ERROR] Error occurred during PDF conversion: ${error}`);

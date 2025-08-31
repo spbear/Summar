@@ -1,15 +1,12 @@
 import SummarPlugin from "./main";
 import { SummarViewContainer, SummarDebug, containsDomain, SummarRequestUrl } from "./globals";
 import { SummarAI } from "./summarai";
-import { SummarTimer } from "./summartimer";
 import { ConfluenceAPI } from "./confluenceapi";
 
 export class ConfluenceHandler extends SummarViewContainer {
-	private timer: SummarTimer;
 
 	constructor(plugin: SummarPlugin) {
 		super(plugin);
-		this.timer = new SummarTimer(plugin);
 	}
 
 
@@ -27,6 +24,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "web";
+		this.initResultRecord("web");
 		if (this.plugin.settingsv2.system.debugLevel<3) {
 			this.clearAllResultItems();
 		}
@@ -42,7 +40,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 		// this.enableNewNote(false, resultKey);
 
 		try {
-			this.timer.start(resultKey, label);
+			this.startTimer(resultKey, label);
 
 			// extractConfluenceInfo 함수 호출
 			const { confluenceApiToken } = this.plugin.settingsv2.common;
@@ -100,7 +98,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
 
-			this.timer.stop();
+			this.stopTimer();
 
 			if (status !== 200) {
 				SummarDebug.error(1, "OpenAI API Error:", summary);
@@ -119,7 +117,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 			}
 
 		} catch (error) {
-			this.timer.stop();
+			this.stopTimer();
 			SummarDebug.error(1, "Error:", error);
 			let msg = "An error occurred while processing the request.";
 			if (error) {

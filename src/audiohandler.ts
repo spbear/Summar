@@ -2,15 +2,12 @@ import { TFile, TFolder, normalizePath, RequestUrlParam } from "obsidian";
 import SummarPlugin from "./main";
 import { SummarDebug, SummarRequestUrl, SummarViewContainer, showSettingsTab, getAvailableFilePath, sanitizeFileName } from "./globals";
 import { SummarAI } from "./summarai";
-import { SummarTimer } from "./summartimer";
 import { get } from "http";
 
 export class AudioHandler extends SummarViewContainer {
-	private timer: SummarTimer;
 
 	constructor(plugin: SummarPlugin) {
 		super(plugin);
-		this.timer = new SummarTimer(plugin);
 	}
 
 	async sendAudioData(files: FileList | File[], givenFolderPath: string = ""): Promise<{ transcriptedText: string, newFilePath: string }> {
@@ -27,6 +24,7 @@ export class AudioHandler extends SummarViewContainer {
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
 		const resultKey = this.plugin.generateUniqueId();
 		const label = "transtript";
+		this.initResultRecord("transcript");
 		if (this.plugin.settingsv2.system.debugLevel<3) {
 			this.clearAllResultItems();
 		}
@@ -93,7 +91,7 @@ export class AudioHandler extends SummarViewContainer {
 			}
 		}
 
-		this.timer.start(resultKey, label);
+		this.startTimer(resultKey,label)
 
 		// Process files in parallel
 		const handler = this;
@@ -205,7 +203,7 @@ export class AudioHandler extends SummarViewContainer {
 					}
 				}
 				SummarDebug.error(1, `Failed to transcribe file ${fileName} after 3 attempts. Last error:`, lastError);
-				this.timer.stop();
+				this.stopTimer();
 				return { __isTranscribeError: true, error: lastError };
 			}
 			// 실제 호출
@@ -230,7 +228,8 @@ export class AudioHandler extends SummarViewContainer {
         });
 
         if (failedFiles.length > 0) {
-            this.timer.stop();
+			this.stopTimer();
+
             let errorMsg = '\u274C Failed to transcribe some audio files. All files must be processed successfully to proceed.\n';
             errorMsg += failedFiles.map(f => {
                 let errStr = f.error ? (f.error.status ? `[${f.error.status}] ` : '') + (f.error.message || f.error.toString?.() || f.error) : 'Unknown error';
@@ -393,7 +392,7 @@ export class AudioHandler extends SummarViewContainer {
 		const recordingDate = this.extractRecordingDateFromPath(folderPath, filesToSave, noteFilePath);
 		await this.plugin.dailyNotesHandler.addMeetingLinkToDailyNote(newFilePath, 'transcript', recordingDate);
 		
-		this.timer.stop();
+		this.stopTimer();
 		return {transcriptedText, newFilePath};
 
 		function formatTime(seconds: number): string {

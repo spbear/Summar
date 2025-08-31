@@ -43,7 +43,7 @@ export class IndexedDBManager {
      * 현재 데이터베이스의 스키마 버전을 나타냅니다.
      * 데이터베이스 구조가 변경될 때마다 이 값을 증가시켜 마이그레이션을 관리합니다.
      */
-    private dbVersion = 4;
+    private dbVersion = 5;
 
 
 
@@ -58,11 +58,18 @@ export class IndexedDBManager {
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 this.db = request.result;
+                // Cleanup old chat logs (older than 1 day). Run asynchronously.
+                try {
+                    void this.clearOldChatLogs(1)
+                        .then((deleted) => SummarDebug.log(1, `clearOldChatLogs(1): ${deleted} rows deleted`))
+                        .catch(() => {/* ignore cleanup errors */});
+                } catch {/* ignore */}
                 resolve();
             };
             
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
+                const upgradeTx: IDBTransaction | null = (event.target as IDBOpenDBRequest).transaction;
                 
                 // API 로그 저장소
                 if (!db.objectStoreNames.contains('api_logs')) {
@@ -92,6 +99,19 @@ export class IndexedDBManager {
                     const chatStore = db.createObjectStore('chat_logs', { keyPath: 'statsId' });
                     // 검색 편의를 위한 보조 인덱스 (옵션)
                     chatStore.createIndex('prompt', 'prompt', { unique: false });
+                    // 정리/범위 조회를 위한 타임스탬프 인덱스
+                    chatStore.createIndex('timestamp', 'timestamp', { unique: false });
+                } else if (upgradeTx) {
+                    // 기존 저장소에 인덱스가 없다면 추가
+                    const chatStore = upgradeTx.objectStore('chat_logs');
+                    const indexNames = chatStore.indexNames as unknown as DOMStringList;
+                    if (!(indexNames as any).contains || !(indexNames as any).contains('timestamp')) {
+                        // 일부 환경에서 DOMStringList.contains가 없을 수 있어 방어적으로 처리
+                        try { chatStore.createIndex('timestamp', 'timestamp', { unique: false }); } catch {}
+                    }
+                    if (!(indexNames as any).contains || !(indexNames as any).contains('prompt')) {
+                        try { chatStore.createIndex('prompt', 'prompt', { unique: false }); } catch {}
+                    }
                 }
             };
         });
@@ -101,18 +121,20 @@ export class IndexedDBManager {
      * chat_logs에 대화 상위 데이터를 저장합니다.
      */
     async addChat(statsId: string, prompt: string, response: string): Promise<boolean> {
+        return false;
         return new Promise((resolve) => {
             if (!this.db) { resolve(false); return; }
             const tx = this.db.transaction(['chat_logs'], 'readwrite');
             const store = tx.objectStore('chat_logs');
-            const req = store.put({ statsId, prompt, response_text: response });
+            const now = Date.now();
+            const req = store.put({ statsId, prompt, response_text: response, timestamp: now });
             req.onsuccess = () => resolve(true);
             req.onerror = () => resolve(false);
         });
     }
 
     /** 내부용: chat_logs에서 statsId로 조회 */
-    async getChat(statsId: string): Promise<{ statsId: string; prompt: string; response_text: string } | null> {
+    async getChat(statsId: string): Promise<{ statsId: string; prompt: string; response_text: string; timestamp?: number } | null> {
         return new Promise((resolve, reject) => {
             try {
                 if (!this.db) { resolve(null); return; }
@@ -140,8 +162,7 @@ export class IndexedDBManager {
         responseToken?: number;
         model?: string;
         actualModelUsed?: string;
-        timestamp?: number;
-        timestampISO?: string;
+        timestamp?: number; // chat_logs timestamp
     } | null> {
         const [chat, api] = await Promise.all([
             this.getChat(statsId),
@@ -155,8 +176,8 @@ export class IndexedDBManager {
             responseToken: api?.responseTokens,
             model: api?.model,
             actualModelUsed: api?.actualModelUsed,
-            timestamp: api?.timestamp,
-            timestampISO: api?.timestampISO,
+            // 요구사항: chat_logs의 timestamp를 사용
+            timestamp: chat?.timestamp,
         };
     }
 
@@ -462,7 +483,10 @@ export class IndexedDBManager {
         return imported;
     }
 
-    async clearOldLogs(days: number): Promise<number> {
+    /**
+     * api_logs에서 days일 이전의 항목을 삭제합니다.
+     */
+    async clearOldAPILogs(days: number): Promise<number> {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
         
@@ -487,6 +511,49 @@ export class IndexedDBManager {
                 }
             };
             
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * chat_logs에서 days일 이전의 항목을 삭제합니다.
+     * chat_logs.timestamp 인덱스를 사용하며, 없을 경우 전체 순회를 통해 삭제합니다.
+     */
+    async clearOldChatLogs(days: number): Promise<number> {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+
+        return new Promise((resolve, reject) => {
+            if (!this.db) { resolve(0); return; }
+            const transaction = this.db.transaction(['chat_logs'], 'readwrite');
+            const store = transaction.objectStore('chat_logs');
+
+            let deleted = 0;
+
+            // 인덱스가 있으면 활용
+            let request: IDBRequest<IDBCursorWithValue | null>;
+            try {
+                const index = store.index('timestamp');
+                const range = IDBKeyRange.upperBound(cutoffDate.getTime());
+                request = index.openCursor(range);
+            } catch {
+                // 인덱스가 없는 경우 전체 순회
+                request = store.openCursor();
+            }
+
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+                if (cursor) {
+                    const value = cursor.value as { timestamp?: number };
+                    if (!value.timestamp || value.timestamp <= cutoffDate.getTime()) {
+                        cursor.delete();
+                        deleted++;
+                    }
+                    cursor.continue();
+                } else {
+                    resolve(deleted);
+                }
+            };
             request.onerror = () => reject(request.error);
         });
     }

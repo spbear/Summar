@@ -1,9 +1,13 @@
 import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
-import { ISummarResultManager, ISummarViewContext, SummarViewEvents } from "./SummarViewTypes";
+import { composeStandardResultHeader, getDefaultLabelIcon } from "./ResultHeaderComposer";
+import { ISummarResultManager, ISummarViewContext, SummarResultRecord, SummarViewEvents } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
 export class SummarResultManager implements ISummarResultManager {
   private events: SummarViewEvents = {};
+  // key별 지연 렌더 타이머(append 폭주 시 렌더 횟수 축소)
+  private renderTimers: Map<string, NodeJS.Timeout> = new Map();
+  private readonly RENDER_DEBOUNCE_MS = 60;
 
   constructor(private context: ISummarViewContext) {}
 
@@ -32,8 +36,10 @@ export class SummarResultManager implements ISummarResultManager {
     // 토글 버튼 이벤트 설정
     this.setupToggleButton(resultItem, resultText, key);
     
-    // 결과 아이템을 Map에 저장
-    this.context.resultItems.set(key, resultItem);
+    // 결과 아이템을 레코드에 저장
+    const rec = this.ensureRecord(key);
+    rec.itemEl = resultItem;
+    rec.label = label;
     
     // 컨테이너에 추가
     this.context.resultContainer.appendChild(resultItem);
@@ -45,7 +51,7 @@ export class SummarResultManager implements ISummarResultManager {
   }
 
   appendResultText(key: string, label: string, message: string): string {
-    let resultItem = this.context.resultItems.get(key);
+    let resultItem = this.context.resultRecords.get(key)?.itemEl || null;
     
     if (!resultItem) {
       // 새로운 resultItem 생성
@@ -53,37 +59,31 @@ export class SummarResultManager implements ISummarResultManager {
       return this.updateResultText(key, label, message);
     }
     
-    // 기존 텍스트에 추가
-    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
-    if (resultText) {
-      const currentText = resultText.getAttribute('data-raw-text') || '';
-      const newText = currentText + message;
-      
-      resultText.setAttribute('data-raw-text', newText);
-      const renderedHtml = this.context.markdownRenderer.render(newText);
-      const cleanedHtml = this.cleanupMarkdownOutput(renderedHtml);
-      resultText.innerHTML = cleanedHtml;
-    }
+    // Map 우선: 기존 텍스트에 추가
+    const currentText = this.getResult(key);
+    const newText = currentText + message;
+
+    // 저장소 갱신
+    this.setResult(key, newText);
+
+    // 렌더는 디바운스로 스케줄링
+    this.scheduleRender(key);
     
     return key;
   }
 
   updateResultText(key: string, label: string, message: string): string {
-    let resultItem = this.context.resultItems.get(key);
+    let resultItem = this.context.resultRecords.get(key)?.itemEl || null;
     
     if (!resultItem) {
       // 새로운 resultItem 생성
       resultItem = this.createResultItem(key, label);
     }
     
-    // 텍스트 완전 교체
-    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
-    if (resultText) {
-      resultText.setAttribute('data-raw-text', message);
-      const renderedHtml = this.context.markdownRenderer.render(message);
-      const cleanedHtml = this.cleanupMarkdownOutput(renderedHtml);
-      resultText.innerHTML = cleanedHtml;
-    }
+    // 텍스트 완전 교체: Map 저장 → 렌더 반영
+    this.setResult(key, message);
+    // 즉시 반영 대신 동일한 경로로 디바운스 렌더(일관성)
+    this.scheduleRender(key);
     
     return key;
   }
@@ -92,40 +92,29 @@ export class SummarResultManager implements ISummarResultManager {
     if (key === "") {
       // 빈 키인 경우 모든 resultItem의 텍스트를 합쳐서 반환
       let allText = "";
-      this.context.resultItems.forEach((resultItem, itemKey) => {
-        const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
-        if (resultText) {
-          const text = resultText.getAttribute('data-raw-text') || '';
-          if (text) {
-            allText += (allText ? '\n\n' : '') + text;
-          }
+      this.context.resultRecords.forEach((rec, itemKey) => {
+        const text = rec.result || '';
+        if (text) {
+          allText += (allText ? '\n\n' : '') + text;
         }
       });
       return allText;
     }
     
-    const resultItem = this.context.resultItems.get(key);
-    if (!resultItem) {
-      return "";
-    }
-    
-    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
-    if (resultText) {
-      return resultText.getAttribute('data-raw-text') || '';
-    }
-    
-    return "";
+    const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
+    if (!resultItem) return "";
+    return this.getResult(key);
   }
 
   foldResult(key: string | null, fold: boolean): void {
     if (!key || key === "") {
       // 모든 resultItem에 대해 동일하게 적용
-      this.context.resultItems.forEach((resultItem, itemKey) => {
-        this.applyFoldToResultItem(resultItem, fold);
+      this.context.resultRecords.forEach((rec, itemKey) => {
+        if (rec.itemEl) this.applyFoldToResultItem(rec.itemEl, fold);
       });
     } else {
       // 특정 key의 resultItem에만 적용
-      const resultItem = this.context.resultItems.get(key);
+      const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
       if (resultItem) {
         this.applyFoldToResultItem(resultItem, fold);
       }
@@ -134,14 +123,59 @@ export class SummarResultManager implements ISummarResultManager {
 
   clearAllResultItems(): void {
     // 이벤트를 통해 각 resultItem 제거 알림
-    this.context.resultItems.forEach((resultItem, key) => {
+    this.context.resultRecords.forEach((rec, key) => {
       this.events.onResultItemRemoved?.(key);
     });
     
     // 데이터 정리
-    this.context.resultItems.clear();
-    this.context.newNoteNames.clear();
+    this.context.resultRecords.clear();
     this.context.resultContainer.empty();
+
+    // 보류 중인 렌더 타이머 정리
+    this.renderTimers.forEach((t) => {
+      clearTimeout(t);
+      this.context.timeoutRefs.delete(t);
+    });
+    this.renderTimers.clear();
+  }
+
+  cleanup(): void {
+    // 모든 지연 렌더 타이머 정리
+    this.renderTimers.forEach((t) => {
+      clearTimeout(t);
+      this.context.timeoutRefs.delete(t);
+    });
+    this.renderTimers.clear();
+  }
+
+  private scheduleRender(key: string): void {
+    // 기존 타이머가 있으면 취소
+    const prev = this.renderTimers.get(key);
+    if (prev) {
+      clearTimeout(prev);
+      this.context.timeoutRefs.delete(prev);
+    }
+    const timer = setTimeout(() => {
+      try {
+        const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
+        if (!resultItem) return;
+        const resultTextEl = resultItem.querySelector('.result-text') as HTMLDivElement | null;
+        if (!resultTextEl) return;
+        const raw = this.getResult(key);
+        const rendered = this.context.markdownRenderer.render(raw);
+        const cleaned = this.cleanupMarkdownOutput(rendered);
+        resultTextEl.innerHTML = cleaned;
+      } finally {
+        // 타이머 해제 및 참조 제거
+        const t = this.renderTimers.get(key);
+        if (t) {
+          this.context.timeoutRefs.delete(t);
+        }
+        this.renderTimers.delete(key);
+      }
+    }, this.RENDER_DEBOUNCE_MS);
+    this.renderTimers.set(key, timer);
+    this.context.timeoutRefs.add(timer);
   }
 
   enableNewNote(key: string, newNotePath?: string): void {
@@ -152,22 +186,23 @@ export class SummarResultManager implements ISummarResultManager {
       now.getHours().toString().padStart(2, "0") +
       now.getMinutes().toString().padStart(2, "0");
 
-    let newNoteName = newNotePath ? newNotePath : formattedDate;
-    if (!newNoteName.includes(".md")) {
-      newNoteName += ".md";
+    let noteName = newNotePath ? newNotePath : formattedDate;
+    if (!noteName.includes(".md")) {
+      noteName += ".md";
     }
-    this.context.newNoteNames.set(key, newNoteName);
+    const rec2 = this.ensureRecord(key);
+    rec2.noteName = noteName;
 
     // key에 해당하는 resultItem의 버튼들을 활성화
-    const resultItem = this.context.resultItems.get(key);
+    const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
     if (resultItem) {
       this.enableResultItemButtons(resultItem);
     }
   }
 
   getNoteName(key: string): string {
-    let newNoteName = this.context.newNoteNames.get(key);
-    return (newNoteName && newNoteName.length > 0) ? newNoteName : "";
+    const rec = this.context.resultRecords.get(key);
+    return rec?.noteName || "";
   }
 
   cleanupMarkdownOutput(html: string): string {
@@ -190,35 +225,30 @@ export class SummarResultManager implements ISummarResultManager {
   }
 
   private createResultHeader(key: string, label: string): HTMLDivElement {
-    const resultHeader = document.createElement('div');
-    resultHeader.className = 'result-header';
-    resultHeader.style.width = '100%';
-    resultHeader.style.display = 'flex';
-    resultHeader.style.alignItems = 'center';
-    resultHeader.style.gap = '0px';
-    resultHeader.style.marginBottom = '0px';
-    resultHeader.style.padding = '0px';
-    resultHeader.style.border = '1px solid var(--background-modifier-border)';
-    resultHeader.style.backgroundColor = 'var(--background-primary)';
-    
-    // 라벨 추가
-    const labelElement = document.createElement('span');
-    labelElement.textContent = label;
-    labelElement.style.fontSize = '10px';
-    labelElement.style.color = 'var(--text-muted)';
-    labelElement.style.marginLeft = '2px';
-    labelElement.style.marginRight = '0px';
-    labelElement.style.fontWeight = 'bold';
-    labelElement.style.flexShrink = '0';
-    labelElement.style.backgroundColor = 'var(--interactive-normal)';
-    labelElement.style.padding = '2px 4px';
-    labelElement.style.borderRadius = '3px';
-    resultHeader.appendChild(labelElement);
-    
-    // 버튼들 추가
-    this.addHeaderButtons(resultHeader, key);
-    
-    return resultHeader;
+    const uploadWikiButton = this.createUploadWikiButton(key);
+    const uploadSlackButton = this.createUploadSlackButton(key);
+    const newNoteButton = this.createNewNoteButton(key);
+    const toggleButton = this.createToggleButton();
+    const copyButton = this.createCopyButton(key);
+    const rightSpacer = document.createElement('div');
+    rightSpacer.style.flex = '1';
+    rightSpacer.style.minWidth = '8px';
+    const showMenuButton = this.createShowMenuButton(key);
+
+    // Pick an icon by label; callers could be updated to pass explicit icon if desired.
+    const icon = getDefaultLabelIcon(label);
+    const rec = this.ensureRecord(key);
+    rec.label = label;
+    rec.icon = icon;
+    return composeStandardResultHeader(label, {
+      uploadWiki: uploadWikiButton,
+      uploadSlack: uploadSlackButton,
+      newNote: newNoteButton,
+      toggle: toggleButton,
+      copy: copyButton,
+      spacer: rightSpacer,
+      menu: showMenuButton,
+    }, { icon });
   }
 
   private createResultText(key: string): HTMLDivElement {
@@ -245,12 +275,32 @@ export class SummarResultManager implements ISummarResultManager {
     resultText.style.overflowWrap = 'break-word';
     resultText.style.display = 'block';
     resultText.style.verticalAlign = 'top';
-    resultText.setAttribute('data-raw-text', '');
+    // raw text는 Map/통합 레코드에서만 관리
     
     // 텍스트 선택 이벤트 설정
     this.setupTextSelectionEvents(resultText);
     
     return resultText;
+  }
+
+  // ===== Unified record helpers (phase 1: sync with legacy Maps) =====
+  private ensureRecord(key: string): SummarResultRecord {
+    let rec = this.context.resultRecords.get(key);
+    if (!rec) {
+      rec = { key, itemEl: null, result: '', noteName: undefined };
+      this.context.resultRecords.set(key, rec);
+    }
+    return rec;
+  }
+
+  private setResult(key: string, text: string): void {
+    const rec = this.ensureRecord(key);
+    rec.result = text;
+  }
+
+  private getResult(key: string): string {
+    const rec = this.context.resultRecords.get(key);
+    return rec?.result || '';
   }
 
   private setupTextSelectionEvents(resultText: HTMLDivElement): void {
@@ -322,6 +372,9 @@ export class SummarResultManager implements ISummarResultManager {
           
           // resultText 표시/숨김
           resultText.style.display = newToggled ? 'none' : 'block';
+          // 통합 레코드에 접힘 상태 반영
+          const rec = this.ensureRecord(key);
+          rec.folded = newToggled;
           
           // 이벤트 발생
           this.events.onToggleStateChanged?.(key, newToggled);
@@ -337,38 +390,7 @@ export class SummarResultManager implements ISummarResultManager {
     }
   }
 
-  private addHeaderButtons(resultHeader: HTMLDivElement, key: string): void {
-    // Upload Wiki 버튼 (첫 번째)
-    const uploadWikiButton = this.createUploadWikiButton(key);
-    
-    // Upload Slack 버튼 (두 번째)
-    const uploadSlackButton = this.createUploadSlackButton(key);
-    
-    // New Note 버튼 (세 번째)
-    const newNoteButton = this.createNewNoteButton(key);
-    
-    // Toggle 버튼 (네 번째)
-    const toggleButton = this.createToggleButton();
-    
-    // Copy 버튼 (다섯 번째)
-    const copyButton = this.createCopyButton(key);
-    
-    // 우측 정렬용 spacer
-    const rightSpacer = document.createElement('div');
-    rightSpacer.style.flex = '1';
-    rightSpacer.style.minWidth = '8px';
-    
-    // Show Menu 버튼 (맨 오른쪽)
-    const showMenuButton = this.createShowMenuButton(key);
-    
-    resultHeader.appendChild(uploadWikiButton);
-    resultHeader.appendChild(uploadSlackButton);
-    resultHeader.appendChild(newNoteButton);
-    resultHeader.appendChild(toggleButton);
-    resultHeader.appendChild(copyButton);
-    resultHeader.appendChild(rightSpacer);
-    resultHeader.appendChild(showMenuButton);
-  }
+  private addHeaderButtons(_: HTMLDivElement, __: string): void { /* deprecated by composer */ }
 
   private createToggleButton(): HTMLButtonElement {
     const button = document.createElement('button');
@@ -443,6 +465,8 @@ export class SummarResultManager implements ISummarResultManager {
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
     button.style.margin = '0';
+    button.disabled = true;
+    button.style.display = 'none';
     
     setIcon(button, 'copy');
     
@@ -477,7 +501,8 @@ export class SummarResultManager implements ISummarResultManager {
     const buttons = [
       'new-note-button',
       'upload-result-to-wiki-button', 
-      'upload-result-to-slack-button'
+      'upload-result-to-slack-button',
+      'copy-result-button'
     ];
     
     buttons.forEach(buttonId => {

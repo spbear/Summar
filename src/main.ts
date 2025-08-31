@@ -107,8 +107,6 @@ export default class SummarPlugin extends Plugin {
 
   // 자동 업데이트 관련
   private autoUpdateTimeoutId: NodeJS.Timeout | null = null;
-
-  // newNoteName: string = "";
   
   OBSIDIAN_PLUGIN_DIR: string = "";
   PLUGIN_ID: string = ""; // 플러그인 아이디
