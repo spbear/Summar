@@ -142,7 +142,6 @@ export class SummarView extends View {
     
     // Clear data
     this.context.resultRecords.clear();
-    this.context.resultRecords.clear();
     
     // Create new AbortController for potential reuse
     this.abortController = new AbortController();
@@ -175,11 +174,18 @@ export class SummarView extends View {
     // Setup event listeners
     this.eventHandler.setupEventListeners();
 
+    // Import result items from plugin directory if a snapshot exists
+    await this.resultManager.importResultItemsFromPluginDir("summar-results.json");
+
     SummarDebug.log(1, "SummarView rendered successfully with new architecture");
   }
 
   // ==================== Public API Methods ====================
   // These methods maintain the existing interface for external components
+
+  pushResultPrompt(key: string, prompt: string): void {
+    return this.resultManager.pushResultPrompt(key, prompt);
+  }
 
   updateResultText(key: string, label: string, message: string): string {
     return this.resultManager.updateResultText(key, label, message);
@@ -193,7 +199,7 @@ export class SummarView extends View {
     return this.resultManager.getResultText(key);
   }
 
-  updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
+  updateResultInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
   }
 
   enableNewNote(key: string, newNotePath?: string): void {

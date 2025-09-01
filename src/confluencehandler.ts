@@ -89,6 +89,9 @@ export class ConfluenceHandler extends SummarViewContainer {
 			// this.enableNewNote(false, resultKey);
 
 			const message = `${webPrompt}\n\n${page_content}`;
+			
+			this.pushResultPrompt(message);
+
 			await summarai.chat([message]);
 			const status = summarai.response.status;
 			const summary = summarai.response.text;

@@ -32,20 +32,39 @@ export class SummarViewContainer {
       label,
       icon,
       folded: false,
-      prompt: "",
+      // prompt: "",
+      prompts: [],
     };
   }
 
-  initResultRecord(label: string = "", icon: string = "tag"): void {
+  // 오버로드: 문자열 또는 옵션 객체 모두 지원 + clearOldItems 제어
+  initResultRecord(label?: string, clearOldItems?: boolean): void;
+  initResultRecord(opts?: { label?: string; icon?: string; clearOldItems?: boolean }): void;
+  initResultRecord(
+    arg: string | { label?: string; icon?: string; clearOldItems?: boolean } = {},
+    clearOldItems?: boolean
+  ): void {
+    let label = "";
+    let icon = "tag";
+    let shouldClear: boolean | undefined = clearOldItems;
+    if (typeof arg === "string") {
+      label = arg;
+    } else if (arg && typeof arg === "object") {
+      ({ label = "", icon = "tag", clearOldItems: shouldClear } = arg);
+    }
     this.resultRecord = this.createResultRecord(label, icon);
-		if (this.plugin.settingsv2.system.debugLevel<3) {
-			this.clearAllResultItems();
-		}
+    const doClear = typeof shouldClear === "boolean" ? shouldClear : (this.plugin.settingsv2.system.debugLevel < 3);
+    if (doClear) this.clearAllResultItems();
   }
 
   setResultRecord(key: string, label: string) {
     this.resultRecord.key = key;
     this.resultRecord.label = label;
+  }
+
+  pushResultPrompt(prompt: string) {
+    this.resultRecord.prompts?.push(prompt);
+    return this.plugin.pushResultPrompt(this.resultRecord.key, prompt);
   }
 
   /**
@@ -70,14 +89,14 @@ export class SummarViewContainer {
       return this.plugin.getResultText(this.resultRecord.key);
   }
 
-  updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
+  updateResultInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
     this.plugin.enableNewNote(true, key, newNotePath);
     this.resultRecord.statId = statId;
-    this.resultRecord.prompt = prompt;
+    this.resultRecord.prompts = prompts;
     this.resultRecord.noteName = newNotePath;
     this.plugin.updateResultInfo(this.resultRecord.key, 
                                  this.resultRecord.statId, 
-                                 this.resultRecord.prompt, 
+                                 this.resultRecord.prompts, 
                                  this.resultRecord.noteName);
   }
 

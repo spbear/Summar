@@ -37,7 +37,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 	}
 
 	async summarize(transcripted: string, newFilePath: string): Promise<string> {
-		this.initResultRecord("summary");
+		this.initResultRecord("summary", false);
 		this.updateResultText("Summarizing from transcripted text");
 		// this.enableNewNote(false, resultKey);
 		// SummarDebug.log(2, "Fetched page content:", page_content);
@@ -58,6 +58,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			this.startTimer();
 
 			const message = `${transcriptSummaryPrompt}\n\n${transcripted}`;
+			this.pushResultPrompt(message);
 			await summarai.chat([message]);
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
@@ -131,7 +132,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 	}
 
 	async refine(transcripted: string, summarized: string, newFilePath: string): Promise<string> {
-		this.initResultRecord("refinement");
+		this.initResultRecord("refinement", false);
 
 		let refined = "";
 		this.updateResultText("Improving the summary…");
@@ -152,6 +153,9 @@ export class AudioRecordingManager extends SummarViewContainer {
 			
 			this.updateResultText(`Refining summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...`);
 			// this.enableNewNote(false, resultKey);
+
+			this.pushResultPrompt(messages[0]);
+			this.pushResultPrompt(messages[1]);
 			this.startTimer();
 
 			await summarai.chat(messages);

@@ -33,12 +33,13 @@ export class CustomCommandHandler extends SummarViewContainer {
 			return;
 		}
 
-		this.initResultRecord("custom");
 		
 		const cmdModel = command.model || 'gpt-4o';
 		const cmdPrompt = command.prompt || '';
 		const appendToNote = command.appendToNote;
 		const copyToClipboard = command.copyToClipboard;
+
+		this.initResultRecord("custom");
 
 		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 
@@ -52,6 +53,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 			this.startTimer();
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
+			this.pushResultPrompt(message);
 
 			await summarai.chat([message]);
 			const responseStatus = summarai.response.status;

@@ -25,7 +25,7 @@ export class SummarResultRecord {
   noteName?: string;
   icon?: string;
   folded?: boolean;
-  prompt?: string;
+  prompts?: string[];
 }
 
 // 매니저 인터페이스들
@@ -46,6 +46,8 @@ export interface ISummarResultManager {
   appendResultText(key: string, label: string, message: string): string;
   updateResultText(key: string, label: string, message: string): string;
   getResultText(key: string): string;
+  pushResultPrompt(key: string, prompt: string): void;
+  importResultItemsFromPluginDir(filename?: string): Promise<void>;
   foldResult(key: string | null, fold: boolean): void;
   clearAllResultItems(): void;
   enableNewNote(key: string, newNotePath?: string): void;

@@ -529,6 +529,9 @@ export class AudioHandler extends SummarViewContainer {
 		if ((this.plugin.settingsv2.recording.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settingsv2.recording.sttModel === "gpt-4o-transcribe")
 			&& this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]) {
 			addField("prompt", this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
+			this.pushResultPrompt(this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
+		} else {
+			this.pushResultPrompt('transcribe using whisper-1');
 		}
 
 		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
@@ -678,6 +681,9 @@ export class AudioHandler extends SummarViewContainer {
 		if (this.plugin.settingsv2.recording.recordingLanguage) {
 			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settingsv2.recording.recordingLanguage)}.`;
 		}
+
+		this.pushResultPrompt(systemInstruction);
+
 		try {
 			const bodyContent = JSON.stringify({
 				contents: [{

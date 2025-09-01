@@ -1436,6 +1436,17 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
+    pushResultPrompt(key: string, prompt: string) {
+      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+      if (leaves.length > 0) {
+        const summarView = leaves[0].view as SummarView;
+        if (summarView && typeof summarView.pushResultPrompt === 'function') {
+          return summarView.pushResultPrompt(key, prompt);
+        }
+      }
+      return "";
+  }
+
   updateResultText(key: string, label: string, message: string): string {
       // SummarView의 updateResultText 메서드를 호출
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
@@ -1478,13 +1489,13 @@ export default class SummarPlugin extends Plugin {
     return "";
   }
 
-  updateResultInfo(key: string, statId: string, prompt: string, newNotePath: string) {
+  updateResultInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
       if (summarView && typeof summarView.updateResultInfo === 'function') {
 
-          summarView.updateResultInfo(key, statId, prompt, newNotePath);
+          summarView.updateResultInfo(key, statId, prompts, newNotePath);
       }
     }
   }

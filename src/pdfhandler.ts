@@ -51,6 +51,7 @@ export class PdfHandler extends SummarViewContainer {
 			const modelName = this.plugin.settingsv2.pdf.pdfModel;
 			SummarDebug.Notice(1, file.name);
 
+			this.pushResultPrompt(pdfPrompt);
 			this.startTimer();
 
 			// 단계 1: PDF 파일 준비

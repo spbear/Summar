@@ -106,6 +106,51 @@ export class SummarResultManager implements ISummarResultManager {
     return this.getResult(key);
   }
 
+
+  /**
+   * Import result items from a JSON file placed in the plugin directory
+   * and populate the view accordingly.
+   * Default filename: summar-results.json
+   * Expected JSON shape:
+   * { "resultItems": { "0": { result, prompts, statId, key, label, noteName }, ... } }
+   */
+  async importResultItemsFromPluginDir(filename: string = "summar-results.json"): Promise<void> {
+    try {
+      const plugin = this.context.plugin;
+      const path = `${plugin.PLUGIN_DIR}/${filename}`;
+      const exists = await plugin.app.vault.adapter.exists(path);
+      if (!exists) return;
+
+      const jsonText = await plugin.app.vault.adapter.read(path);
+      const data = JSON.parse(jsonText || '{}');
+      const items = data?.resultItems || {};
+
+      Object.keys(items).sort().forEach((k) => {
+        const it = items[k] || {};
+        const key: string = it.key || plugin.generateUniqueId();
+        const label: string = it.label || "imported";
+        const result: string = it.result || "";
+        const noteName: string | undefined = it.noteName || undefined;
+        const prompts: string[] | undefined = Array.isArray(it.prompts) ? it.prompts : undefined;
+        const statId: string | undefined = it.statId || undefined;
+
+        // Create the UI item
+        this.createResultItem(key, label);
+        if (result) this.updateResultText(key, label, result);
+        if (noteName) this.enableNewNote(key, noteName);
+
+        // Persist fields into record
+        const rec = this.context.resultRecords.get(key);
+        if (rec) {
+          rec.prompts = prompts || [];
+          rec.statId = statId;
+        }
+      });
+    } catch (error) {
+      console.error('Failed to import result items:', error);
+    }
+  }
+
   foldResult(key: string | null, fold: boolean): void {
     if (!key || key === "") {
       // 모든 resultItem에 대해 동일하게 적용
@@ -292,6 +337,13 @@ export class SummarResultManager implements ISummarResultManager {
     }
     return rec;
   }
+
+  pushResultPrompt(key: string, prompt: string): void {
+    const rec = this.ensureRecord(key);
+    if (!rec.prompts) rec.prompts = [];
+    rec.prompts.push(prompt);
+  }
+
 
   private setResult(key: string, text: string): void {
     const rec = this.ensureRecord(key);
