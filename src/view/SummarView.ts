@@ -174,9 +174,6 @@ export class SummarView extends View {
     // Setup event listeners
     this.eventHandler.setupEventListeners();
 
-    // Import result items from plugin directory if a snapshot exists
-    await this.resultManager.importResultItemsFromPluginDir("summar-results.json");
-
     SummarDebug.log(1, "SummarView rendered successfully with new architecture");
   }
 

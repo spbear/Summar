@@ -1,6 +1,6 @@
-import { Platform, setIcon, normalizePath } from "obsidian";
+import { Platform, setIcon } from "obsidian";
 import { ISummarUIRenderer, ISummarViewContext } from "./SummarViewTypes";
-import { SummarDebug, getAvailableFilePath } from "../globals";
+import { SummarDebug } from "../globals";
 
 export class SummarUIRenderer implements ISummarUIRenderer {
   constructor(private context: ISummarViewContext) {}
@@ -34,8 +34,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     // 버튼들 생성
     const uploadWikiButton = this.createUploadWikiButton(buttonContainer);
     const uploadSlackButton = this.createUploadSlackButton(buttonContainer);
-    const saveResultItemsButton = this.createSaveResultItemsButton(buttonContainer);
-    const deleteAllButton = this.createDeleteAllButton(buttonContainer);
+    const testButton = this.createTestButton(buttonContainer);
     
     // 구분선 추가
     this.createSeparator(buttonContainer);
@@ -47,8 +46,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     this.setupPlatformSpecificVisibility({
       uploadWikiButton,
       uploadSlackButton,
-      saveResultItemsButton,
-      deleteAllButton,
+      testButton,
       pdfButton,
       recordButton
     });
@@ -57,8 +55,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     this.setupButtonEvents({
       uploadWikiButton,
       uploadSlackButton,
-      saveResultItemsButton,
-      deleteAllButton,
+      testButton,
       pdfButton,
       recordButton
     });
@@ -160,18 +157,6 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     return button;
   }
 
-  private createSaveResultItemsButton(container: HTMLDivElement): HTMLButtonElement {
-    const button = container.createEl("button", {
-      cls: "lucide-icon-button",
-    });
-    button.setAttribute("aria-label", "Save all result items");
-    setIcon(button, "save");
-    // 기본은 항상 표시(권한/상태 조건이 생기면 여기서 제어)
-    button.disabled = false;
-    button.style.display = '';
-    return button;
-  }
-
   private updateSlackButtonLabels(button: HTMLButtonElement): void {
     const channelId = this.context.plugin.settingsv2.common.slackChannelId || "Not set";
     let channelInfo = " (No Channel)";
@@ -195,16 +180,18 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     }
   }
 
-  private createDeleteAllButton(container: HTMLDivElement): HTMLButtonElement {
+  private createTestButton(container: HTMLDivElement): HTMLButtonElement {
     const button = container.createEl("button", {
       cls: "lucide-icon-button",
     });
-    button.setAttribute("aria-label", "Delete all result items");
-    setIcon(button, "trash-2");
-    button.disabled = true;
-    button.style.display = 'none';
+    button.setAttribute("aria-label", "Test menu");
+    button.setAttribute("button-id", "test-button");
+    setIcon(button, "menu");
+    button.disabled = false;
+    button.style.display = '';
     return button;
   }
+
 
   private createSeparator(container: HTMLDivElement): HTMLElement {
     return container.createEl("span", {
@@ -270,11 +257,13 @@ export class SummarUIRenderer implements ISummarUIRenderer {
   private setupPlatformSpecificVisibility(buttons: {
     uploadWikiButton: HTMLButtonElement;
     uploadSlackButton: HTMLButtonElement;
-    saveResultItemsButton: HTMLButtonElement;
-    deleteAllButton: HTMLButtonElement;
+    testButton: HTMLButtonElement;
     pdfButton: HTMLButtonElement;
     recordButton: HTMLButtonElement;
   }): void {
+    // 테스트 버튼 가시성 설정 (debugLevel < 3일 때만 표시)
+    const shouldShowTestButton = this.context.plugin.settingsv2.system.debugLevel >= 3;
+    
     if (!(Platform.isMacOS && Platform.isDesktopApp)) {
       // macOS 데스크톱이 아닌 경우 일부 버튼 숨김
       buttons.uploadWikiButton.style.display = "none";
@@ -283,84 +272,47 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       
       buttons.uploadSlackButton.style.display = "none";
       buttons.uploadSlackButton.disabled = true;
-
-      buttons.saveResultItemsButton.style.display = "none";
-      buttons.saveResultItemsButton.disabled = true;
       
       buttons.pdfButton.style.display = "none";
       buttons.pdfButton.disabled = true;
       
       buttons.recordButton.style.width = "100%";
+      // macOS가 아니면 테스트 버튼 숨김
+      buttons.testButton.style.display = 'none';
+      buttons.testButton.disabled = true;
     } else {
       // macOS 데스크톱인 경우 초기 버튼 상태 설정
       this.context.plugin.updateSlackButtonState();
+      // 테스트 버튼 표시 여부 결정 (macOS에서만 debugLevel 조건 확인)
+      if (shouldShowTestButton) {
+        buttons.testButton.style.display = '';
+        buttons.testButton.disabled = false;
+      } else {
+        buttons.testButton.style.display = 'none';
+        buttons.testButton.disabled = true;
+      }
     }
   }
 
   private setupInputEvents(inputField: HTMLInputElement, fetchButton: HTMLButtonElement): void {
-    fetchButton.onclick = async () => {
-      const url = inputField.value.trim();
-      if (!url) {
-        SummarDebug.Notice(0, "Please enter a valid URL.");
-        return;
-      }
-      this.context.plugin.confluenceHandler.fetchAndSummarize(url);
-    };
+    // Fetch 버튼 이벤트는 SummarEventHandler에서 위임 처리
+    fetchButton.setAttribute('button-id', 'fetch-button');
   }
 
   private setupButtonEvents(buttons: {
     uploadWikiButton: HTMLButtonElement;
     uploadSlackButton: HTMLButtonElement;
-    saveResultItemsButton: HTMLButtonElement;
-    deleteAllButton: HTMLButtonElement;
+    testButton: HTMLButtonElement;
     pdfButton: HTMLButtonElement;
     recordButton: HTMLButtonElement;
   }): void {
-    // PDF 버튼 이벤트
-    buttons.pdfButton.onclick = async () => {
-      this.context.plugin.pdfHandler.convertPdfToMarkdown();
-    };
+    // PDF 버튼 이벤트는 SummarEventHandler에서 위임 처리
+    buttons.pdfButton.setAttribute('button-id', 'pdf-button');
 
-    // Record 버튼 이벤트
-    buttons.recordButton.onclick = async () => {
-      await this.context.plugin.toggleRecording();
-    };
+    // Record 버튼 이벤트는 SummarEventHandler에서 위임 처리
+    buttons.recordButton.setAttribute('button-id', 'record-button');
 
-    // Save Result Items 버튼 이벤트
-    buttons.saveResultItemsButton.addEventListener("click", async () => {
-      try {
-        SummarDebug.Notice(1, "Save button clicked");
-
-        // Build JSON structure
-        const resultItems: Record<string, any> = {};
-        let idx = 0;
-        this.context.resultRecords.forEach((rec) => {
-          resultItems[String(idx)] = {
-            result: rec.result ?? "",
-            prompts: rec.prompts ?? [],
-            statId: rec.statId ?? "",
-            key: rec.key ?? "",
-            label: rec.label ?? "",
-            noteName: rec.noteName ?? "",
-          };
-          idx += 1;
-        });
-
-        const payload = { resultItems };
-
-        // File path within plugin directory
-        const ts = new Date();
-        const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, "0")}${String(ts.getDate()).padStart(2, "0")}-${String(ts.getHours()).padStart(2, "0")}${String(ts.getMinutes()).padStart(2, "0")}${String(ts.getSeconds()).padStart(2, "0")}`;
-        const basePath = normalizePath(`${this.context.plugin.PLUGIN_DIR}/summar-results-${stamp}`);
-        const targetPath = getAvailableFilePath(basePath, ".json", this.context.plugin);
-
-        await this.context.plugin.app.vault.adapter.write(targetPath, JSON.stringify(payload, null, 2));
-        SummarDebug.Notice(1, `Saved result items to\n${targetPath}`);
-      } catch (error) {
-        SummarDebug.error(1, "Failed to save result items:", error);
-        SummarDebug.Notice(0, "Failed to save result items. Check console for details.");
-      }
-    }, { signal: this.context.abortController.signal });
+    // Save/Test 버튼 이벤트는 SummarEventHandler에서 위임 처리
 
     // 다른 버튼 이벤트들은 SummarEventHandler에서 처리
   }

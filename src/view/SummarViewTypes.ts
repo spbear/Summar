@@ -47,7 +47,8 @@ export interface ISummarResultManager {
   updateResultText(key: string, label: string, message: string): string;
   getResultText(key: string): string;
   pushResultPrompt(key: string, prompt: string): void;
-  importResultItemsFromPluginDir(filename?: string): Promise<void>;
+  importResultItemsFromPluginDir(filename?: string): Promise<number>;
+  saveResultItemsToPluginDir(): Promise<string>;
   foldResult(key: string | null, fold: boolean): void;
   clearAllResultItems(): void;
   enableNewNote(key: string, newNotePath?: string): void;

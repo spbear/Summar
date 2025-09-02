@@ -33,8 +33,7 @@ export class SummarResultManager implements ISummarResultManager {
     resultItem.appendChild(resultHeader);
     resultItem.appendChild(resultText);
     
-    // 토글 버튼 이벤트 설정
-    this.setupToggleButton(resultItem, resultText, key);
+    // 토글 버튼 이벤트 설정은 SummarEventHandler에서 처리
     
     // 결과 아이템을 레코드에 저장
     const rec = this.ensureRecord(key);
@@ -48,6 +47,35 @@ export class SummarResultManager implements ISummarResultManager {
     this.events.onResultItemCreated?.(key, resultItem);
     
     return resultItem;
+  }
+
+  deleteResultItem(key: string): boolean {
+    // 해당 키의 결과 아이템이 존재하는지 확인
+    const rec = this.context.resultRecords.get(key);
+    if (!rec || !rec.itemEl) {
+      SummarDebug.log(1, `Result item not found for key: ${key}`);
+      return false;
+    }
+
+    // 이벤트를 통해 resultItem 제거 알림
+    this.events.onResultItemRemoved?.(key);
+
+    // DOM에서 제거
+    rec.itemEl.remove();
+
+    // resultRecords Map에서 제거
+    this.context.resultRecords.delete(key);
+
+    // 해당 키의 렌더 타이머가 있다면 정리
+    const renderTimer = this.renderTimers.get(key);
+    if (renderTimer) {
+      clearTimeout(renderTimer);
+      this.context.timeoutRefs.delete(renderTimer);
+      this.renderTimers.delete(key);
+    }
+
+    SummarDebug.log(1, `Result item deleted: ${key}`);
+    return true;
   }
 
   appendResultText(key: string, label: string, message: string): string {
@@ -114,41 +142,63 @@ export class SummarResultManager implements ISummarResultManager {
    * Expected JSON shape:
    * { "resultItems": { "0": { result, prompts, statId, key, label, noteName }, ... } }
    */
-  async importResultItemsFromPluginDir(filename: string = "summar-results.json"): Promise<void> {
+  async importResultItemsFromPluginDir(filename: string = "summar-results.json"): Promise<number> {
+    let importedCount = 0;
     try {
       const plugin = this.context.plugin;
       const path = `${plugin.PLUGIN_DIR}/${filename}`;
       const exists = await plugin.app.vault.adapter.exists(path);
-      if (!exists) return;
+      if (!exists) return importedCount;
 
       const jsonText = await plugin.app.vault.adapter.read(path);
       const data = JSON.parse(jsonText || '{}');
-      const items = data?.resultItems || {};
+      const items = data?.resultItems;
 
-      Object.keys(items).sort().forEach((k) => {
-        const it = items[k] || {};
+      const ingest = (it: any) => {
+        if (!it || typeof it !== 'object') return;
         const key: string = it.key || plugin.generateUniqueId();
+        
+        // 기존에 동일한 key가 존재하는지 확인
+        if (this.context.resultRecords.has(key)) {
+          SummarDebug.log(1, `Skipping import for existing key: ${key}`);
+          return;
+        }
+        
         const label: string = it.label || "imported";
         const result: string = it.result || "";
         const noteName: string | undefined = it.noteName || undefined;
-        const prompts: string[] | undefined = Array.isArray(it.prompts) ? it.prompts : undefined;
+        const prompts: string[] = Array.isArray(it.prompts) ? it.prompts : [];
         const statId: string | undefined = it.statId || undefined;
 
         // Create the UI item
         this.createResultItem(key, label);
         if (result) this.updateResultText(key, label, result);
         if (noteName) this.enableNewNote(key, noteName);
+        this.foldResult(key, true);
 
         // Persist fields into record
         const rec = this.context.resultRecords.get(key);
         if (rec) {
-          rec.prompts = prompts || [];
+          rec.prompts = prompts;
           rec.statId = statId;
         }
-      });
+        
+        // 성공적으로 추가된 경우 카운트 증가
+        importedCount++;
+      };
+
+      if (Array.isArray(items)) {
+        items.forEach(ingest);
+      } else if (items && typeof items === 'object') {
+        Object.keys(items).sort().forEach(k => ingest(items[k]));
+      } else {
+        // Nothing to import
+      }
     } catch (error) {
       console.error('Failed to import result items:', error);
     }
+    
+    return importedCount;
   }
 
   foldResult(key: string | null, fold: boolean): void {
@@ -191,6 +241,35 @@ export class SummarResultManager implements ISummarResultManager {
       this.context.timeoutRefs.delete(t);
     });
     this.renderTimers.clear();
+  }
+
+
+
+  /**
+   * Serialize current result records into a JSON payload and write to plugin directory.
+   * Returns the written file path.
+   */
+  async saveResultItemsToPluginDir(): Promise<string> {
+    const resultItems: any[] = [];
+    this.context.resultRecords.forEach((rec) => {
+      resultItems.push({
+        result: rec.result ?? "",
+        prompts: Array.isArray(rec.prompts) ? rec.prompts : [],
+        statId: rec.statId ?? "",
+        key: rec.key ?? "",
+        label: rec.label ?? "",
+        noteName: rec.noteName ?? "",
+      });
+    });
+
+    const payload = { resultItems };
+
+    const ts = new Date();
+    const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, "0")}${String(ts.getDate()).padStart(2, "0")}-${String(ts.getHours()).padStart(2, "0")}${String(ts.getMinutes()).padStart(2, "0")}${String(ts.getSeconds()).padStart(2, "0")}`;
+    const basePath = `${this.context.plugin.PLUGIN_DIR}/summar-results-${stamp}`;
+    const targetPath = `${basePath}.json`;
+    await this.context.plugin.app.vault.adapter.write(targetPath, JSON.stringify(payload, null, 2));
+    return targetPath
   }
 
   private scheduleRender(key: string): void {
@@ -400,48 +479,6 @@ export class SummarResultManager implements ISummarResultManager {
     }, { signal });
   }
 
-  private setupToggleButton(resultItem: HTMLDivElement, resultText: HTMLDivElement, key: string): void {
-    const toggleButton = resultItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
-    if (toggleButton) {
-      toggleButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-        
-        // 중복 실행 방지
-        if ((this.context as any).isToggling) {
-          SummarDebug.log(1, `Toggle already in progress for key: ${key}, skipping`);
-          return;
-        }
-        
-        (this.context as any).isToggling = true;
-        
-        try {
-          const currentToggled = toggleButton.getAttribute('toggled') === 'true';
-          const newToggled = !currentToggled;
-          
-          // 버튼 상태 업데이트
-          toggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
-          setIcon(toggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
-          
-          // resultText 표시/숨김
-          resultText.style.display = newToggled ? 'none' : 'block';
-          // 통합 레코드에 접힘 상태 반영
-          const rec = this.ensureRecord(key);
-          rec.folded = newToggled;
-          
-          // 이벤트 발생
-          this.events.onToggleStateChanged?.(key, newToggled);
-          
-        } finally {
-          // 플래그 해제
-          const timeoutId = setTimeout(() => {
-            (this.context as any).isToggling = false;
-          }, 100);
-          this.context.timeoutRefs.add(timeoutId);
-        }
-      }, { signal: this.context.abortController.signal });
-    }
-  }
-
   private addHeaderButtons(_: HTMLDivElement, __: string): void { /* deprecated by composer */ }
 
   private createToggleButton(): HTMLButtonElement {
@@ -536,15 +573,7 @@ export class SummarResultManager implements ISummarResultManager {
     
     setIcon(button, 'menu');
     
-    // 클릭 시 Notice 호출
-    button.addEventListener('click', () => {
-      try {
-        SummarDebug.Notice(1, `Show menu clicked: ${key}`);
-      } catch (e) {
-        // 안전하게 무시
-        console.debug('Notice call failed', e);
-      }
-    }, { signal: this.context.abortController.signal });
+    // 이벤트 리스너는 SummarEventHandler에서 처리
     
     return button;
   }
