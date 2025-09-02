@@ -73,6 +73,16 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     return resultContainer;
   }
 
+  renderChatContainer(container: HTMLElement): HTMLDivElement {
+    const chatContainer: HTMLDivElement = container.createEl("div", {
+      cls: "summarview-chat",
+    });
+    
+    this.setupChatContainerStyles(chatContainer);
+    
+    return chatContainer;
+  }
+
   setupContainerStyles(container: HTMLElement): void {
     // 컨테이너의 기본 스타일 설정
     container.style.height = "100%";
@@ -241,10 +251,11 @@ export class SummarUIRenderer implements ISummarUIRenderer {
   private setupResultContainerStyles(resultContainer: HTMLDivElement): void {
     resultContainer.style.position = "relative";
     resultContainer.style.width = "calc(100% - 10px)";
-    resultContainer.style.height = "calc(100% - 120px)";
+    resultContainer.style.height = "calc(100% - 140px)"; // 120px + 6px for status bar
     resultContainer.style.border = "1px solid var(--background-modifier-border)";
     resultContainer.style.padding = "10px";
     resultContainer.style.margin = "5px";
+    resultContainer.style.marginBottom = "25px";
     resultContainer.style.overflowY = "auto";
     resultContainer.style.overflowX = "hidden";
     resultContainer.style.backgroundColor = "var(--background-primary)";
@@ -252,6 +263,21 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     
     // sticky header positioning을 확실히 하기 위해 강제 설정
     resultContainer.style.position = "relative !important" as any;
+  }
+
+  private setupChatContainerStyles(chatContainer: HTMLDivElement): void {
+    chatContainer.style.position = "relative";
+    chatContainer.style.width = "calc(100% - 10px)";
+    chatContainer.style.height = "400px";
+    chatContainer.style.border = "1px solid var(--background-modifier-border)";
+    chatContainer.style.margin = "5px";
+    chatContainer.style.marginBottom = "25px";
+    chatContainer.style.marginTop = "0";
+    chatContainer.style.backgroundColor = "var(--background-primary)";
+    chatContainer.style.color = "var(--text-normal)";
+    chatContainer.style.borderRadius = "6px";
+    chatContainer.style.overflow = "hidden";
+    chatContainer.style.display = "none"; // 초기에는 숨김
   }
 
   private setupPlatformSpecificVisibility(buttons: {

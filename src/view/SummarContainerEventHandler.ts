@@ -149,6 +149,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
     // 메뉴 아이템들 생성
     const menuItems = [
+      { label: 'Chat', action: () => this.handleChat() },
       { label: 'Load test result', action: () => this.handleLoadAllResult() },
       { label: 'Save all result', action: () => this.handleSaveAllResult() },
       { label: 'Delete all result', action: () => this.handleDeleteAllResult() }
@@ -213,6 +214,13 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     } catch (error) {
       SummarDebug.error(1, 'Failed to save result items:', error);
       SummarDebug.Notice(0, 'Failed to save result items. Check console for details.');
+    }
+  }
+
+  private async handleChat(): Promise<void> {
+    const chatManager = (this.context as any).chatManager;
+    if (chatManager && chatManager.toggleChatContainer) {
+      chatManager.toggleChatContainer();
     }
   }
 

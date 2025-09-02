@@ -8,6 +8,7 @@ export interface ISummarViewContext {
   leaf: WorkspaceLeaf;
   containerEl: HTMLElement;
   resultContainer: HTMLDivElement;
+  chatContainer: HTMLDivElement;
   // 통합 레코드 저장소 (단계적 도입)
   resultRecords: Map<string, SummarResultRecord>;
   markdownRenderer: MarkdownIt;
@@ -38,6 +39,7 @@ export interface ISummarUIRenderer {
   renderInputContainer(container: HTMLElement): HTMLDivElement;
   renderButtonContainer(container: HTMLElement): HTMLDivElement;
   renderResultContainer(container: HTMLElement): HTMLDivElement;
+  renderChatContainer(container: HTMLElement): HTMLDivElement;
   setupContainerStyles(container: HTMLElement): void;
 }
 
@@ -78,6 +80,14 @@ export interface ISummarUploadManager {
   uploadContentToSlack(title: string, content: string): Promise<void>;
   getCurrentMainPaneTabType(): string;
   updateSlackButtonTooltip(): void;
+}
+
+export interface ISummarChatManager {
+  setupChatContainer(): void;
+  sendMessage(message: string): Promise<void>;
+  clearChat(): void;
+  toggleChatContainer(): void;
+  cleanup(): void;
 }
 
 // 이벤트 타입
