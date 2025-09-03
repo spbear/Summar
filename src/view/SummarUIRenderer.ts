@@ -5,23 +5,23 @@ import { SummarDebug } from "../globals";
 export class SummarUIRenderer implements ISummarUIRenderer {
   constructor(private context: ISummarViewContext) {}
 
-  renderInputContainer(container: HTMLElement): HTMLDivElement {
-    const inputContainer: HTMLDivElement = container.createEl("div", {
-      cls: "input-container",
+  renderUrlInputContainer(container: HTMLElement): HTMLDivElement {
+    const urlInputContainer: HTMLDivElement = container.createEl("div", {
+      cls: "url-input-container",
     });
     
-    this.setupInputContainerStyles(inputContainer);
+    this.setupUrlInputContainerStyles(urlInputContainer);
     
     // Input field 생성
-    const inputField = this.createInputField(inputContainer);
+    const urlInputField = this.createUrlInputField(urlInputContainer);
     
     // Fetch button 생성
-    const fetchButton = this.createFetchButton(inputContainer);
+    const fetchButton = this.createFetchButton(urlInputContainer);
     
     // 이벤트 리스너 설정
-    this.setupInputEvents(inputField, fetchButton);
+    this.setupInputEvents(urlInputField, fetchButton);
     
-    return inputContainer;
+    return urlInputContainer;
   }
 
   renderButtonContainer(container: HTMLElement): HTMLDivElement {
@@ -89,37 +89,37 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     container.style.overflow = "hidden";
   }
 
-  private setupInputContainerStyles(inputContainer: HTMLDivElement): void {
-    inputContainer.style.display = "flex";
-    inputContainer.style.alignItems = "center";
-    inputContainer.style.gap = "5px";
-    inputContainer.style.marginBottom = "1px";
+  private setupUrlInputContainerStyles(urlInputContainer: HTMLDivElement): void {
+    urlInputContainer.style.display = "flex";
+    urlInputContainer.style.alignItems = "center";
+    urlInputContainer.style.gap = "5px";
+    urlInputContainer.style.marginBottom = "1px";
     
     // Copilot 등 다른 플러그인의 CSS 간섭 방지
-    inputContainer.style.setProperty('margin-left', '5px', 'important');
-    inputContainer.style.setProperty('margin-right', '5px', 'important');
-    inputContainer.classList.add('summar-input-container');
+    urlInputContainer.style.setProperty('margin-left', '5px', 'important');
+    urlInputContainer.style.setProperty('margin-right', '5px', 'important');
+    urlInputContainer.classList.add('summar-url-input-container');
   }
 
-  private createInputField(container: HTMLDivElement): HTMLInputElement {
-    const inputField: HTMLInputElement = container.createEl("input", {
+  private createUrlInputField(container: HTMLDivElement): HTMLInputElement {
+    const urlInputField: HTMLInputElement = container.createEl("input", {
       type: "text",
       placeholder: "Enter Web page URL",
-      cls: "summarview-input",
+      cls: "summarview-url-input",
     });
     
-    inputField.style.flexGrow = "1";
-    inputField.style.padding = "8px";
-    inputField.style.border = "1px solid var(--background-modifier-border)";
-    inputField.style.borderRadius = "5px";
-    inputField.style.boxSizing = "border-box";
-    inputField.style.margin = "5px";
-    inputField.value = this.context.plugin.settingsv2.system.testUrl || "";
+    urlInputField.style.flexGrow = "1";
+    urlInputField.style.padding = "8px";
+    urlInputField.style.border = "1px solid var(--background-modifier-border)";
+    urlInputField.style.borderRadius = "5px";
+    urlInputField.style.boxSizing = "border-box";
+    urlInputField.style.margin = "5px";
+    urlInputField.value = this.context.plugin.settingsv2.system.testUrl || "";
     
     // Store input field for later use
-    this.context.plugin.inputField = inputField;
+    this.context.plugin.urlInputField = urlInputField;
     
-    return inputField;
+    return urlInputField;
   }
 
   private createFetchButton(container: HTMLDivElement): HTMLButtonElement {
@@ -260,7 +260,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
 
   private setupResultContainerStyles(resultContainer: HTMLDivElement): void {
     resultContainer.style.position = "relative";
-    resultContainer.style.width = "auto"; // inputContainer와 동일하게 auto로 설정
+    resultContainer.style.width = "auto"; // urlInputContainer와 동일하게 auto로 설정
     resultContainer.style.height = "calc(100% - 140px)"; // 120px + 6px for status bar
     resultContainer.style.border = "1px solid var(--background-modifier-border)";
     resultContainer.style.padding = "10px";
@@ -335,7 +335,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     }
   }
 
-  private setupInputEvents(inputField: HTMLInputElement, fetchButton: HTMLButtonElement): void {
+  private setupInputEvents(urlInputField: HTMLInputElement, fetchButton: HTMLButtonElement): void {
     // Fetch 버튼 이벤트는 SummarEventHandler에서 위임 처리
     fetchButton.setAttribute('button-id', 'fetch-button');
   }

@@ -98,13 +98,13 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   }
 
   private async handleFetchClick(): Promise<void> {
-    const inputField = this.context.plugin.inputField;
-    if (!inputField) {
+    const urlInputField = this.context.plugin.urlInputField;
+    if (!urlInputField) {
       SummarDebug.Notice(0, "Input field not found.");
       return;
     }
     
-    const url = inputField.value.trim();
+    const url = urlInputField.value.trim();
     if (!url) {
       SummarDebug.Notice(0, "Please enter a valid URL.");
       return;

@@ -36,7 +36,7 @@ export interface ISummarStyleManager {
 }
 
 export interface ISummarUIRenderer {
-  renderInputContainer(container: HTMLElement): HTMLDivElement;
+  renderUrlInputContainer(container: HTMLElement): HTMLDivElement;
   renderButtonContainer(container: HTMLElement): HTMLDivElement;
   renderResultContainer(container: HTMLElement): HTMLDivElement;
   renderChatContainer(container: HTMLElement): HTMLDivElement;

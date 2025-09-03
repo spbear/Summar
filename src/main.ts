@@ -87,7 +87,7 @@ export default class SummarPlugin extends Plugin {
   uploadNoteToSlackButton: HTMLButtonElement;
   newNoteButton: HTMLButtonElement;
   newNoteLabel: HTMLSpanElement;
-  inputField: HTMLInputElement;
+  urlInputField: HTMLInputElement;
   recordButton: HTMLButtonElement;
 
   summarSettingTab: SummarSettingsTab;
@@ -1355,7 +1355,7 @@ export default class SummarPlugin extends Plugin {
   setLinkForCommand(link: string) {
     SummarDebug.Notice(0, `Link set for command: ${link}`);
 
-    this.inputField.value = link;
+    this.urlInputField.value = link;
     this.confluenceHandler.fetchAndSummarize(link);
   }
 

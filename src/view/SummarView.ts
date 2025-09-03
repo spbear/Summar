@@ -159,15 +159,15 @@ export class SummarView extends View {
     this.context.abortController = this.abortController;
   }
 
-  private setupStyleProtection(inputContainer: HTMLDivElement, buttonContainer: HTMLDivElement): void {
+  private setupStyleProtection(urlInputContainer: HTMLDivElement, buttonContainer: HTMLDivElement): void {
     // 다른 플러그인의 스타일 변경을 감지하고 복원하는 MutationObserver
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
           const target = mutation.target as HTMLElement;
           
-          // inputContainer 또는 buttonContainer의 마진이 변경된 경우 복원
-          if (target === inputContainer || target === buttonContainer) {
+          // urlInputContainer 또는 buttonContainer의 마진이 변경된 경우 복원
+          if (target === urlInputContainer || target === buttonContainer) {
             if (target.style.marginLeft !== '5px') {
               target.style.setProperty('margin-left', '5px', 'important');
             }
@@ -179,8 +179,8 @@ export class SummarView extends View {
       });
     });
 
-    // inputContainer와 buttonContainer 감시
-    observer.observe(inputContainer, { 
+    // urlInputContainer buttonContainer 감시
+    observer.observe(urlInputContainer, { 
       attributes: true, 
       attributeFilter: ['style'] 
     });
@@ -210,7 +210,7 @@ export class SummarView extends View {
     this.uiRenderer.setupContainerStyles(container);
 
     // Render UI components
-    const inputContainer = this.uiRenderer.renderInputContainer(container);
+    const urlInputContainer = this.uiRenderer.renderUrlInputContainer(container);
     const buttonContainer = this.uiRenderer.renderButtonContainer(container);
     const resultContainer = this.uiRenderer.renderResultContainer(container);
     const chatContainer = this.uiRenderer.renderChatContainer(container);
@@ -222,7 +222,7 @@ export class SummarView extends View {
     this.context.chatContainer = chatContainer;
 
     // Copilot 등 다른 플러그인의 스타일 간섭 방지를 위한 MutationObserver 설정
-    this.setupStyleProtection(inputContainer, buttonContainer);
+    this.setupStyleProtection(urlInputContainer, buttonContainer);
 
     // Setup chat container
     this.chatManager.setupChatContainer();

@@ -481,9 +481,9 @@ async activateTab(tabId: string): Promise<void> {
           await this.plugin.settingsv2.saveSettings();
 
           // Dynamically enable/disable the input field
-          const inputField = containerEl.querySelector<HTMLInputElement>(".confluence-url-input");
-          if (inputField) {
-            inputField.disabled = !value;
+          const urlInputField = containerEl.querySelector<HTMLInputElement>(".confluence-url-input");
+          if (urlInputField) {
+            urlInputField.disabled = !value;
           }
         })
       )
