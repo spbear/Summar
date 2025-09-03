@@ -8,7 +8,7 @@ import { SummarDebug } from "../globals";
  */
 export class SummarChatManager implements ISummarChatManager {
   private chatHeader: HTMLDivElement | null = null;
-  private chatInput: HTMLTextAreaElement | null = null;
+  private inputArea: HTMLTextAreaElement | null = null;
   private isChatVisible: boolean = false;
   private splitter: HTMLDivElement | null = null;
   private isResizing: boolean = false;
@@ -18,13 +18,19 @@ export class SummarChatManager implements ISummarChatManager {
   constructor(private context: ISummarViewContext) {}
 
   setupChatContainer(): void {
+    // chatContainer를 flex 컨테이너로 설정
+    this.context.chatContainer.style.display = 'flex';
+    this.context.chatContainer.style.flexDirection = 'column';
+    this.context.chatContainer.style.padding = '0';
+    this.context.chatContainer.style.boxSizing = 'border-box';
+
     // Chat header 생성
     this.chatHeader = this.createChatHeader();
     this.context.chatContainer.appendChild(this.chatHeader);
 
-    // Chat input 영역 생성
-    const chatInputContainer = this.createChatInputContainer();
-    this.context.chatContainer.appendChild(chatInputContainer);
+    // Input area 생성 (간단한 textarea)
+    this.inputArea = this.createInputArea();
+    this.context.chatContainer.appendChild(this.inputArea);
 
     // Splitter 생성 및 chatContainer 위에 삽입
     this.splitter = this.createSplitter();
@@ -118,63 +124,54 @@ export class SummarChatManager implements ISummarChatManager {
     return header;
   }
 
-  private createChatInputContainer(): HTMLDivElement {
-    const container = document.createElement('div');
-    container.className = 'chat-input-container';
-    container.style.cssText = `
-      display: flex;
-      flex-direction: column;
-      height: calc(100% - 44px);
-      background: var(--background-primary);
-    `;
-
-    // Chat input 영역
-    const inputArea = document.createElement('div');
+  private createInputArea(): HTMLTextAreaElement {
+    const inputArea = document.createElement('textarea');
     inputArea.className = 'chat-input-area';
+    inputArea.placeholder = 'Type your message here...';
     inputArea.style.cssText = `
+      flex: 1;
+      width: 100%;
+      margin: 0;
       padding: 16px;
-      display: flex;
-      gap: 8px;
-      align-items: flex-end;
-      height: 100%;
+      background: var(--background-primary);
+      border: none;
+      border-radius: 0;
+      resize: none;
+      outline: none;
+      font-family: var(--font-interface);
+      font-size: var(--font-ui-small);
+      color: var(--text-normal);
       box-sizing: border-box;
     `;
 
-    this.chatInput = document.createElement('textarea');
-    this.chatInput.placeholder = 'Type your message...';
-    this.chatInput.style.cssText = `
-      flex: 1;
-      min-height: 40px;
-      max-height: 120px;
-      padding: 8px 12px;
-      border: 1px solid var(--background-modifier-border);
-      border-radius: 6px;
-      background: var(--background-primary);
-      color: var(--text-normal);
-      resize: vertical;
-      font-family: var(--font-text);
-      font-size: 14px;
-      line-height: 1.4;
-      width: 100%;
-      box-sizing: border-box;
-    `;
+    // chatContainer height에서 chatHeader height를 뺀 만큼 채움
+    this.updateInputAreaHeight(inputArea);
 
     // Enter 키 이벤트 추가
-    this.chatInput.addEventListener('keydown', (e) => {
+    inputArea.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const message = this.chatInput?.value.trim();
+        const message = inputArea.value.trim();
         if (message) {
           this.sendMessage(message);
         }
       }
     });
 
-    inputArea.appendChild(this.chatInput);
+    return inputArea;
+  }
 
-    container.appendChild(inputArea);
-
-    return container;
+  private updateInputAreaHeight(inputArea: HTMLTextAreaElement): void {
+    if (!this.chatHeader) return;
+    
+    // chatHeader의 실제 높이를 getBoundingClientRect로 계산 (resultHeader와 동일한 방식)
+    const chatHeaderRect = this.chatHeader.getBoundingClientRect();
+    const chatHeaderHeight = chatHeaderRect.height;
+    
+    // inputArea의 높이를 chatContainer height - chatHeader height로 설정
+    inputArea.style.height = `calc(100% - ${chatHeaderHeight}px)`;
+    
+    SummarDebug.log(1, `Input area height updated: calc(100% - ${chatHeaderHeight}px)`);
   }
 
   private createSplitter(): HTMLDivElement {
@@ -246,12 +243,12 @@ export class SummarChatManager implements ISummarChatManager {
   private resizeChatContainer(height: number): void {
     this.context.chatContainer.style.height = `${height}px`;
     
-    // Result container height 조정 (status bar 고려해서 6px 여백)
+    // Result container height 조정 - chatContainer의 마진을 고려
     const containerRect = this.context.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
     const splitterHeight = 4;
-    const statusBarMargin = 6; // Obsidian status bar를 위한 여백
-    const newResultHeight = containerRect.height - inputHeight - height - splitterHeight - statusBarMargin;
+    const chatMargins = 6; // chatContainer의 하단 마진 (resultContainer와 동일한 간격)
+    const newResultHeight = containerRect.height - inputHeight - height - splitterHeight - chatMargins;
     
     this.context.resultContainer.style.height = `${newResultHeight}px`;
   }
@@ -270,7 +267,7 @@ export class SummarChatManager implements ISummarChatManager {
     const chatHeight = 200;
     
     // Chat container 표시
-    this.context.chatContainer.style.display = 'block';
+    this.context.chatContainer.style.display = 'flex';
     this.context.chatContainer.style.height = `${chatHeight}px`;
     
     // Splitter 표시 (chatContainer 바로 위에)
@@ -278,16 +275,16 @@ export class SummarChatManager implements ISummarChatManager {
       this.splitter.style.display = 'block';
     }
     
-    // Result container height 조정 (status bar 고려해서 6px 여백)
+    // Result container height 조정 - chatContainer의 마진(좌우 2px + 하단 6px)을 고려
     const containerRect = this.context.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
     const splitterHeight = 4;
-    const statusBarMargin = 6; // Obsidian status bar를 위한 여백
-    const newResultHeight = containerRect.height - inputHeight - chatHeight - splitterHeight - statusBarMargin;
+    const chatMargins = 6; // chatContainer의 하단 마진 (resultContainer와 동일한 간격)
+    const newResultHeight = containerRect.height - inputHeight - chatHeight - splitterHeight - chatMargins;
     
     this.context.resultContainer.style.height = `${newResultHeight}px`;
     
-    SummarDebug.log(1, `Chat container shown, result height adjusted to ${newResultHeight}px with status bar margin`);
+    SummarDebug.log(1, `Chat container shown, result height adjusted to ${newResultHeight}px with chat margins`);
   }
 
   private hideChatContainer(): void {
@@ -299,15 +296,15 @@ export class SummarChatManager implements ISummarChatManager {
       this.splitter.style.display = 'none';
     }
     
-    // Result container height 복원 (status bar 고려해서 6px 여백)
+    // Result container height 복원 - chatContainer가 없을 때의 하단 간격 (6px)
     const containerRect = this.context.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
-    const statusBarMargin = 6; // Obsidian status bar를 위한 여백
+    const statusBarMargin = 6; // resultContainer의 기본 하단 간격
     const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
     
     this.context.resultContainer.style.height = `${fullResultHeight}px`;
     
-    SummarDebug.log(1, 'Chat container hidden, result height restored with status bar margin');
+    SummarDebug.log(1, 'Chat container hidden, result height restored with original bottom margin');
   }
 
   async sendMessage(message: string): Promise<void> {
@@ -316,16 +313,16 @@ export class SummarChatManager implements ISummarChatManager {
     SummarDebug.Notice(1, `Chat message: ${message}`);
     
     // 입력 필드 초기화
-    if (this.chatInput) {
-      this.chatInput.value = '';
+    if (this.inputArea) {
+      this.inputArea.value = '';
     }
     
     // TODO: 실제 채팅 로직 구현
   }
 
   clearChat(): void {
-    if (this.chatInput) {
-      this.chatInput.value = '';
+    if (this.inputArea) {
+      this.inputArea.value = '';
     }
     
     SummarDebug.Notice(1, 'Chat cleared');
