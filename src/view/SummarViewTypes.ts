@@ -68,6 +68,7 @@ export interface ISummarStickyHeaderManager {
   cleanup(): void;
   observeHeader(resultHeader: HTMLDivElement): void;
   unobserveHeader(resultHeader: HTMLDivElement): void;
+  getCurrentStickyKey(): string | null;
 }
 
 export interface ISummarEventHandler {

@@ -1,6 +1,7 @@
 import { Platform, MarkdownView, normalizePath, setIcon } from "obsidian";
 import { ISummarEventHandler, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
+import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 
 /**
  * Item 레벨 이벤트 핸들러
@@ -16,7 +17,19 @@ export class SummarItemEventHandler implements ISummarEventHandler {
       const target = event.target as HTMLElement;
       const button = target.closest('button') as HTMLButtonElement;
       
-      if (!button) return;
+      if (!button) {
+        // 버튼이 아닌 경우, result-header 클릭인지 확인
+        const resultHeader = target.closest('.result-header') as HTMLDivElement;
+        if (resultHeader) {
+          const resultItem = resultHeader.closest('.result-item') as HTMLDivElement;
+          const key = resultItem?.getAttribute('result-key');
+          if (key) {
+            this.handleHeaderClick(key);
+            return;
+          }
+        }
+        return;
+      }
       
       const buttonId = button.getAttribute('button-id');
       const resultItem = button.closest('.result-item') as HTMLDivElement;
@@ -45,10 +58,56 @@ export class SummarItemEventHandler implements ISummarEventHandler {
           break;
       }
     }, { signal: this.context.abortController.signal });
+
+    // Sticky header 클릭 이벤트 처리
+    this.setupStickyHeaderClickListener();
   }
 
   cleanup(): void {
     // AbortController가 이미 모든 이벤트 리스너를 정리하므로 추가 작업 없음
+  }
+
+  private setupStickyHeaderClickListener(): void {
+    // Sticky header container에 대한 클릭 이벤트 처리
+    // SummarView의 container에서 sticky header 클릭을 감지
+    this.context.containerEl.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      
+      // Sticky header container 영역 내에서 클릭이 발생했는지 확인
+      const stickyHeaderContainer = target.closest('.sticky-header-container') as HTMLDivElement;
+      if (!stickyHeaderContainer) {
+        return;
+      }
+      
+      // 버튼 클릭인 경우는 기존 처리에 맡김
+      const button = target.closest('button') as HTMLButtonElement;
+      if (button) {
+        return;
+      }
+      
+      // sticky header container 내의 result-header를 클릭한 경우 toggle 처리
+      const resultHeader = target.closest('.result-header') as HTMLDivElement;
+      if (resultHeader && stickyHeaderContainer.contains(resultHeader)) {
+        const stickyHeaderManager = (this.context as any).stickyHeaderManager;
+        if (stickyHeaderManager && stickyHeaderManager.getCurrentStickyKey) {
+          const key = stickyHeaderManager.getCurrentStickyKey();
+          if (key) {
+            this.handleHeaderClick(key);
+          }
+        }
+      }
+    }, { signal: this.context.abortController.signal });
+  }
+
+  private handleHeaderClick(key: string): void {
+    // result-header나 sticky header를 클릭했을 때 toggle 버튼 클릭과 동일한 동작
+    const resultItem = this.context.resultContainer.querySelector(`[result-key="${key}"]`) as HTMLDivElement;
+    if (resultItem) {
+      const toggleButton = resultItem.querySelector('[button-id="toggle-fold-button"]') as HTMLButtonElement;
+      if (toggleButton) {
+        this.handleToggleClick(key, toggleButton);
+      }
+    }
   }
 
   private async handleNewNoteClick(key: string): Promise<void> {
@@ -146,126 +205,13 @@ export class SummarItemEventHandler implements ISummarEventHandler {
 
   private handleShowMenuClick(key: string, event: MouseEvent): void {
     const button = event.target as HTMLButtonElement;
-    const rect = button.getBoundingClientRect();
     
-    // 기존 팝업 메뉴가 있다면 제거
-    const existingMenu = document.querySelector('.item-popup-menu');
-    if (existingMenu) {
-      existingMenu.remove();
-    }
+    const menuItems = SummarMenuUtils.createStandardMenuItems(key, this.context, false);
 
-    // 팝업 메뉴 생성 (임시로 화면 밖에 배치하여 크기 측정)
-    const menu = document.createElement('div');
-    menu.className = 'item-popup-menu';
-    menu.style.cssText = `
-      position: fixed;
-      top: -9999px;
-      left: -9999px;
-      background: var(--background-primary);
-      border: 1px solid var(--background-modifier-border);
-      border-radius: 5px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 1000;
-      min-width: 150px;
-      padding: 4px;
-      visibility: hidden;
-    `;
-
-    // 메뉴 아이템들 생성
-    const menuItems = [
-      { label: 'Reply', action: () => this.handleReply(key) },
-      { label: 'Delete result', action: () => this.handleDeleteResult(key) }
-    ];
-
-    menuItems.forEach(item => {
-      const menuItem = document.createElement('div');
-      menuItem.className = 'item-menu-item';
-      menuItem.textContent = item.label;
-      menuItem.style.cssText = `
-        padding: 8px 12px;
-        cursor: pointer;
-        border-radius: 3px;
-        color: var(--text-normal);
-      `;
-      
-      menuItem.addEventListener('mouseenter', () => {
-        menuItem.style.backgroundColor = 'var(--background-modifier-hover)';
-      });
-      
-      menuItem.addEventListener('mouseleave', () => {
-        menuItem.style.backgroundColor = 'transparent';
-      });
-      
-      menuItem.addEventListener('click', () => {
-        item.action();
-        menu.remove();
-        // 스크롤 이벤트 리스너 제거
-        this.context.resultContainer.removeEventListener('scroll', closeMenuOnScroll);
-      });
-      
-      menu.appendChild(menuItem);
+    SummarMenuUtils.showPopupMenu(button, menuItems, {
+      zIndex: 1000,
+      context: this.context
     });
-
-    // 임시로 DOM에 추가하여 크기 측정
-    document.body.appendChild(menu);
-    const menuRect = menu.getBoundingClientRect();
-
-    // 메뉴 위치 계산
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    
-    // 기본적으로 버튼의 오른쪽 아래에 배치
-    let menuTop = rect.bottom + 5;
-    let menuLeft = rect.right - menuRect.width;
-
-    // 화면 오른쪽을 벗어나는 경우 버튼 왼쪽으로 이동
-    if (menuLeft < 0) {
-      menuLeft = rect.left;
-    }
-
-    // 화면 하단을 벗어나는 경우 버튼 위쪽으로 이동
-    if (menuTop + menuRect.height > viewportHeight) {
-      menuTop = rect.top - menuRect.height - 5;
-    }
-
-    // 최종 위치 설정
-    menu.style.cssText = `
-      position: fixed;
-      top: ${menuTop}px;
-      left: ${menuLeft}px;
-      background: var(--background-primary);
-      border: 1px solid var(--background-modifier-border);
-      border-radius: 5px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 1000;
-      min-width: 150px;
-      padding: 4px;
-      visibility: visible;
-    `;
-
-    // 스크롤 시 메뉴 닫기를 위한 이벤트 리스너
-    const closeMenuOnScroll = () => {
-      menu.remove();
-      this.context.resultContainer.removeEventListener('scroll', closeMenuOnScroll);
-      document.removeEventListener('click', closeMenu);
-    };
-
-    // 메뉴 외부 클릭 시 닫기
-    const closeMenu = (e: MouseEvent) => {
-      if (!menu.contains(e.target as Node)) {
-        menu.remove();
-        document.removeEventListener('click', closeMenu);
-        this.context.resultContainer.removeEventListener('scroll', closeMenuOnScroll);
-      }
-    };
-    
-    // 스크롤 이벤트 리스너 추가
-    this.context.resultContainer.addEventListener('scroll', closeMenuOnScroll);
-    
-    // 약간의 지연 후 이벤트 리스너 추가 (현재 클릭 이벤트가 즉시 닫히는 것을 방지)
-    setTimeout(() => {
-      document.addEventListener('click', closeMenu);
-    }, 100);
   }
 
   private handleToggleClick(key: string, toggleButton: HTMLButtonElement): void {
@@ -319,14 +265,11 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   }
 
   private handleReply(key: string): void {
-    SummarDebug.Notice(1, `Reply: ${key}`);
+    SummarMenuUtils.handleReply(key, false);
   }
 
   private handleDeleteResult(key: string): void {
-    const resultManager = (this.context as any).resultManager;
-    if (resultManager && resultManager.deleteResultItem) {
-      resultManager.deleteResultItem(key);
-    }
+    SummarMenuUtils.handleDeleteResult(key, this.context);
   }
 
   private setToggleButtonIcon(button: HTMLButtonElement, folded: boolean): void {

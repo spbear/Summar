@@ -229,6 +229,24 @@
     user-select: none;
 }
 
+/* 🔹 Summar 버튼 컨테이너 (Copilot 등 다른 플러그인과의 충돌 방지) */
+.summar-button-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0 5px;
+    margin-bottom: 1px;
+}
+
+/* Copilot 플러그인 충돌 방지 - 강화된 선택자 */
+.workspace-leaf-content[data-type="summar-view"] .summar-button-container,
+.summar-view-container .summar-button-container {
+    margin-left: 5px !important;
+    margin-right: 5px !important;
+    margin-top: 0px !important;
+    margin-bottom: 1px !important;
+}
+
 /* Custom Command 옵션 토글 행 스타일 */
 .custom-command-options-row {
   display: flex;

@@ -113,6 +113,8 @@ export class SummarView extends View {
     (this.context as any).uploadManager = this.uploadManager;
     // Add result manager reference for event handler to fetch raw text via Map
     (this.context as any).resultManager = this.resultManager;
+    // Add sticky header manager reference to context for event handler
+    (this.context as any).stickyHeaderManager = this.stickyHeaderManager;
     // Add chat manager reference to context for event handler
     (this.context as any).chatManager = this.chatManager;
   }
@@ -157,9 +159,49 @@ export class SummarView extends View {
     this.context.abortController = this.abortController;
   }
 
+  private setupStyleProtection(inputContainer: HTMLDivElement, buttonContainer: HTMLDivElement): void {
+    // 다른 플러그인의 스타일 변경을 감지하고 복원하는 MutationObserver
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+          const target = mutation.target as HTMLElement;
+          
+          // inputContainer 또는 buttonContainer의 마진이 변경된 경우 복원
+          if (target === inputContainer || target === buttonContainer) {
+            if (target.style.marginLeft !== '5px') {
+              target.style.setProperty('margin-left', '5px', 'important');
+            }
+            if (target.style.marginRight !== '5px') {
+              target.style.setProperty('margin-right', '5px', 'important');
+            }
+          }
+        }
+      });
+    });
+
+    // inputContainer와 buttonContainer 감시
+    observer.observe(inputContainer, { 
+      attributes: true, 
+      attributeFilter: ['style'] 
+    });
+    observer.observe(buttonContainer, { 
+      attributes: true, 
+      attributeFilter: ['style'] 
+    });
+
+    // cleanup 시 observer도 정리
+    this.context.abortController.signal.addEventListener('abort', () => {
+      observer.disconnect();
+    });
+  }
+
   private async renderView(): Promise<void> {
     const container: HTMLElement = this.containerEl;
     container.empty();
+
+    // SummarView 식별을 위한 속성 추가 (Copilot 등 다른 플러그인과의 충돌 방지)
+    container.setAttribute('data-summar-view', 'true');
+    container.classList.add('summar-view-container');
 
     // Inject styles
     this.styleManager.injectStyles();
@@ -178,6 +220,9 @@ export class SummarView extends View {
     this.chatContainer = chatContainer;
     this.context.resultContainer = resultContainer;
     this.context.chatContainer = chatContainer;
+
+    // Copilot 등 다른 플러그인의 스타일 간섭 방지를 위한 MutationObserver 설정
+    this.setupStyleProtection(inputContainer, buttonContainer);
 
     // Setup chat container
     this.chatManager.setupChatContainer();

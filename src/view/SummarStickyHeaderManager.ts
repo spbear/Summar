@@ -2,6 +2,7 @@ import { ISummarStickyHeaderManager, ISummarViewContext } from "./SummarViewType
 import { SummarDebug } from "../globals";
 import { setIcon } from "obsidian";
 import { composeStandardResultHeader, getDefaultLabelIcon } from "./ResultHeaderComposer";
+import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 
 export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private stickyHeaderContainer: HTMLDivElement | null = null;
@@ -526,14 +527,22 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     
     setIcon(button, iconName);
     
-    // 원본 버튼 클릭으로 위임
-    button.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (originalItem) {
-        const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
-        originalButton?.click();
-      }
-    }, { signal: this.context.abortController.signal });
+    // show-menu-button은 특별 처리 (sticky header 위치에 메뉴 표시)
+    if (buttonId === 'show-menu-button') {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.handleStickyMenuClick(key, event);
+      }, { signal: this.context.abortController.signal });
+    } else {
+      // 다른 버튼들은 원본 버튼 클릭으로 위임
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (originalItem) {
+          const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+          originalButton?.click();
+        }
+      }, { signal: this.context.abortController.signal });
+    }
     
     return button;
   }
@@ -612,5 +621,30 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       }, 100);
       this.context.timeoutRefs.add(timeoutId);
     }
+  }
+
+  getCurrentStickyKey(): string | null {
+    return this.currentStickyKey;
+  }
+
+  private handleStickyMenuClick(key: string, event: MouseEvent): void {
+    const button = event.target as HTMLButtonElement;
+    
+    const menuItems = SummarMenuUtils.createStandardMenuItems(key, this.context, true);
+
+    SummarMenuUtils.showPopupMenu(button, menuItems, {
+      zIndex: 10001, // sticky header보다 위에 표시
+      context: this.context
+    });
+
+    SummarDebug.log(1, `Sticky menu opened for key: ${key}`);
+  }
+
+  private handleStickyReply(key: string): void {
+    SummarMenuUtils.handleReply(key, true);
+  }
+
+  private handleStickyDeleteResult(key: string): void {
+    SummarMenuUtils.handleDeleteResult(key, this.context);
   }
 }

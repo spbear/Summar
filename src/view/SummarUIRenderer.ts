@@ -26,7 +26,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
 
   renderButtonContainer(container: HTMLElement): HTMLDivElement {
     const buttonContainer: HTMLDivElement = container.createEl("div", {
-      cls: "button-container",
+      cls: "summar-button-container",
     });
     
     this.setupButtonContainerStyles(buttonContainer);
@@ -94,6 +94,11 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     inputContainer.style.alignItems = "center";
     inputContainer.style.gap = "5px";
     inputContainer.style.marginBottom = "1px";
+    
+    // Copilot 등 다른 플러그인의 CSS 간섭 방지
+    inputContainer.style.setProperty('margin-left', '5px', 'important');
+    inputContainer.style.setProperty('margin-right', '5px', 'important');
+    inputContainer.classList.add('summar-input-container');
   }
 
   private createInputField(container: HTMLDivElement): HTMLInputElement {
@@ -139,9 +144,14 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     buttonContainer.style.alignItems = "center";
     buttonContainer.style.gap = "5px";
     buttonContainer.style.marginBottom = "1px";
-    buttonContainer.style.marginLeft = "0px";
-    buttonContainer.style.marginRight = "0px";
+    buttonContainer.style.marginLeft = "5px";
+    buttonContainer.style.marginRight = "5px";
     buttonContainer.style.marginTop = "0px";
+    
+    // Copilot 등 다른 플러그인의 CSS 간섭 방지
+    buttonContainer.style.setProperty('margin-left', '5px', 'important');
+    buttonContainer.style.setProperty('margin-right', '5px', 'important');
+    buttonContainer.classList.add('summar-button-container');
   }
 
   private createUploadWikiButton(container: HTMLDivElement): HTMLButtonElement {
