@@ -6,6 +6,7 @@ import MarkdownIt from "markdown-it";
 export interface ISummarViewContext {
   plugin: SummarPlugin;
   leaf: WorkspaceLeaf;
+  view?: any; // SummarView 참조 (circular dependency 방지를 위해 any 타입 사용)
   containerEl: HTMLElement;
   resultContainer: HTMLDivElement;
   chatContainer: HTMLDivElement;

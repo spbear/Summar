@@ -283,7 +283,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     chatContainer.style.width = "auto"; // resultContainer와 동일하게 auto로 설정
     chatContainer.style.height = "400px";
     chatContainer.style.border = "1px solid var(--background-modifier-border)";
-    chatContainer.style.marginTop = "5px";
+    chatContainer.style.marginTop = "2px";
     chatContainer.style.marginLeft = "5px";
     chatContainer.style.marginRight = "5px";
     chatContainer.style.marginBottom = "25px";

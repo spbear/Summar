@@ -68,6 +68,7 @@ export class SummarView extends View {
     this.context = {
       plugin: this.plugin,
       leaf: leaf,
+      view: this, // SummarView 참조 추가
       containerEl: this.containerEl,
       resultContainer: this.resultContainer, // Will be set in renderView
       chatContainer: this.chatContainer, // Will be set in renderView
@@ -345,6 +346,15 @@ export class SummarView extends View {
     this.timeoutRefs.add(timeoutId);
   }
 
+  updateResultContainerMargin(): void {
+    const chatVisible = this.chatContainer.style.display !== 'none';
+    const marginValue = chatVisible ? "2px" : "25px";
+    
+    this.resultContainer.style.marginBottom = marginValue;
+    
+    SummarDebug.log(1, `ResultContainer margin updated to ${marginValue} (chat visible: ${chatVisible})`);
+  }
+
   private handleResize(): void {
     const containerRect = this.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
@@ -368,5 +378,8 @@ export class SummarView extends View {
       const fullResultHeight = containerRect.height - inputHeight;
       this.resultContainer.style.height = `${fullResultHeight}px`;
     }
+    
+    // 마진 업데이트 추가
+    this.updateResultContainerMargin();
   }
 }

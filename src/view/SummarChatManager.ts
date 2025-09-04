@@ -284,6 +284,11 @@ export class SummarChatManager implements ISummarChatManager {
     
     this.context.resultContainer.style.height = `${newResultHeight}px`;
     
+    // 중앙 마진 관리 함수 호출
+    if (this.context.view && this.context.view.updateResultContainerMargin) {
+      this.context.view.updateResultContainerMargin();
+    }
+    
     SummarDebug.log(1, `Chat container shown, result height adjusted to ${newResultHeight}px with chat margins`);
   }
 
@@ -303,6 +308,11 @@ export class SummarChatManager implements ISummarChatManager {
     const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
     
     this.context.resultContainer.style.height = `${fullResultHeight}px`;
+    
+    // 중앙 마진 관리 함수 호출
+    if (this.context.view && this.context.view.updateResultContainerMargin) {
+      this.context.view.updateResultContainerMargin();
+    }
     
     SummarDebug.log(1, 'Chat container hidden, result height restored with original bottom margin');
   }
