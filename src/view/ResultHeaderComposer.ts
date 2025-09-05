@@ -129,7 +129,7 @@ export function composeStandardChatHeader(label: string, buttons: ChatHeaderButt
   labelChip.style.alignItems = 'center';
   labelChip.style.gap = '4px';
   labelChip.style.fontSize = '10px';
-  labelChip.style.color = 'var(--text-normal)';
+  labelChip.style.color = 'var(--text-muted)';
   labelChip.style.marginLeft = '2px';
   labelChip.style.marginRight = '0px';
   labelChip.style.fontWeight = 'bold';

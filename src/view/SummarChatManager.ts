@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import { ISummarChatManager, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
+import { composeStandardChatHeader, ChatHeaderButtonsSet } from "./ResultHeaderComposer";
 
 /**
  * Chat 기능 관리자
@@ -42,47 +43,10 @@ export class SummarChatManager implements ISummarChatManager {
   }
 
   private createChatHeader(): HTMLDivElement {
-    const header = document.createElement('div');
-    header.className = 'chat-header';
-    header.style.cssText = `
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 16px;
-      background: var(--background-secondary);
-      border-bottom: 1px solid var(--background-modifier-border);
-      height: 44px;
-      box-sizing: border-box;
-    `;
-
-    // 왼쪽: 채팅 제목과 아이콘
-    const leftSection = document.createElement('div');
-    leftSection.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    `;
-
-    const chatIcon = document.createElement('div');
-    chatIcon.className = 'chat-icon';
-    setIcon(chatIcon, 'message-circle');
-    leftSection.appendChild(chatIcon);
-
-    const chatTitle = document.createElement('span');
-    chatTitle.textContent = 'Chat';
-    chatTitle.style.cssText = `
-      font-weight: 500;
-      color: var(--text-normal);
-    `;
-    leftSection.appendChild(chatTitle);
-
-    // 오른쪽: 액션 버튼들
-    const rightSection = document.createElement('div');
-    rightSection.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    `;
+    // Spacer
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    spacer.style.minWidth = '8px';
 
     // Clear 버튼
     const clearButton = document.createElement('button');
@@ -91,15 +55,16 @@ export class SummarChatManager implements ISummarChatManager {
     clearButton.style.cssText = `
       background: none;
       border: none;
-      padding: 4px;
+      padding: 2px;
       cursor: pointer;
       border-radius: 3px;
       display: flex;
       align-items: center;
       justify-content: center;
+      transform: scale(0.8);
+      transform-origin: center;
     `;
     setIcon(clearButton, 'trash-2');
-    rightSection.appendChild(clearButton);
 
     // Close 버튼
     const closeButton = document.createElement('button');
@@ -108,18 +73,32 @@ export class SummarChatManager implements ISummarChatManager {
     closeButton.style.cssText = `
       background: none;
       border: none;
-      padding: 4px;
+      padding: 2px;
       cursor: pointer;
       border-radius: 3px;
       display: flex;
       align-items: center;
       justify-content: center;
+      transform: scale(0.8);
+      transform-origin: center;
     `;
     setIcon(closeButton, 'x');
-    rightSection.appendChild(closeButton);
 
-    header.appendChild(leftSection);
-    header.appendChild(rightSection);
+    // ChatHeaderButtonsSet 구성
+    const buttons: ChatHeaderButtonsSet = {
+      spacer: spacer,
+      clear: clearButton,
+      close: closeButton
+    };
+
+    // composeStandardChatHeader 사용
+    const header = composeStandardChatHeader('Chat', buttons, { 
+      icon: 'message-circle'
+    });
+
+    // 높이 설정 (ResultHeaderComposer에서 주석처리된 부분 적용)
+    header.style.height = '32px';
+    header.style.padding = '4px 6px';
 
     return header;
   }
