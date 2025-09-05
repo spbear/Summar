@@ -89,6 +89,7 @@ export interface ISummarChatManager {
   sendMessage(message: string): Promise<void>;
   clearChat(): void;
   toggleChatContainer(): void;
+  handleViewResize(): void;
   cleanup(): void;
 }
 

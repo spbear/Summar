@@ -179,10 +179,10 @@ export class SummarChatManager implements ISummarChatManager {
     splitter.className = 'chat-splitter';
     splitter.style.cssText = `
       height: 4px;
-      background: var(--background-modifier-border);
+      background: transparent;
       cursor: ns-resize;
-      border-top: 1px solid var(--background-modifier-border);
-      border-bottom: 1px solid var(--background-modifier-border);
+      border-top: 1px solid transparent;
+      border-bottom: 1px solid transparent;
       display: none;
       user-select: none;
       position: relative;
@@ -195,7 +195,7 @@ export class SummarChatManager implements ISummarChatManager {
 
     splitter.addEventListener('mouseleave', () => {
       if (!this.isResizing) {
-        splitter.style.background = 'var(--background-modifier-border)';
+        splitter.style.background = 'transparent';
       }
     });
 
@@ -229,7 +229,7 @@ export class SummarChatManager implements ISummarChatManager {
     const handleMouseUp = () => {
       this.isResizing = false;
       if (this.splitter) {
-        this.splitter.style.background = 'var(--background-modifier-border)';
+        this.splitter.style.background = 'transparent';
       }
       
       document.removeEventListener('mousemove', handleMouseMove);
@@ -251,6 +251,28 @@ export class SummarChatManager implements ISummarChatManager {
     const newResultHeight = containerRect.height - inputHeight - height - splitterHeight - chatMargins;
     
     this.context.resultContainer.style.height = `${newResultHeight}px`;
+  }
+
+  handleViewResize(): void {
+    const chatVisible = this.context.chatContainer.style.display !== 'none';
+    
+    if (chatVisible) {
+      // chatContainer가 표시된 경우 현재 높이를 유지하면서 리사이징
+      const currentChatHeight = parseInt(this.context.chatContainer.style.height) || 200;
+      this.resizeChatContainer(currentChatHeight);
+      
+      SummarDebug.log(1, `View resized: chat visible, maintained height ${currentChatHeight}px`);
+    } else {
+      // chatContainer가 숨겨진 경우 resultContainer를 전체 크기로 복원
+      const containerRect = this.context.containerEl.getBoundingClientRect();
+      const inputHeight = 60; // 대략적인 input + button 영역 높이
+      const statusBarMargin = 6; // resultContainer의 기본 하단 간격
+      const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
+      
+      this.context.resultContainer.style.height = `${fullResultHeight}px`;
+      
+      SummarDebug.log(1, `View resized: chat hidden, result height restored to ${fullResultHeight}px`);
+    }
   }
 
   toggleChatContainer(): void {

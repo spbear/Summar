@@ -74,6 +74,7 @@ export class SummarMenuUtils {
         cursor: pointer;
         border-radius: 3px;
         color: var(--text-normal);
+        font-size: var(--font-ui-small);
       `;
       
       menuItem.addEventListener('mouseenter', () => {

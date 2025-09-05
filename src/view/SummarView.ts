@@ -348,7 +348,7 @@ export class SummarView extends View {
 
   updateResultContainerMargin(): void {
     const chatVisible = this.chatContainer.style.display !== 'none';
-    const marginValue = chatVisible ? "2px" : "25px";
+    const marginValue = chatVisible ? "1px" : "25px";
     
     this.resultContainer.style.marginBottom = marginValue;
     
@@ -356,30 +356,10 @@ export class SummarView extends View {
   }
 
   private handleResize(): void {
-    const containerRect = this.containerEl.getBoundingClientRect();
-    const inputHeight = 60; // 대략적인 input + button 영역 높이
+    // SummarChatManager의 공용 리사이징 메서드 호출
+    this.chatManager.handleViewResize();
     
-    // Chat container가 보이는 경우
-    const chatVisible = this.chatContainer.style.display !== 'none';
-    
-    if (chatVisible) {
-      const chatHeight = 500;
-      const newResultHeight = containerRect.height - inputHeight - chatHeight;
-      
-      // Result container 높이 조정
-      this.resultContainer.style.height = `${newResultHeight}px`;
-      
-      // Chat container를 하단에 정렬
-      this.chatContainer.style.position = 'absolute';
-      this.chatContainer.style.bottom = '0';
-      this.chatContainer.style.width = 'calc(100% - 10px)';
-    } else {
-      // Chat이 숨겨진 경우 result container 전체 크기로 복원
-      const fullResultHeight = containerRect.height - inputHeight;
-      this.resultContainer.style.height = `${fullResultHeight}px`;
-    }
-    
-    // 마진 업데이트 추가
+    // 마진 업데이트
     this.updateResultContainerMargin();
   }
 }

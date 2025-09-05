@@ -164,6 +164,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
         cursor: pointer;
         border-radius: 3px;
         color: var(--text-normal);
+        font-size: var(--font-ui-small);
       `;
       
       menuItem.addEventListener('mouseenter', () => {
