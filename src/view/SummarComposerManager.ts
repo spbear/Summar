@@ -9,6 +9,7 @@ import { setStandardComposerHeader, ComposerHeaderButtonsSet } from "./OutputHea
  */
 export class SummarComposerManager implements ISummarComposerManager {
   private composerHeader: HTMLDivElement | null = null;
+  private composerHeaderLabel: HTMLElement | null = null;
   private promptEditor: HTMLTextAreaElement | null = null;
   private isComposerVisible: boolean = false;
   private splitter: HTMLDivElement | null = null;
@@ -16,8 +17,16 @@ export class SummarComposerManager implements ISummarComposerManager {
   private minComposerHeight: number = 100;
   private maxComposerHeight: number = 500;
   private targetKey: string | null = null;
+  
+  // 메모리 누수 방지를 위한 이벤트 정리용 AbortController
+  private splitterAbortController: AbortController | null = null;
 
   constructor(private context: ISummarViewContext) {}
+
+  // 현재 타겟 키 조회 getter
+  get currentTargetKey(): string | null {
+    return this.targetKey;
+  }
 
   setupComposerContainer(): void {
     // composerContainer의 모든 스타일을 여기서 통합 관리
@@ -116,6 +125,9 @@ export class SummarComposerManager implements ISummarComposerManager {
       icon: 'message-circle'
     });
 
+    // label element 참조 저장
+    this.composerHeaderLabel = header.querySelector('.composer-label-text') as HTMLElement;
+
     // 높이 설정 (OutputHeaderComposer에서 주석처리된 부분 적용)
     header.style.height = '28px';
     header.style.padding = '4px 6px';
@@ -189,12 +201,16 @@ export class SummarComposerManager implements ISummarComposerManager {
 
     // 호버 효과
     splitter.addEventListener('mouseenter', () => {
-      splitter.style.background = 'var(--interactive-accent)';
+      if (!this.isResizing) {
+        splitter.style.background = 'var(--interactive-accent)';
+        SummarDebug.log(2, 'Splitter hover enter');
+      }
     });
 
     splitter.addEventListener('mouseleave', () => {
       if (!this.isResizing) {
         splitter.style.background = 'transparent';
+        SummarDebug.log(2, 'Splitter hover leave');
       }
     });
 
@@ -208,14 +224,27 @@ export class SummarComposerManager implements ISummarComposerManager {
     e.preventDefault();
     this.isResizing = true;
     
+    // 이전 AbortController가 있다면 정리
+    if (this.splitterAbortController) {
+      this.splitterAbortController.abort();
+    }
+    
+    // 새로운 AbortController 생성
+    this.splitterAbortController = new AbortController();
+    const signal = this.splitterAbortController.signal;
+    
     if (this.splitter) {
       this.splitter.style.background = 'var(--interactive-accent)';
     }
 
     const startY = e.clientY;
     const startHeight = parseInt(this.context.composerContainer.style.height) || 200;
+    
+    SummarDebug.log(1, `Splitter mousedown: startY=${startY}, startHeight=${startHeight}`);
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (signal.aborted || !this.isResizing) return;  // isResizing 체크 추가
+      
       const deltaY = startY - e.clientY; // 위로 드래그하면 positive
       const newHeight = Math.max(
         this.minComposerHeight,
@@ -225,18 +254,26 @@ export class SummarComposerManager implements ISummarComposerManager {
       this.resizeComposerContainer(newHeight);
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
+      if (signal.aborted) return;
+      
+      SummarDebug.log(1, `Splitter mouseup: resizing=${this.isResizing}`);
+      
       this.isResizing = false;
       if (this.splitter) {
         this.splitter.style.background = 'transparent';
       }
       
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      // 이벤트 리스너 완전히 제거
+      if (this.splitterAbortController) {
+        this.splitterAbortController.abort();
+        this.splitterAbortController = null;
+      }
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // AbortController를 사용하여 이벤트 리스너 등록
+    document.addEventListener('mousemove', handleMouseMove, { signal });
+    document.addEventListener('mouseup', handleMouseUp, { signal });
   }
 
   private resizeComposerContainer(height: number): void {
@@ -313,7 +350,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     SummarDebug.log(1, `Composer container shown, output height adjusted to ${newOutputHeight}px with composer margins`);
   }
 
-  private hideComposerContainer(): void {
+  hideComposerContainer(): void {
     // Composer container 숨김
     this.context.composerContainer.style.display = 'none';
     
@@ -321,6 +358,11 @@ export class SummarComposerManager implements ISummarComposerManager {
     if (this.splitter) {
       this.splitter.style.display = 'none';
     }
+    
+    // targetKey 초기화 및 하이라이팅 제거
+    this.targetKey = null;
+    this.clearAllHighlighting();
+    this.resetComposerLabel();
     
     // Output container height 복원 - composerContainer가 없을 때의 하단 간격 (6px)
     const containerRect = this.context.containerEl.getBoundingClientRect();
@@ -356,22 +398,94 @@ export class SummarComposerManager implements ISummarComposerManager {
       this.promptEditor.value = '';
     }
     
+    // targetKey 초기화 및 하이라이팅 제거
+    this.targetKey = null;
+    this.clearAllHighlighting();
+    this.resetComposerLabel();
+    
     SummarDebug.Notice(1, 'Composer cleared');
   }
 
   setOutput(key: string): void {
     this.targetKey = key;
+    
+    // 이전 하이라이팅 제거 및 새로운 하이라이팅 적용
+    this.updateHeaderHighlighting(key);
+    
+    // 컴포저 헤더 라벨 업데이트
+    this.updateComposerLabel(key);
+    
     SummarDebug.log(1, `Composer target set to output key: ${key}`);
+  }
+
+  private updateHeaderHighlighting(key: string): void {
+    // 모든 하이라이팅 제거
+    this.clearAllHighlighting();
+    
+    // 새로운 하이라이팅 적용
+    if (this.context.outputManager) {
+      this.context.outputManager.highlightOutputHeader(key);
+    }
+    if (this.context.stickyHeaderManager) {
+      this.context.stickyHeaderManager.highlightStickyHeader(key);
+    }
+  }
+
+  private clearAllHighlighting(): void {
+    if (this.context.outputManager) {
+      this.context.outputManager.clearAllHeaderHighlights();
+    }
+    if (this.context.stickyHeaderManager) {
+      this.context.stickyHeaderManager.clearAllStickyHeaderHighlights();
+    }
+  }
+
+  private updateComposerLabel(key: string): void {
+    if (!this.composerHeaderLabel) return;
+
+    // outputRecords에서 타겟 아이템의 라벨 찾기
+    const targetRecord = this.context.outputRecords.get(key);
+    let targetLabel = '';
+    
+    if (targetRecord && targetRecord.label) {
+      targetLabel = targetRecord.label;
+    }
+
+    // 저장된 label element 직접 사용
+    if (targetLabel) {
+      this.composerHeaderLabel.textContent = `reply to: ${targetLabel}`;
+      SummarDebug.log(1, `Composer label updated to: Reply to: ${targetLabel}`);
+    }
+  }
+
+  private resetComposerLabel(): void {
+    if (!this.composerHeaderLabel) return;
+
+    // 저장된 label element 직접 사용
+    this.composerHeaderLabel.textContent = 'composer';
+    SummarDebug.log(1, 'Composer label reset to default');
   }
 
   cleanup(): void {
     // 리사이징 중단
     this.isResizing = false;
     
+    // Splitter 이벤트 정리
+    if (this.splitterAbortController) {
+      this.splitterAbortController.abort();
+      this.splitterAbortController = null;
+    }
+    
     // Splitter 제거
     if (this.splitter) {
       this.splitter.remove();
       this.splitter = null;
     }
+    
+    // 기타 DOM 요소 정리
+    this.composerHeader = null;
+    this.composerHeaderLabel = null;
+    this.promptEditor = null;
+    this.targetKey = null;
   }
 }

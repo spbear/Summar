@@ -166,11 +166,23 @@ export class SummarMenuUtils {
   /**
    * Reply 액션을 처리합니다
    * @param key 결과 아이템의 키
+   * @param context 뷰 컨텍스트
    * @param isFromStickyHeader sticky header에서 호출되었는지 여부
    */
-  static handleReply(key: string, isFromStickyHeader: boolean = false): void {
-    const source = isFromStickyHeader ? 'sticky header' : 'output item';
-    SummarDebug.Notice(1, `Reply from ${source}: ${key}`);
+  static handleReply(key: string, context: ISummarViewContext, isFromStickyHeader: boolean = false): void {
+    // ComposerManager를 통해 composer 표시 및 타겟 설정
+    const composerManager = context.composerManager;
+    if (composerManager && composerManager.showComposerContainer) {
+      // Composer 표시
+      composerManager.showComposerContainer();
+      // 타겟 아이템 설정
+      composerManager.setOutput(key);
+      
+      const source = isFromStickyHeader ? 'sticky header' : 'output item';
+      SummarDebug.log(1, `Reply initiated from ${source} for output key: ${key}`);
+    } else {
+      SummarDebug.log(1, `ComposerManager not found, cannot initiate reply for key: ${key}`);
+    }
   }
 
   /**
@@ -200,7 +212,7 @@ export class SummarMenuUtils {
     return [
       { 
         label: 'Reply', 
-        action: () => this.handleReply(key, isFromStickyHeader) 
+        action: () => this.handleReply(key, context, isFromStickyHeader) 
       },
       { 
         label: 'Delete Output', 

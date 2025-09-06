@@ -114,17 +114,8 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   }
 
   private handleReplyOutput(key: string): void {
-    // ComposerManager를 통해 composer 표시 및 타겟 설정
-    const composerManager = (this.context as any).composerManager;
-    if (composerManager) {
-      // Composer 표시
-      composerManager.showComposerContainer();
-      // 타겟 아이템 설정
-      composerManager.setOutput(key);
-      SummarDebug.log(1, `Reply initiated for output key: ${key}`);
-    } else {
-      SummarDebug.log(1, `ComposerManager not found, cannot initiate reply for key: ${key}`);
-    }
+    // SummarMenuUtils를 통해 통합된 reply 처리
+    SummarMenuUtils.handleReply(key, this.context, false);
   }
 
   private async handleNewNoteClick(key: string): Promise<void> {
@@ -282,7 +273,7 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   }
 
   private handleReply(key: string): void {
-    SummarMenuUtils.handleReply(key, false);
+    SummarMenuUtils.handleReply(key, this.context, false);
   }
 
   private handleDeleteOutput(key: string): void {

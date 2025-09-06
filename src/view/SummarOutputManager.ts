@@ -259,6 +259,49 @@ export class SummarOutputManager implements ISummarOutputManager {
     this.renderTimers.clear();
   }
 
+  // ===== 하이라이트 관련 메서드 =====
+  
+  highlightOutputHeader(key: string): void {
+    // 해당 key의 output item에서 header 찾기
+    const targetRecord = this.context.outputRecords.get(key);
+    if (targetRecord && targetRecord.itemEl) {
+      const header = targetRecord.itemEl.querySelector('.output-header') as HTMLElement;
+      if (header) {
+        // 배색 반전 효과 적용
+        this.applyInvertedColorScheme(header);
+        SummarDebug.log(1, `Output header highlighted with inverted colors for key: ${key}`);
+      }
+    }
+  }
+
+  clearAllHeaderHighlights(): void {
+    // outputRecords를 통해 모든 output header에서 하이라이팅 제거
+    this.context.outputRecords.forEach((record) => {
+      if (record.itemEl) {
+        const header = record.itemEl.querySelector('.output-header') as HTMLElement;
+        if (header) {
+          // 원래 배색으로 복원
+          this.applyOriginalColorScheme(header);
+        }
+      }
+    });
+    SummarDebug.log(1, 'All output header highlights cleared');
+  }
+
+  /**
+   * 헤더에 하이라이트 효과를 적용합니다
+   */
+  private applyInvertedColorScheme(header: HTMLElement): void {
+    header.style.backgroundColor = 'var(--background-modifier-hover)';
+  }
+
+  /**
+   * 헤더를 원래 배색으로 복원합니다
+   */
+  private applyOriginalColorScheme(header: HTMLElement): void {
+    header.style.backgroundColor = '';
+  }
+
 
 
   /**

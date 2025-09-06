@@ -15,6 +15,15 @@ export interface ISummarViewContext {
   markdownRenderer: MarkdownIt;
   abortController: AbortController;
   timeoutRefs: Set<NodeJS.Timeout>;
+  
+  // 매니저 참조들 (타입 안전성 향상)
+  outputManager?: ISummarOutputManager;
+  stickyHeaderManager?: ISummarStickyHeaderManager;
+  uploadManager?: ISummarUploadManager;
+  composerManager?: ISummarComposerManager;
+  
+  // 하이라이트 상태 조회 메서드
+  getHighlightedKey(): string | null;
 }
 
 // 결과 아이템에 대한 통합 상태 레코드
@@ -59,6 +68,10 @@ export interface ISummarOutputManager {
   cleanupMarkdownOutput(html: string): string;
   setEventHandlers(events: SummarViewEvents): void;
   cleanup(): void;
+  
+  // 하이라이트 관련 메서드
+  highlightOutputHeader(key: string): void;
+  clearAllHeaderHighlights(): void;
 }
 
 export interface ISummarStickyHeaderManager {
@@ -70,6 +83,10 @@ export interface ISummarStickyHeaderManager {
   observeHeader(outputHeader: HTMLDivElement): void;
   unobserveHeader(outputHeader: HTMLDivElement): void;
   getCurrentStickyKey(): string | null;
+  
+  // 하이라이트 관련 메서드
+  highlightStickyHeader(key: string): void;
+  clearAllStickyHeaderHighlights(): void;
 }
 
 export interface ISummarEventHandler {
@@ -89,8 +106,14 @@ export interface ISummarComposerManager {
   sendMessage(message: string): Promise<void>;
   clearComposer(): void;
   toggleComposerContainer(): void;
+  showComposerContainer(): void;
+  hideComposerContainer(): void;
+  setOutput(key: string): void;
   handleViewResize(): void;
   cleanup(): void;
+  
+  // 현재 타겟 키 조회
+  get currentTargetKey(): string | null;
 }
 
 // 이벤트 타입

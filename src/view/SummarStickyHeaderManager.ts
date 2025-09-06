@@ -281,6 +281,9 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     // sticky header 생성 및 위치 설정
     this.createAndPositionStickyHeader(key, resolvedLabel, originalHeader);
     
+    // 현재 하이라이트 상태 확인 및 적용
+    this.applyCurrentHighlightState(key);
+    
     this.currentStickyKey = key;
     SummarDebug.log(1, `Sticky header shown for key: ${key}`);
   }
@@ -309,6 +312,10 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     
     // 기존 sticky header 내용 제거
     this.stickyHeaderContainer!.innerHTML = '';
+    
+    // sticky header container에 key 정보 설정
+    this.stickyHeaderContainer!.setAttribute('data-key', key);
+    this.stickyHeaderContainer!.className = 'sticky-header-container sticky-header';
     
     // 새로운 sticky header 생성
     const stickyHeader = this.createOutputHeader(key, label);
@@ -491,7 +498,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     const rec = this.context.outputRecords.get(key);
     const icon = rec?.icon || getDefaultLabelIcon(label);
     const stickyLabel = rec?.label || label;
-    return composeStandardOutputHeader(stickyLabel, {
+    const header = composeStandardOutputHeader(stickyLabel, {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
       newNote: newNoteButton,
@@ -501,6 +508,8 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       spacer: rightSpacer,
       menu: showMenuButton,
     }, { icon });
+
+    return header;
   }
 
   private addStickyHeaderButtons(_: HTMLDivElement, __: string): void { /* deprecated by composer */ }
@@ -643,10 +652,74 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   }
 
   private handleStickyReply(key: string): void {
-    SummarMenuUtils.handleReply(key, true);
+    SummarMenuUtils.handleReply(key, this.context, true);
   }
 
   private handleStickyDeleteOutput(key: string): void {
     SummarMenuUtils.handleDeleteOutput(key, this.context);
+  }
+
+  // ===== 하이라이트 관련 메서드 =====
+  
+  highlightStickyHeader(key: string): void {
+    // 해당 key의 sticky header 찾기
+    const stickyHeader = this.context.containerEl.querySelector(`.sticky-header[data-key="${key}"] .output-header`) as HTMLElement;
+    if (stickyHeader) {
+      // 배색 반전 효과 적용 (!important로 강제 적용)
+      this.applyInvertedColorScheme(stickyHeader);
+      SummarDebug.log(1, `Sticky header highlighted with inverted colors for key: ${key}`);
+    }
+  }
+
+  clearAllStickyHeaderHighlights(): void {
+    // 모든 sticky header에서 하이라이팅 제거
+    const stickyHeaders = this.context.containerEl.querySelectorAll('.sticky-header .output-header');
+    stickyHeaders.forEach((header: HTMLElement) => {
+      this.applyOriginalColorScheme(header);
+    });
+    SummarDebug.log(1, 'All sticky header highlights cleared');
+  }
+
+  /**
+   * Sticky 헤더에 하이라이트 효과를 적용합니다 (!important 사용)
+   */
+  private applyInvertedColorScheme(header: HTMLElement): void {
+    // 헤더 배경색 변경 (!important로 강제 적용)
+    header.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
+  }
+
+  /**
+   * Sticky 헤더를 원래 배색으로 복원합니다
+   */
+  /**
+   * Sticky 헤더에서 원래 배색으로 복원합니다
+   */
+  private applyOriginalColorScheme(header: HTMLElement): void {
+    // 헤더 배경색 제거
+    header.style.removeProperty('background-color');
+  }
+
+  private applyCurrentHighlightState(key: string): void {
+    // 현재 composer의 targetKey와 일치하는지 확인
+    const highlightedKey = this.context.getHighlightedKey();
+    SummarDebug.log(1, `Checking highlight state: currentKey=${key}, highlightedKey=${highlightedKey}`);
+    
+    if (highlightedKey === key) {
+      // 새로 생성된 sticky header에 하이라이트 적용
+      const stickyHeader = this.context.containerEl.querySelector(`.sticky-header[data-key="${key}"] .output-header`) as HTMLElement;
+      SummarDebug.log(1, `Looking for sticky header with selector: .sticky-header[data-key="${key}"] .output-header`);
+      SummarDebug.log(1, `Found sticky header element:`, stickyHeader);
+      
+      if (stickyHeader) {
+        // 배색 반전 효과 적용
+        this.applyInvertedColorScheme(stickyHeader);
+        SummarDebug.log(1, `Applied current inverted color scheme to sticky header for key: ${key}`);
+      } else {
+        SummarDebug.log(1, `Failed to find sticky header for key: ${key}`);
+        // 대안으로 direct container search
+        const allStickyHeaders = this.context.containerEl.querySelectorAll('.sticky-header .output-header');
+        SummarDebug.log(1, `Found ${allStickyHeaders.length} sticky headers in total`);
+      }
+    }
   }
 }

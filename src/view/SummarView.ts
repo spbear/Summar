@@ -39,6 +39,7 @@ export class SummarView extends View {
   // Resource management
   private abortController: AbortController = new AbortController();
   private timeoutRefs: Set<NodeJS.Timeout> = new Set();
+  private resizeObserver: ResizeObserver | null = null;
 
   // Managers
   private styleManager: ISummarStyleManager;
@@ -75,7 +76,12 @@ export class SummarView extends View {
       outputRecords: new Map<string, SummarOutputRecord>(),
       markdownRenderer: this.markdownRenderer,
       abortController: this.abortController,
-      timeoutRefs: this.timeoutRefs
+      timeoutRefs: this.timeoutRefs,
+      
+      // 하이라이트 상태 조회 메서드
+      getHighlightedKey: () => {
+        return this.composerManager?.currentTargetKey || null;
+      }
     };
 
     // Initialize managers
@@ -110,14 +116,11 @@ export class SummarView extends View {
     
     this.outputManager.setEventHandlers(events);
 
-    // Add upload manager reference to context for event handler
-    (this.context as any).uploadManager = this.uploadManager;
-    // Add output manager reference for event handler to fetch raw text via Map
-    (this.context as any).outputManager = this.outputManager;
-    // Add sticky header manager reference to context for event handler
-    (this.context as any).stickyHeaderManager = this.stickyHeaderManager;
-    // Add composer manager reference to context for event handler
-    (this.context as any).composerManager = this.composerManager;
+    // Add manager references to context for type safety
+    this.context.outputManager = this.outputManager;
+    this.context.stickyHeaderManager = this.stickyHeaderManager;
+    this.context.uploadManager = this.uploadManager;
+    this.context.composerManager = this.composerManager;
   }
 
   getViewType(): string {
@@ -146,6 +149,12 @@ export class SummarView extends View {
     this.stickyHeaderManager.cleanup();
     this.eventHandler.cleanup();
     this.composerManager.cleanup();
+    
+    // Cleanup ResizeObserver
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
     
     // Cleanup resources
     this.abortController.abort();
@@ -260,7 +269,9 @@ export class SummarView extends View {
     return this.outputManager.getOutputText(key);
   }
 
-  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
+  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string): void {
+    // 현재 사용되지 않음 - 필요 시 구현
+    SummarDebug.log(1, `updateOutputInfo called for key: ${key}, statId: ${statId}`);
   }
 
   enableNewNote(key: string, newNotePath?: string): void {
@@ -333,17 +344,11 @@ export class SummarView extends View {
 
   private setupResizeHandling(): void {
     // ResizeObserver를 사용하여 컨테이너 크기 변화 감지
-    const resizeObserver = new ResizeObserver(() => {
+    this.resizeObserver = new ResizeObserver(() => {
       this.handleResize();
     });
     
-    resizeObserver.observe(this.containerEl);
-    
-    // 정리를 위해 timeout refs에 추가 (실제로는 cleanup에서 disconnect 필요)
-    const timeoutId = setTimeout(() => {
-      // ResizeObserver cleanup will be handled in onunload
-    }, 0);
-    this.timeoutRefs.add(timeoutId);
+    this.resizeObserver.observe(this.containerEl);
   }
 
   updateOutputContainerMargin(): void {
