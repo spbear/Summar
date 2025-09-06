@@ -78,7 +78,8 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       cls: "summarview-chat",
     });
     
-    this.setupChatContainerStyles(chatContainer);
+    // 스타일 설정은 SummarChatManager.setupChatContainer()에서 통합 관리
+    // 여기서는 기본 클래스만 설정하고 실제 스타일은 SummarChatManager가 담당
     
     return chatContainer;
   }
@@ -276,23 +277,6 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     
     // sticky header positioning을 확실히 하기 위해 강제 설정
     resultContainer.style.position = "relative !important" as any;
-  }
-
-  private setupChatContainerStyles(chatContainer: HTMLDivElement): void {
-    chatContainer.style.position = "relative";
-    chatContainer.style.width = "auto"; // resultContainer와 동일하게 auto로 설정
-    chatContainer.style.height = "400px";
-    chatContainer.style.border = "1px solid var(--background-modifier-border)";
-    chatContainer.style.marginTop = "1px";
-    chatContainer.style.marginLeft = "5px";
-    chatContainer.style.marginRight = "5px";
-    chatContainer.style.marginBottom = "25px";
-    chatContainer.style.backgroundColor = "var(--background-primary)";
-    chatContainer.style.color = "var(--text-normal)";
-    chatContainer.style.borderRadius = "6px";
-    chatContainer.style.overflow = "hidden";
-    chatContainer.style.boxSizing = "border-box"; // resultContainer와 동일
-    chatContainer.style.display = "none"; // 초기에는 숨김
   }
 
   private setupPlatformSpecificVisibility(buttons: {

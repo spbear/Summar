@@ -117,7 +117,8 @@ export function composeStandardChatHeader(label: string, buttons: ChatHeaderButt
   chatHeader.style.gap = '0px';
   chatHeader.style.marginBottom = '0px';
   chatHeader.style.padding = '0px';
-  chatHeader.style.border = '1px solid var(--background-modifier-border)';
+  chatHeader.style.border = 'none';
+  // chatHeader.style.border = '1px solid var(--background-modifier-border)';
   chatHeader.style.backgroundColor = 'var(--background-secondary)';
 //  chatHeader.style.height = '44px';
   chatHeader.style.boxSizing = 'border-box';

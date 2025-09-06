@@ -19,11 +19,8 @@ export class SummarChatManager implements ISummarChatManager {
   constructor(private context: ISummarViewContext) {}
 
   setupChatContainer(): void {
-    // chatContainer를 flex 컨테이너로 설정
-    this.context.chatContainer.style.display = 'flex';
-    this.context.chatContainer.style.flexDirection = 'column';
-    this.context.chatContainer.style.padding = '0';
-    this.context.chatContainer.style.boxSizing = 'border-box';
+    // chatContainer의 모든 스타일을 여기서 통합 관리
+    this.setupChatContainerStyles();
 
     // Chat header 생성
     this.chatHeader = this.createChatHeader();
@@ -40,6 +37,28 @@ export class SummarChatManager implements ISummarChatManager {
     // 초기에는 숨김
     this.context.chatContainer.style.display = 'none';
     this.splitter.style.display = 'none';
+  }
+
+  private setupChatContainerStyles(): void {
+    // SummarUIRenderer에서 가져온 기본 스타일들
+    this.context.chatContainer.style.position = "relative";
+    this.context.chatContainer.style.width = "auto";
+    this.context.chatContainer.style.height = "400px";
+    this.context.chatContainer.style.border = "1px solid var(--background-modifier-border)";
+    this.context.chatContainer.style.marginTop = "1px";
+    this.context.chatContainer.style.marginLeft = "5px";
+    this.context.chatContainer.style.marginRight = "5px";
+    this.context.chatContainer.style.marginBottom = "25px";
+    this.context.chatContainer.style.backgroundColor = "var(--background-primary)";
+    this.context.chatContainer.style.color = "var(--text-normal)";
+    this.context.chatContainer.style.borderRadius = "6px";
+    this.context.chatContainer.style.overflow = "hidden";
+    this.context.chatContainer.style.boxSizing = "border-box";
+    
+    // SummarChatManager에서 추가하는 flex 스타일들
+    this.context.chatContainer.style.display = 'flex';
+    this.context.chatContainer.style.flexDirection = 'column';
+    this.context.chatContainer.style.padding = '0';
   }
 
   private createChatHeader(): HTMLDivElement {
@@ -97,7 +116,7 @@ export class SummarChatManager implements ISummarChatManager {
     });
 
     // 높이 설정 (ResultHeaderComposer에서 주석처리된 부분 적용)
-    header.style.height = '32px';
+    header.style.height = '28px';
     header.style.padding = '4px 6px';
 
     return header;
