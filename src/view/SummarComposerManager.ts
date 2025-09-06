@@ -158,12 +158,34 @@ export class SummarComposerManager implements ISummarComposerManager {
     // composerContainer height에서 composerHeader height를 뺀 만큼 채움
     this.updatePromptEditorHeight(promptEditor);
 
-    // Enter 키 이벤트 추가
+    // IME 조합 상태 추적 변수
+    let isComposing = false;
+
+    // IME 조합 시작 이벤트
+    promptEditor.addEventListener('compositionstart', () => {
+      isComposing = true;
+      SummarDebug.log(2, 'IME composition started');
+    });
+
+    // IME 조합 완료 이벤트
+    promptEditor.addEventListener('compositionend', () => {
+      isComposing = false;
+      SummarDebug.log(2, 'IME composition ended');
+    });
+
+    // Enter 키 이벤트 추가 (IME 조합 중일 때는 무시)
     promptEditor.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
+        // IME 조합 중일 때는 엔터 이벤트 무시
+        if (isComposing) {
+          SummarDebug.log(2, 'Enter key ignored during IME composition');
+          return;
+        }
+        
         e.preventDefault();
         const message = promptEditor.value.trim();
         if (message) {
+          SummarDebug.log(1, `Sending message: "${message}"`);
           this.sendMessage(message);
         }
       }
