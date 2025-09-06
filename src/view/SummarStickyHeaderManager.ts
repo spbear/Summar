@@ -479,6 +479,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     const uploadWikiButton = this.createStickyButton('upload-output-to-wiki-button', 'Upload this output to Confluence', 'file-up', key);
     const uploadSlackButton = this.createStickyButton('upload-output-to-slack-button', 'Upload this output to Slack', 'hash', key);
     const newNoteButton = this.createStickyButton('new-note-button', 'Create new note with this output', 'file-output', key);
+    const replyButton = this.createStickyButton('reply-output-button', 'reply', 'message-circle-reply', key);
     const toggleButton = this.createStickyToggleButton(key);
     const copyButton = this.createStickyButton('copy-output-button', 'Copy this output to clipboard', 'copy', key);
     const rightSpacer = document.createElement('div');
@@ -494,6 +495,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
       newNote: newNoteButton,
+      reply: replyButton,
       toggle: toggleButton,
       copy: copyButton,
       spacer: rightSpacer,

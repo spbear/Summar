@@ -368,6 +368,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     const uploadWikiButton = this.createUploadWikiButton(key);
     const uploadSlackButton = this.createUploadSlackButton(key);
     const newNoteButton = this.createNewNoteButton(key);
+    const replyButton = this.createReplyButton(key);
     const toggleButton = this.createToggleButton();
     const copyButton = this.createCopyButton(key);
     const rightSpacer = document.createElement('div');
@@ -384,6 +385,7 @@ export class SummarOutputManager implements ISummarOutputManager {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
       newNote: newNoteButton,
+      reply: replyButton,
       toggle: toggleButton,
       copy: copyButton,
       spacer: rightSpacer,
@@ -524,6 +526,22 @@ export class SummarOutputManager implements ISummarOutputManager {
     button.style.display = 'none';
     
     setIcon(button, 'file-output');
+    
+    // 이벤트 리스너는 별도 매니저에서 처리
+    
+    return button;
+  }
+
+  private createReplyButton(key: string): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.className = 'lucide-icon-button';
+    button.setAttribute('button-id', 'reply-output-button');
+    button.setAttribute('aria-label', 'reply');
+    button.style.transform = 'scale(0.7)';
+    button.style.transformOrigin = 'center';
+    button.style.margin = '0';
+    
+    setIcon(button, 'message-circle-reply');
     
     // 이벤트 리스너는 별도 매니저에서 처리
     

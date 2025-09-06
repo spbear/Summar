@@ -4,6 +4,7 @@ export type HeaderButtonsSet = {
   uploadWiki: HTMLElement;
   uploadSlack: HTMLElement;
   newNote: HTMLElement;
+  reply: HTMLElement;
   toggle: HTMLElement;
   copy: HTMLElement;
   spacer: HTMLElement;
@@ -99,6 +100,7 @@ export function composeStandardOutputHeader(label: string, buttons: HeaderButton
   outputHeader.appendChild(buttons.uploadWiki);
   outputHeader.appendChild(buttons.uploadSlack);
   outputHeader.appendChild(buttons.newNote);
+  outputHeader.appendChild(buttons.reply);
   outputHeader.appendChild(buttons.toggle);
   outputHeader.appendChild(buttons.copy);
   outputHeader.appendChild(buttons.spacer);

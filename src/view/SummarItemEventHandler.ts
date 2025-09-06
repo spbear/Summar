@@ -47,6 +47,9 @@ export class SummarItemEventHandler implements ISummarEventHandler {
         case 'upload-output-to-slack-button':
           this.handleUploadOutputToSlack(key);
           break;
+        case 'reply-output-button':
+          this.handleReplyOutput(key);
+          break;
         case 'copy-output-button':
           this.handleCopyOutput(key);
           break;
@@ -107,6 +110,20 @@ export class SummarItemEventHandler implements ISummarEventHandler {
       if (toggleButton) {
         this.handleToggleClick(key, toggleButton);
       }
+    }
+  }
+
+  private handleReplyOutput(key: string): void {
+    // ComposerManager를 통해 composer 표시 및 타겟 설정
+    const composerManager = (this.context as any).composerManager;
+    if (composerManager) {
+      // Composer 표시
+      composerManager.showComposerContainer();
+      // 타겟 아이템 설정
+      composerManager.setOutput(key);
+      SummarDebug.log(1, `Reply initiated for output key: ${key}`);
+    } else {
+      SummarDebug.log(1, `ComposerManager not found, cannot initiate reply for key: ${key}`);
     }
   }
 

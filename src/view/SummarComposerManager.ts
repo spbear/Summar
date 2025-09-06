@@ -15,6 +15,7 @@ export class SummarComposerManager implements ISummarComposerManager {
   private isResizing: boolean = false;
   private minComposerHeight: number = 100;
   private maxComposerHeight: number = 500;
+  private targetKey: string | null = null;
 
   constructor(private context: ISummarViewContext) {}
 
@@ -283,7 +284,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     }
   }
 
-  private showComposerContainer(): void {
+  showComposerContainer(): void {
     const composerHeight = 200;
     
     // Composer container 표시
@@ -356,6 +357,11 @@ export class SummarComposerManager implements ISummarComposerManager {
     }
     
     SummarDebug.Notice(1, 'Composer cleared');
+  }
+
+  setOutput(key: string): void {
+    this.targetKey = key;
+    SummarDebug.log(1, `Composer target set to output key: ${key}`);
   }
 
   cleanup(): void {
