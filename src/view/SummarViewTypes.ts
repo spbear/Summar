@@ -9,7 +9,7 @@ export interface ISummarViewContext {
   view?: any; // SummarView 참조 (circular dependency 방지를 위해 any 타입 사용)
   containerEl: HTMLElement;
   resultContainer: HTMLDivElement;
-  chatContainer: HTMLDivElement;
+  composerContainer: HTMLDivElement;
   // 통합 레코드 저장소 (단계적 도입)
   resultRecords: Map<string, SummarResultRecord>;
   markdownRenderer: MarkdownIt;
@@ -40,7 +40,7 @@ export interface ISummarUIRenderer {
   renderUrlInputContainer(container: HTMLElement): HTMLDivElement;
   renderButtonContainer(container: HTMLElement): HTMLDivElement;
   renderResultContainer(container: HTMLElement): HTMLDivElement;
-  renderChatContainer(container: HTMLElement): HTMLDivElement;
+  renderComposerContainer(container: HTMLElement): HTMLDivElement;
   setupContainerStyles(container: HTMLElement): void;
 }
 
@@ -84,11 +84,11 @@ export interface ISummarUploadManager {
   updateSlackButtonTooltip(): void;
 }
 
-export interface ISummarChatManager {
-  setupChatContainer(): void;
+export interface ISummarComposerManager {
+  setupComposerContainer(): void;
   sendMessage(message: string): Promise<void>;
-  clearChat(): void;
-  toggleChatContainer(): void;
+  clearComposer(): void;
+  toggleComposerContainer(): void;
   handleViewResize(): void;
   cleanup(): void;
 }

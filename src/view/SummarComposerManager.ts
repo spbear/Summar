@@ -1,0 +1,371 @@
+import { setIcon } from "obsidian";
+import { ISummarComposerManager, ISummarViewContext } from "./SummarViewTypes";
+import { SummarDebug } from "../globals";
+import { setStandardComposerHeader, ComposerHeaderButtonsSet } from "./ResultHeaderComposer";
+
+/**
+ * Composer 기능 관리자
+ * 채팅 컨테이너 및 메시지 처리를 담당
+ */
+export class SummarComposerManager implements ISummarComposerManager {
+  private composerHeader: HTMLDivElement | null = null;
+  private promptEditor: HTMLTextAreaElement | null = null;
+  private isComposerVisible: boolean = false;
+  private splitter: HTMLDivElement | null = null;
+  private isResizing: boolean = false;
+  private minComposerHeight: number = 100;
+  private maxComposerHeight: number = 500;
+
+  constructor(private context: ISummarViewContext) {}
+
+  setupComposerContainer(): void {
+    // composerContainer의 모든 스타일을 여기서 통합 관리
+    this.setupComposerContainerStyles();
+
+    // Composer header 생성
+    this.composerHeader = this.createComposerHeader();
+    this.context.composerContainer.appendChild(this.composerHeader);
+
+    // Input area 생성 (간단한 textarea)
+    this.promptEditor = this.createPromptEditor();
+    this.context.composerContainer.appendChild(this.promptEditor);
+
+    // Splitter 생성 및 composerContainer 위에 삽입
+    this.splitter = this.createSplitter();
+    this.context.containerEl.insertBefore(this.splitter, this.context.composerContainer);
+
+    // 초기에는 숨김
+    this.context.composerContainer.style.display = 'none';
+    this.splitter.style.display = 'none';
+  }
+
+  private setupComposerContainerStyles(): void {
+    // SummarUIRenderer에서 가져온 기본 스타일들
+    this.context.composerContainer.style.position = "relative";
+    this.context.composerContainer.style.width = "auto";
+    this.context.composerContainer.style.height = "400px";
+    this.context.composerContainer.style.border = "1px solid var(--background-modifier-border)";
+    this.context.composerContainer.style.marginTop = "1px";
+    this.context.composerContainer.style.marginLeft = "5px";
+    this.context.composerContainer.style.marginRight = "5px";
+    this.context.composerContainer.style.marginBottom = "25px";
+    this.context.composerContainer.style.backgroundColor = "var(--background-primary)";
+    this.context.composerContainer.style.color = "var(--text-normal)";
+    this.context.composerContainer.style.borderRadius = "6px";
+    this.context.composerContainer.style.overflow = "hidden";
+    this.context.composerContainer.style.boxSizing = "border-box";
+    
+    // SummarComposerManager에서 추가하는 flex 스타일들
+    this.context.composerContainer.style.display = 'flex';
+    this.context.composerContainer.style.flexDirection = 'column';
+    this.context.composerContainer.style.padding = '0';
+  }
+
+  private createComposerHeader(): HTMLDivElement {
+    // Spacer
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    spacer.style.minWidth = '8px';
+
+    // Clear 버튼
+    const clearButton = document.createElement('button');
+    clearButton.setAttribute('button-id', 'composer-clear-button');
+    clearButton.setAttribute('aria-label', 'Clear composer');
+    clearButton.style.cssText = `
+      background: none;
+      border: none;
+      padding: 2px;
+      cursor: pointer;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: scale(0.8);
+      transform-origin: center;
+    `;
+    setIcon(clearButton, 'trash-2');
+
+    // Close 버튼
+    const closeButton = document.createElement('button');
+    closeButton.setAttribute('button-id', 'composer-close-button');
+    closeButton.setAttribute('aria-label', 'Close composer');
+    closeButton.style.cssText = `
+      background: none;
+      border: none;
+      padding: 2px;
+      cursor: pointer;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: scale(0.8);
+      transform-origin: center;
+    `;
+    setIcon(closeButton, 'x');
+
+    // ComposerHeaderButtonsSet 구성
+    const buttons: ComposerHeaderButtonsSet = {
+      spacer: spacer,
+      clear: clearButton,
+      close: closeButton
+    };
+
+    // setStandardComposerHeader 사용
+    const header = setStandardComposerHeader('composer', buttons, { 
+      icon: 'message-circle'
+    });
+
+    // 높이 설정 (ResultHeaderComposer에서 주석처리된 부분 적용)
+    header.style.height = '28px';
+    header.style.padding = '4px 6px';
+
+    return header;
+  }
+
+  private createPromptEditor(): HTMLTextAreaElement {
+    const promptEditor = document.createElement('textarea');
+    promptEditor.className = 'composer-prompt-editor';
+    promptEditor.placeholder = 'Type your message here...';
+    promptEditor.style.cssText = `
+      flex: 1;
+      width: 100%;
+      margin: 0;
+      padding: 16px;
+      background: var(--background-primary);
+      border: none;
+      border-radius: 0;
+      resize: none;
+      outline: none;
+      font-family: var(--font-interface);
+      font-size: var(--font-ui-small);
+      color: var(--text-normal);
+      box-sizing: border-box;
+    `;
+
+    // composerContainer height에서 composerHeader height를 뺀 만큼 채움
+    this.updatePromptEditorHeight(promptEditor);
+
+    // Enter 키 이벤트 추가
+    promptEditor.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const message = promptEditor.value.trim();
+        if (message) {
+          this.sendMessage(message);
+        }
+      }
+    });
+
+    return promptEditor;
+  }
+
+  private updatePromptEditorHeight(promptEditor: HTMLTextAreaElement): void {
+    if (!this.composerHeader) return;
+    
+    // composerHeader의 실제 높이를 getBoundingClientRect로 계산 (resultHeader와 동일한 방식)
+    const composerHeaderRect = this.composerHeader.getBoundingClientRect();
+    const composerHeaderHeight = composerHeaderRect.height;
+    
+    // promptEditor의 높이를 composerContainer height - composerHeader height로 설정
+    promptEditor.style.height = `calc(100% - ${composerHeaderHeight}px)`;
+    
+    SummarDebug.log(1, `Input area height updated: calc(100% - ${composerHeaderHeight}px)`);
+  }
+
+  private createSplitter(): HTMLDivElement {
+    const splitter = document.createElement('div');
+    splitter.className = 'composer-splitter';
+    splitter.style.cssText = `
+      height: 4px;
+      background: transparent;
+      cursor: ns-resize;
+      border-top: 1px solid transparent;
+      border-bottom: 1px solid transparent;
+      display: none;
+      user-select: none;
+      position: relative;
+    `;
+
+    // 호버 효과
+    splitter.addEventListener('mouseenter', () => {
+      splitter.style.background = 'var(--interactive-accent)';
+    });
+
+    splitter.addEventListener('mouseleave', () => {
+      if (!this.isResizing) {
+        splitter.style.background = 'transparent';
+      }
+    });
+
+    // 리사이징 이벤트
+    splitter.addEventListener('mousedown', this.handleSplitterMouseDown.bind(this));
+
+    return splitter;
+  }
+
+  private handleSplitterMouseDown(e: MouseEvent): void {
+    e.preventDefault();
+    this.isResizing = true;
+    
+    if (this.splitter) {
+      this.splitter.style.background = 'var(--interactive-accent)';
+    }
+
+    const startY = e.clientY;
+    const startHeight = parseInt(this.context.composerContainer.style.height) || 200;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = startY - e.clientY; // 위로 드래그하면 positive
+      const newHeight = Math.max(
+        this.minComposerHeight,
+        Math.min(this.maxComposerHeight, startHeight + deltaY)
+      );
+
+      this.resizeComposerContainer(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      this.isResizing = false;
+      if (this.splitter) {
+        this.splitter.style.background = 'transparent';
+      }
+      
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }
+
+  private resizeComposerContainer(height: number): void {
+    this.context.composerContainer.style.height = `${height}px`;
+    
+    // Result container height 조정 - composerContainer의 마진을 고려
+    const containerRect = this.context.containerEl.getBoundingClientRect();
+    const inputHeight = 60; // 대략적인 input + button 영역 높이
+    const splitterHeight = 4;
+    const composerMargins = 6; // composerContainer의 하단 마진 (resultContainer와 동일한 간격)
+    const newResultHeight = containerRect.height - inputHeight - height - splitterHeight - composerMargins;
+    
+    this.context.resultContainer.style.height = `${newResultHeight}px`;
+  }
+
+  handleViewResize(): void {
+    const composerVisible = this.context.composerContainer.style.display !== 'none';
+    
+    if (composerVisible) {
+      // composerContainer가 표시된 경우 현재 높이를 유지하면서 리사이징
+      const currentComposerHeight = parseInt(this.context.composerContainer.style.height) || 200;
+      this.resizeComposerContainer(currentComposerHeight);
+      
+      SummarDebug.log(1, `View resized: composer visible, maintained height ${currentComposerHeight}px`);
+    } else {
+      // composerContainer가 숨겨진 경우 resultContainer를 전체 크기로 복원
+      const containerRect = this.context.containerEl.getBoundingClientRect();
+      const inputHeight = 60; // 대략적인 input + button 영역 높이
+      const statusBarMargin = 6; // resultContainer의 기본 하단 간격
+      const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
+      
+      this.context.resultContainer.style.height = `${fullResultHeight}px`;
+      
+      SummarDebug.log(1, `View resized: composer hidden, result height restored to ${fullResultHeight}px`);
+    }
+  }
+
+  toggleComposerContainer(): void {
+    this.isComposerVisible = !this.isComposerVisible;
+    
+    if (this.isComposerVisible) {
+      this.showComposerContainer();
+    } else {
+      this.hideComposerContainer();
+    }
+  }
+
+  private showComposerContainer(): void {
+    const composerHeight = 200;
+    
+    // Composer container 표시
+    this.context.composerContainer.style.display = 'flex';
+    this.context.composerContainer.style.height = `${composerHeight}px`;
+    
+    // Splitter 표시 (composerContainer 바로 위에)
+    if (this.splitter) {
+      this.splitter.style.display = 'block';
+    }
+    
+    // Result container height 조정 - composerContainer의 마진(좌우 2px + 하단 6px)을 고려
+    const containerRect = this.context.containerEl.getBoundingClientRect();
+    const inputHeight = 60; // 대략적인 input + button 영역 높이
+    const splitterHeight = 4;
+    const composerMargins = 6; // composerContainer의 하단 마진 (resultContainer와 동일한 간격)
+    const newResultHeight = containerRect.height - inputHeight - composerHeight - splitterHeight - composerMargins;
+    
+    this.context.resultContainer.style.height = `${newResultHeight}px`;
+    
+    // 중앙 마진 관리 함수 호출
+    if (this.context.view && this.context.view.updateResultContainerMargin) {
+      this.context.view.updateResultContainerMargin();
+    }
+    
+    SummarDebug.log(1, `Composer container shown, result height adjusted to ${newResultHeight}px with composer margins`);
+  }
+
+  private hideComposerContainer(): void {
+    // Composer container 숨김
+    this.context.composerContainer.style.display = 'none';
+    
+    // Splitter 숨김
+    if (this.splitter) {
+      this.splitter.style.display = 'none';
+    }
+    
+    // Result container height 복원 - composerContainer가 없을 때의 하단 간격 (6px)
+    const containerRect = this.context.containerEl.getBoundingClientRect();
+    const inputHeight = 60; // 대략적인 input + button 영역 높이
+    const statusBarMargin = 6; // resultContainer의 기본 하단 간격
+    const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
+    
+    this.context.resultContainer.style.height = `${fullResultHeight}px`;
+    
+    // 중앙 마진 관리 함수 호출
+    if (this.context.view && this.context.view.updateResultContainerMargin) {
+      this.context.view.updateResultContainerMargin();
+    }
+    
+    SummarDebug.log(1, 'Composer container hidden, result height restored with original bottom margin');
+  }
+
+  async sendMessage(message: string): Promise<void> {
+    if (!message.trim()) return;
+
+    SummarDebug.Notice(1, `Composer message: ${message}`);
+    
+    // 입력 필드 초기화
+    if (this.promptEditor) {
+      this.promptEditor.value = '';
+    }
+    
+    // TODO: 실제 채팅 로직 구현
+  }
+
+  clearComposer(): void {
+    if (this.promptEditor) {
+      this.promptEditor.value = '';
+    }
+    
+    SummarDebug.Notice(1, 'Composer cleared');
+  }
+
+  cleanup(): void {
+    // 리사이징 중단
+    this.isResizing = false;
+    
+    // Splitter 제거
+    if (this.splitter) {
+      this.splitter.remove();
+      this.splitter = null;
+    }
+  }
+}

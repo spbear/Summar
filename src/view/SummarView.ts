@@ -10,7 +10,7 @@ import { SummarResultManager } from "./SummarResultManager";
 import { SummarStickyHeaderManager } from "./SummarStickyHeaderManager";
 import { SummarEventHandler } from "./SummarEventHandler";
 import { SummarUploadManager } from "./SummarUploadManager";
-import { SummarChatManager } from "./SummarChatManager";
+import { SummarComposerManager } from "./SummarComposerManager";
 
 // 타입 import
 import { 
@@ -21,7 +21,7 @@ import {
   ISummarStickyHeaderManager,
   ISummarEventHandler,
   ISummarUploadManager,
-  ISummarChatManager,
+  ISummarComposerManager,
   SummarViewEvents,
   SummarResultRecord
 } from "./SummarViewTypes";
@@ -32,7 +32,7 @@ export class SummarView extends View {
   // Core properties
   plugin: SummarPlugin;
   resultContainer: HTMLDivElement;
-  chatContainer: HTMLDivElement;
+  composerContainer: HTMLDivElement;
   // 통합 레코드로 전환: 개별 Map 제거
   markdownRenderer: MarkdownIt;
 
@@ -47,7 +47,7 @@ export class SummarView extends View {
   private stickyHeaderManager: ISummarStickyHeaderManager;
   private eventHandler: ISummarEventHandler;
   private uploadManager: ISummarUploadManager;
-  private chatManager: ISummarChatManager;
+  private composerManager: ISummarComposerManager;
 
   // Context for managers
   private context: ISummarViewContext;
@@ -71,7 +71,7 @@ export class SummarView extends View {
       view: this, // SummarView 참조 추가
       containerEl: this.containerEl,
       resultContainer: this.resultContainer, // Will be set in renderView
-      chatContainer: this.chatContainer, // Will be set in renderView
+      composerContainer: this.composerContainer, // Will be set in renderView
       resultRecords: new Map<string, SummarResultRecord>(),
       markdownRenderer: this.markdownRenderer,
       abortController: this.abortController,
@@ -89,7 +89,7 @@ export class SummarView extends View {
     this.stickyHeaderManager = new SummarStickyHeaderManager(this.context);
     this.eventHandler = new SummarEventHandler(this.context);
     this.uploadManager = new SummarUploadManager(this.context);
-    this.chatManager = new SummarChatManager(this.context);
+    this.composerManager = new SummarComposerManager(this.context);
 
     // Set up event handlers for result manager
     const events: SummarViewEvents = {
@@ -116,8 +116,8 @@ export class SummarView extends View {
     (this.context as any).resultManager = this.resultManager;
     // Add sticky header manager reference to context for event handler
     (this.context as any).stickyHeaderManager = this.stickyHeaderManager;
-    // Add chat manager reference to context for event handler
-    (this.context as any).chatManager = this.chatManager;
+    // Add composer manager reference to context for event handler
+    (this.context as any).composerManager = this.composerManager;
   }
 
   getViewType(): string {
@@ -145,7 +145,7 @@ export class SummarView extends View {
     this.resultManager.cleanup();
     this.stickyHeaderManager.cleanup();
     this.eventHandler.cleanup();
-    this.chatManager.cleanup();
+    this.composerManager.cleanup();
     
     // Cleanup resources
     this.abortController.abort();
@@ -214,19 +214,19 @@ export class SummarView extends View {
     const urlInputContainer = this.uiRenderer.renderUrlInputContainer(container);
     const buttonContainer = this.uiRenderer.renderButtonContainer(container);
     const resultContainer = this.uiRenderer.renderResultContainer(container);
-    const chatContainer = this.uiRenderer.renderChatContainer(container);
+    const composerContainer = this.uiRenderer.renderComposerContainer(container);
 
     // Store container references
     this.resultContainer = resultContainer;
-    this.chatContainer = chatContainer;
+    this.composerContainer = composerContainer;
     this.context.resultContainer = resultContainer;
-    this.context.chatContainer = chatContainer;
+    this.context.composerContainer = composerContainer;
 
     // Copilot 등 다른 플러그인의 스타일 간섭 방지를 위한 MutationObserver 설정
     this.setupStyleProtection(urlInputContainer, buttonContainer);
 
-    // Setup chat container
-    this.chatManager.setupChatContainer();
+    // Setup composer container
+    this.composerManager.setupComposerContainer();
 
     // Setup sticky header
     this.stickyHeaderManager.setupStickyHeader(container);
@@ -235,10 +235,10 @@ export class SummarView extends View {
     // Setup event listeners
     this.eventHandler.setupEventListeners();
 
-    // Setup resize handling for chat container
+    // Setup resize handling for composer container
     this.setupResizeHandling();
 
-    SummarDebug.log(1, "SummarView rendered successfully with chat container");
+    SummarDebug.log(1, "SummarView rendered successfully with composer container");
   }
 
   // ==================== Public API Methods ====================
@@ -347,17 +347,17 @@ export class SummarView extends View {
   }
 
   updateResultContainerMargin(): void {
-    const chatVisible = this.chatContainer.style.display !== 'none';
-    const marginValue = chatVisible ? "1px" : "25px";
+    const composerVisible = this.composerContainer.style.display !== 'none';
+    const marginValue = composerVisible ? "1px" : "25px";
     
     this.resultContainer.style.marginBottom = marginValue;
     
-    SummarDebug.log(1, `ResultContainer margin updated to ${marginValue} (chat visible: ${chatVisible})`);
+    SummarDebug.log(1, `ResultContainer margin updated to ${marginValue} (composer visible: ${composerVisible})`);
   }
 
   private handleResize(): void {
-    // SummarChatManager의 공용 리사이징 메서드 호출
-    this.chatManager.handleViewResize();
+    // SummarComposerManager의 공용 리사이징 메서드 호출
+    this.composerManager.handleViewResize();
     
     // 마진 업데이트
     this.updateResultContainerMargin();

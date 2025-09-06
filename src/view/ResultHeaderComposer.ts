@@ -10,7 +10,7 @@ export type HeaderButtonsSet = {
   menu: HTMLElement;
 };
 
-export type ChatHeaderButtonsSet = {
+export type ComposerHeaderButtonsSet = {
   spacer: HTMLElement;
   clear: HTMLElement;
   close: HTMLElement;
@@ -31,7 +31,7 @@ export function getDefaultLabelIcon(label: string): string {
   if (/(note|memo)/.test(l)) return 'file';
   if (/(wiki|confluence)/.test(l)) return 'book';
   if (/(slack)/.test(l)) return 'hash';
-  if (/(chat)/.test(l)) return 'message-square-more';
+  if (/(chat|composer)/.test(l)) return 'message-square-more';
   if (/(summary)/.test(l)) return 'clipboard-list';
   if (/(refinement)/.test(l)) return 'clipboard-check';
   if (/(custom)/.test(l)) return 'pocket-knife';
@@ -107,25 +107,25 @@ export function composeStandardResultHeader(label: string, buttons: HeaderButton
   return resultHeader;
 }
 
-// Build a standardized chat header: label + buttons in fixed order.
-export function composeStandardChatHeader(label: string, buttons: ChatHeaderButtonsSet, options?: LabelOptions): HTMLDivElement {
-  const chatHeader = document.createElement('div');
-  chatHeader.className = 'chat-header';
-  chatHeader.style.width = '100%';
-  chatHeader.style.display = 'flex';
-  chatHeader.style.alignItems = 'center';
-  chatHeader.style.gap = '0px';
-  chatHeader.style.marginBottom = '0px';
-  chatHeader.style.padding = '0px';
-  chatHeader.style.border = 'none';
-  // chatHeader.style.border = '1px solid var(--background-modifier-border)';
-  chatHeader.style.backgroundColor = 'var(--background-secondary)';
-//  chatHeader.style.height = '44px';
-  chatHeader.style.boxSizing = 'border-box';
+// Build a standardized composer header: label + buttons in fixed order.
+export function setStandardComposerHeader(label: string, buttons: ComposerHeaderButtonsSet, options?: LabelOptions): HTMLDivElement {
+  const composerHeader = document.createElement('div');
+  composerHeader.className = 'composer-header';
+  composerHeader.style.width = '100%';
+  composerHeader.style.display = 'flex';
+  composerHeader.style.alignItems = 'center';
+  composerHeader.style.gap = '0px';
+  composerHeader.style.marginBottom = '0px';
+  composerHeader.style.padding = '0px';
+  composerHeader.style.border = 'none';
+  // composerHeader.style.border = '1px solid var(--background-modifier-border)';
+  composerHeader.style.backgroundColor = 'var(--background-secondary)';
+//  composerHeader.style.height = '44px';
+  composerHeader.style.boxSizing = 'border-box';
 
   // Label (Chat icon + title)
   const labelChip = document.createElement('div');
-  labelChip.classList.add('chat-label-chip');
+  labelChip.classList.add('composer-label-chip');
   labelChip.style.display = 'inline-flex';
   labelChip.style.alignItems = 'center';
   labelChip.style.gap = '4px';
@@ -141,14 +141,14 @@ export function composeStandardChatHeader(label: string, buttons: ChatHeaderButt
 
   if (options?.icon) {
     const iconHolder = document.createElement('span');
-    iconHolder.classList.add('chat-label-icon');
+    iconHolder.classList.add('composer-label-icon');
     iconHolder.style.display = 'inline-flex';
     iconHolder.style.width = '12px';
     iconHolder.style.height = '12px';
     iconHolder.style.transform = 'translateY(0)';
     iconHolder.style.color = options.iconColor || 'currentColor';
     setIcon(iconHolder as HTMLElement, options.icon);
-    // Adjust SVG to fit 12x12 for chat header
+    // Adjust SVG to fit 12x12 for composer header
     const svg = iconHolder.querySelector('svg') as SVGElement | null;
     if (svg) {
       svg.style.width = '12px';
@@ -159,17 +159,17 @@ export function composeStandardChatHeader(label: string, buttons: ChatHeaderButt
   }
 
   const labelText = document.createElement('span');
-  labelText.classList.add('chat-label-text');
+  labelText.classList.add('composer-label-text');
   labelText.textContent = label;
   labelChip.appendChild(labelText);
-  chatHeader.appendChild(labelChip);
-  // Chat header에서 안전하게 라벨을 추출할 수 있도록 data 속성도 부여
-  chatHeader.setAttribute('data-label', label);
+  composerHeader.appendChild(labelChip);
+  // Composer header에서 안전하게 라벨을 추출할 수 있도록 data 속성도 부여
+  composerHeader.setAttribute('data-label', label);
 
   // Buttons in canonical order
-  chatHeader.appendChild(buttons.spacer);
-  chatHeader.appendChild(buttons.clear);
-  chatHeader.appendChild(buttons.close);
+  composerHeader.appendChild(buttons.spacer);
+  composerHeader.appendChild(buttons.clear);
+  composerHeader.appendChild(buttons.close);
 
-  return chatHeader;
+  return composerHeader;
 }

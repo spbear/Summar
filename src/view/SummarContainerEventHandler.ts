@@ -149,10 +149,10 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
     // 메뉴 아이템들 생성
     const menuItems = [
-      { label: 'Chat', action: () => this.handleChat() },
-      { label: 'Load test result', action: () => this.handleLoadAllResult() },
-      { label: 'Save all result', action: () => this.handleSaveAllResult() },
-      { label: 'Delete all result', action: () => this.handleDeleteAllResult() }
+      { label: 'Composer', action: () => this.handleComposer() },
+      { label: 'Load output', action: () => this.handleLoadAllResult() },
+      { label: 'Save all output', action: () => this.handleSaveAllResult() },
+      { label: 'Clear all output', action: () => this.handleDeleteAllResult() }
     ];
 
     menuItems.forEach(item => {
@@ -218,10 +218,10 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     }
   }
 
-  private async handleChat(): Promise<void> {
-    const chatManager = (this.context as any).chatManager;
-    if (chatManager && chatManager.toggleChatContainer) {
-      chatManager.toggleChatContainer();
+  private async handleComposer(): Promise<void> {
+    const composerManager = (this.context as any).composerManager;
+    if (composerManager && composerManager.toggleComposerContainer) {
+      composerManager.toggleComposerContainer();
     }
   }
 

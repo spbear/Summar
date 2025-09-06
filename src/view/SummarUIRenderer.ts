@@ -73,15 +73,15 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     return resultContainer;
   }
 
-  renderChatContainer(container: HTMLElement): HTMLDivElement {
-    const chatContainer: HTMLDivElement = container.createEl("div", {
-      cls: "summarview-chat",
+  renderComposerContainer(container: HTMLElement): HTMLDivElement {
+    const composerContainer: HTMLDivElement = container.createEl("div", {
+      cls: "summarview-composer",
     });
     
-    // 스타일 설정은 SummarChatManager.setupChatContainer()에서 통합 관리
-    // 여기서는 기본 클래스만 설정하고 실제 스타일은 SummarChatManager가 담당
+    // 스타일 설정은 SummarComposerManager.setupComposerContainer()에서 통합 관리
+    // 여기서는 기본 클래스만 설정하고 실제 스타일은 SummarComposerManager가 담당
     
-    return chatContainer;
+    return composerContainer;
   }
 
   setupContainerStyles(container: HTMLElement): void {
