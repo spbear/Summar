@@ -293,6 +293,18 @@ export class SummarOutputManager implements ISummarOutputManager {
    */
   private applyInvertedColorScheme(header: HTMLElement): void {
     header.style.backgroundColor = 'var(--background-modifier-hover)';
+    
+    // 헤더 내부의 모든 텍스트 요소(라벨) 배경색을 투명하게
+    const textElements = header.querySelectorAll('.output-label-chip, .output-label-icon, .output-label-text');
+    textElements.forEach((element: HTMLElement) => {
+      element.style.backgroundColor = 'var(--background-primary)';
+    });
+    
+    // 헤더 내부의 모든 버튼 배경색을 투명하게
+    const buttons = header.querySelectorAll('button, .lucide-icon-button');
+    buttons.forEach((button: HTMLElement) => {
+      button.style.backgroundColor = 'var(--background-primary)';
+    });
   }
 
   /**
@@ -300,6 +312,18 @@ export class SummarOutputManager implements ISummarOutputManager {
    */
   private applyOriginalColorScheme(header: HTMLElement): void {
     header.style.backgroundColor = '';
+    
+    // 헤더 내부의 모든 텍스트 요소(라벨) 배경색을 hover 색상으로
+    const textElements = header.querySelectorAll('.output-label-chip, .output-label-icon, .output-label-text');
+    textElements.forEach((element: HTMLElement) => {
+      element.style.backgroundColor = 'var(--background-modifier-hover)';
+    });
+    
+    // 헤더 내부의 모든 버튼 배경색을 hover 색상으로
+    const buttons = header.querySelectorAll('button, .lucide-icon-button');
+    buttons.forEach((button: HTMLElement) => {
+      button.style.backgroundColor = 'var(--background-modifier-hover)';
+    });
   }
 
 

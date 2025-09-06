@@ -686,6 +686,18 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private applyInvertedColorScheme(header: HTMLElement): void {
     // 헤더 배경색 변경 (!important로 강제 적용)
     header.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
+    
+    // 헤더 내부의 모든 텍스트 요소(라벨) 배경색을 투명하게 (!important로 강제 적용)
+    const textElements = header.querySelectorAll('.output-label-text, .data-label, .output-label-chip, .output-label-icon');
+    textElements.forEach((element: HTMLElement) => {
+      element.style.setProperty('background-color', 'var(--background-primary)', 'important');
+    });
+    
+    // 헤더 내부의 모든 버튼 배경색을 투명하게 (!important로 강제 적용)
+    const buttons = header.querySelectorAll('button, .lucide-icon-button');
+    buttons.forEach((button: HTMLElement) => {
+      button.style.setProperty('background-color', 'var(--background-primary)', 'important');
+    });
   }
 
   /**
@@ -697,6 +709,18 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private applyOriginalColorScheme(header: HTMLElement): void {
     // 헤더 배경색 제거
     header.style.removeProperty('background-color');
+    
+    // 헤더 내부의 모든 텍스트 요소(라벨) 배경색을 hover 색상으로
+    const textElements = header.querySelectorAll('.output-label-text, .data-label, .output-label-chip, .output-label-icon');
+    textElements.forEach((element: HTMLElement) => {
+      element.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
+    });
+    
+    // 헤더 내부의 모든 버튼 배경색을 hover 색상으로
+    const buttons = header.querySelectorAll('button, .lucide-icon-button');
+    buttons.forEach((button: HTMLElement) => {
+      button.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
+    });
   }
 
   private applyCurrentHighlightState(key: string): void {
