@@ -3,7 +3,7 @@ import * as os from 'os';
 import { Device } from '@capacitor/device';
 
 import SummarPlugin from "./main";
-import { SummarResultRecord } from "./view/SummarViewTypes";
+import { SummarOutputRecord } from "./view/SummarViewTypes";
 
 // import { PluginSettings } from "./types";
 // import exp from "constants";
@@ -12,7 +12,7 @@ import { SummarResultRecord } from "./view/SummarViewTypes";
 
 export class SummarViewContainer {
   plugin: SummarPlugin;
-  resultRecord: SummarResultRecord;
+  outputRecord: SummarOutputRecord;
 
   timerInterval: number | undefined; // 타이머 ID
   dotCount = 0; // 점(.)의 개수
@@ -20,10 +20,10 @@ export class SummarViewContainer {
 
   constructor(plugin: SummarPlugin) {
     this.plugin = plugin;
-    this.resultRecord = this.createResultRecord();
+    this.outputRecord = this.createOutputRecord();
   }
 
-  private createResultRecord(label: string = "chat", icon: string = "message-square-more"): SummarResultRecord {
+  private createOutputRecord(label: string = "chat", icon: string = "message-square-more"): SummarOutputRecord {
     return {
       key: this.plugin.generateUniqueId(),
       itemEl: null,
@@ -38,9 +38,9 @@ export class SummarViewContainer {
   }
 
   // 오버로드: 문자열 또는 옵션 객체 모두 지원 + clearOldItems 제어
-  initResultRecord(label?: string, clearOldItems?: boolean): void;
-  initResultRecord(opts?: { label?: string; icon?: string; clearOldItems?: boolean }): void;
-  initResultRecord(
+  initOutputRecord(label?: string, clearOldItems?: boolean): void;
+  initOutputRecord(opts?: { label?: string; icon?: string; clearOldItems?: boolean }): void;
+  initOutputRecord(
     arg: string | { label?: string; icon?: string; clearOldItems?: boolean } = {},
     clearOldItems?: boolean
   ): void {
@@ -52,65 +52,65 @@ export class SummarViewContainer {
     } else if (arg && typeof arg === "object") {
       ({ label = "", icon = "tag", clearOldItems: shouldClear } = arg);
     }
-    this.resultRecord = this.createResultRecord(label, icon);
+    this.outputRecord = this.createOutputRecord(label, icon);
     const doClear = typeof shouldClear === "boolean" ? shouldClear : (this.plugin.settingsv2.system.debugLevel < 3);
-    if (doClear) this.clearAllResultItems();
+    if (doClear) this.clearAllOutputItems();
   }
 
-  setResultRecord(key: string, label: string) {
-    this.resultRecord.key = key;
-    this.resultRecord.label = label;
+  setOutputRecord(key: string, label: string) {
+    this.outputRecord.key = key;
+    this.outputRecord.label = label;
   }
 
-  pushResultPrompt(prompt: string) {
-    this.resultRecord.prompts?.push(prompt);
-    return this.plugin.pushResultPrompt(this.resultRecord.key, prompt);
+  pushOutputPrompt(prompt: string) {
+    this.outputRecord.prompts?.push(prompt);
+    return this.plugin.pushOutputPrompt(this.outputRecord.key, prompt);
   }
 
   /**
    * Updates the value of a result container.
-   * @param resultContainer The container object to update.
+   * @param outputContainer The container object to update.
    * @param message The message to set as the value.
    */
-  updateResultText(message: string): string {
-      this.resultRecord.result = message;
-      return this.plugin.updateResultText(this.resultRecord.key, 
-                                          this.resultRecord.label as string, 
-                                          this.resultRecord.result);
+  updateOutputText(message: string): string {
+      this.outputRecord.result = message;
+      return this.plugin.updateOutputText(this.outputRecord.key, 
+                                          this.outputRecord.label as string, 
+                                          this.outputRecord.result);
   }
 
-  appendResultText(message: string): string {
-      this.resultRecord.result = message;
-      return this.plugin.appendResultText(this.resultRecord.key, 
-                                          this.resultRecord.label as string, 
-                                          this.resultRecord.result);
+  appendOutputText(message: string): string {
+      this.outputRecord.result = message;
+      return this.plugin.appendOutputText(this.outputRecord.key, 
+                                          this.outputRecord.label as string, 
+                                          this.outputRecord.result);
   }
-  getResultText(): string {
-      return this.plugin.getResultText(this.resultRecord.key);
+  getOutputText(): string {
+      return this.plugin.getOutputText(this.outputRecord.key);
   }
 
-  updateResultInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
+  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
     this.plugin.enableNewNote(true, key, newNotePath);
-    this.resultRecord.statId = statId;
-    this.resultRecord.prompts = prompts;
-    this.resultRecord.noteName = newNotePath;
-    this.plugin.updateResultInfo(this.resultRecord.key, 
-                                 this.resultRecord.statId, 
-                                 this.resultRecord.prompts, 
-                                 this.resultRecord.noteName);
+    this.outputRecord.statId = statId;
+    this.outputRecord.prompts = prompts;
+    this.outputRecord.noteName = newNotePath;
+    this.plugin.updateOutputInfo(this.outputRecord.key, 
+                                 this.outputRecord.statId, 
+                                 this.outputRecord.prompts, 
+                                 this.outputRecord.noteName);
   }
 
   enableNewNote(enabled: boolean, newNotePath?: string) {
-    this.resultRecord.noteName = newNotePath;
-    this.plugin.enableNewNote(enabled, this.resultRecord.key, this.resultRecord.noteName);
+    this.outputRecord.noteName = newNotePath;
+    this.plugin.enableNewNote(enabled, this.outputRecord.key, this.outputRecord.noteName);
   } 
 
-  foldResult(fold: boolean): void {
-    this.plugin.foldResult(this.resultRecord.key, fold);
+  foldOutput(fold: boolean): void {
+    this.plugin.foldOutput(this.outputRecord.key, fold);
   }
   
-  clearAllResultItems(): void {
-    this.plugin.clearAllResultItems();
+  clearAllOutputItems(): void {
+    this.plugin.clearAllOutputItems();
   }
 
   // 타이머 시작 함수
@@ -122,7 +122,7 @@ export class SummarViewContainer {
     this.started = true; // 시작 여부 변경
     this.dotCount = 0; // 초기화
     this.timerInterval = window.setInterval(() => {
-      const result = this.appendResultText(".");      
+      const result = this.appendOutputText(".");      
       this.dotCount++;
     }, 500); // 500ms마다 실행
   }

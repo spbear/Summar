@@ -5,7 +5,7 @@ import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 
 /**
  * Item 레벨 이벤트 핸들러
- * 개별 결과 아이템들의 버튼 이벤트 (toggle, copy, new-note, upload-result 등) 처리
+ * 개별 결과 아이템들의 버튼 이벤트 (toggle, copy, new-note, upload-output 등) 처리
  */
 export class SummarItemEventHandler implements ISummarEventHandler {
   constructor(private context: ISummarViewContext) {}
@@ -13,16 +13,16 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   setupEventListeners(): void {
     // 결과 아이템별 버튼 이벤트는 동적으로 생성되므로
     // 이벤트 위임(event delegation) 방식 사용
-    this.context.resultContainer.addEventListener('click', (event) => {
+    this.context.outputContainer.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       const button = target.closest('button') as HTMLButtonElement;
       
       if (!button) {
-        // 버튼이 아닌 경우, result-header 클릭인지 확인
-        const resultHeader = target.closest('.result-header') as HTMLDivElement;
-        if (resultHeader) {
-          const resultItem = resultHeader.closest('.result-item') as HTMLDivElement;
-          const key = resultItem?.getAttribute('result-key');
+        // 버튼이 아닌 경우, output-header 클릭인지 확인
+        const outputHeader = target.closest('.output-header') as HTMLDivElement;
+        if (outputHeader) {
+          const outputItem = outputHeader.closest('.output-item') as HTMLDivElement;
+          const key = outputItem?.getAttribute('output-key');
           if (key) {
             this.handleHeaderClick(key);
             return;
@@ -32,8 +32,8 @@ export class SummarItemEventHandler implements ISummarEventHandler {
       }
       
       const buttonId = button.getAttribute('button-id');
-      const resultItem = button.closest('.result-item') as HTMLDivElement;
-      const key = resultItem?.getAttribute('result-key');
+      const outputItem = button.closest('.output-item') as HTMLDivElement;
+      const key = outputItem?.getAttribute('output-key');
       
       if (!key) return;
       
@@ -41,14 +41,14 @@ export class SummarItemEventHandler implements ISummarEventHandler {
         case 'new-note-button':
           this.handleNewNoteClick(key);
           break;
-        case 'upload-result-to-wiki-button':
-          this.handleUploadResultToWiki(key);
+        case 'upload-output-to-wiki-button':
+          this.handleUploadOutputToWiki(key);
           break;
-        case 'upload-result-to-slack-button':
-          this.handleUploadResultToSlack(key);
+        case 'upload-output-to-slack-button':
+          this.handleUploadOutputToSlack(key);
           break;
-        case 'copy-result-button':
-          this.handleCopyResult(key);
+        case 'copy-output-button':
+          this.handleCopyOutput(key);
           break;
         case 'show-menu-button':
           this.handleShowMenuClick(key, event);
@@ -85,9 +85,9 @@ export class SummarItemEventHandler implements ISummarEventHandler {
         return;
       }
       
-      // sticky header container 내의 result-header를 클릭한 경우 toggle 처리
-      const resultHeader = target.closest('.result-header') as HTMLDivElement;
-      if (resultHeader && stickyHeaderContainer.contains(resultHeader)) {
+      // sticky header container 내의 output-header를 클릭한 경우 toggle 처리
+      const outputHeader = target.closest('.output-header') as HTMLDivElement;
+      if (outputHeader && stickyHeaderContainer.contains(outputHeader)) {
         const stickyHeaderManager = (this.context as any).stickyHeaderManager;
         if (stickyHeaderManager && stickyHeaderManager.getCurrentStickyKey) {
           const key = stickyHeaderManager.getCurrentStickyKey();
@@ -100,10 +100,10 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   }
 
   private handleHeaderClick(key: string): void {
-    // result-header나 sticky header를 클릭했을 때 toggle 버튼 클릭과 동일한 동작
-    const resultItem = this.context.resultContainer.querySelector(`[result-key="${key}"]`) as HTMLDivElement;
-    if (resultItem) {
-      const toggleButton = resultItem.querySelector('[button-id="toggle-fold-button"]') as HTMLButtonElement;
+    // output-header나 sticky header를 클릭했을 때 toggle 버튼 클릭과 동일한 동작
+    const outputItem = this.context.outputContainer.querySelector(`[output-key="${key}"]`) as HTMLDivElement;
+    if (outputItem) {
+      const toggleButton = outputItem.querySelector('[button-id="toggle-fold-button"]') as HTMLButtonElement;
       if (toggleButton) {
         this.handleToggleClick(key, toggleButton);
       }
@@ -136,9 +136,9 @@ export class SummarItemEventHandler implements ISummarEventHandler {
           await this.context.plugin.app.vault.adapter.mkdir(folderPath);
         }
         
-        const resultTextContent = this.getResultText(key);
-        SummarDebug.log(1, `resultText content===\n${resultTextContent}`);
-        await this.context.plugin.app.vault.create(filePath, resultTextContent);
+        const outputTextContent = this.getOutputText(key);
+        SummarDebug.log(1, `outputText content===\n${outputTextContent}`);
+        await this.context.plugin.app.vault.create(filePath, outputTextContent);
         await this.context.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
       }
     } catch (error) {
@@ -146,8 +146,8 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     }
   }
 
-  private async handleUploadResultToWiki(key: string): Promise<void> {
-    const resultText = this.getResultText(key);
+  private async handleUploadOutputToWiki(key: string): Promise<void> {
+    const outputText = this.getOutputText(key);
     let title = this.getNoteName(key);
     
     // '/' 이후부터 '.md' 이전까지의 문자열 추출
@@ -162,14 +162,14 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     
     // title이 비어있다면 기본값 설정
     if (!title) {
-      title = `Result_${key}`;
+      title = `Output_${key}`;
     }
     
-    await this.uploadContentToWiki(title, resultText);
+    await this.uploadContentToWiki(title, outputText);
   }
 
-  private async handleUploadResultToSlack(key: string): Promise<void> {
-    const resultText = this.getResultText(key);
+  private async handleUploadOutputToSlack(key: string): Promise<void> {
+    const outputText = this.getOutputText(key);
     let title = this.getNoteName(key);
     
     // '/' 이후부터 '.md' 이전까지의 문자열 추출
@@ -184,18 +184,18 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     
     // title이 비어있다면 기본값 설정
     if (!title) {
-      title = `Result_${key}`;
+      title = `Output_${key}`;
     }
     
-    await this.uploadContentToSlack(title, resultText);
+    await this.uploadContentToSlack(title, outputText);
   }
 
-  private async handleCopyResult(key: string): Promise<void> {
+  private async handleCopyOutput(key: string): Promise<void> {
     try {
-      // Map 기반 저장소 사용 → resultManager 경유로 원문 취득
-      const resultManager = (this.context as any).resultManager as { getResultText: (k: string) => string } | undefined;
-      const result = resultManager?.getResultText(key) || '';
-      await navigator.clipboard.writeText(result || '');
+      // Map 기반 저장소 사용 → outputManager 경유로 원문 취득
+      const outputManager = (this.context as any).outputManager as { getOutputText: (k: string) => string } | undefined;
+      const output = outputManager?.getOutputText(key) || '';
+      await navigator.clipboard.writeText(output || '');
       SummarDebug.Notice(1, 'Content copied to clipboard');
     } catch (error) {
       SummarDebug.error(1, "Error copying to clipboard:", error);
@@ -224,11 +224,11 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     (this.context as any).isToggling = true;
     
     try {
-      const resultItem = toggleButton.closest('.result-item') as HTMLDivElement;
-      const resultText = resultItem?.querySelector('.result-text') as HTMLDivElement;
+      const outputItem = toggleButton.closest('.output-item') as HTMLDivElement;
+      const outputText = outputItem?.querySelector('.output-text') as HTMLDivElement;
       
-      if (!resultItem || !resultText) {
-        SummarDebug.log(1, `Could not find result item or text for key: ${key}`);
+      if (!outputItem || !outputText) {
+        SummarDebug.log(1, `Could not find output item or text for key: ${key}`);
         return;
       }
       
@@ -239,20 +239,20 @@ export class SummarItemEventHandler implements ISummarEventHandler {
       toggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
       this.setToggleButtonIcon(toggleButton, newToggled);
       
-      // resultText 표시/숨김
-      resultText.style.display = newToggled ? 'none' : 'block';
+      // outputText 표시/숨김
+      outputText.style.display = newToggled ? 'none' : 'block';
       
       // 통합 레코드에 접힘 상태 반영
-      const rec = this.context.resultRecords.get(key);
+      const rec = this.context.outputRecords.get(key);
       if (rec) {
         rec.folded = newToggled;
       }
       
       // 이벤트 발생 (StickyHeader 업데이트 등을 위해)
-      // Note: 이벤트 시스템이 필요하면 resultManager를 통해 호출
-      const resultManager = (this.context as any).resultManager;
-      if (resultManager && resultManager.events && resultManager.events.onToggleStateChanged) {
-        resultManager.events.onToggleStateChanged(key, newToggled);
+      // Note: 이벤트 시스템이 필요하면 outputManager를 통해 호출
+      const outputManager = (this.context as any).outputManager;
+      if (outputManager && outputManager.events && outputManager.events.onToggleStateChanged) {
+        outputManager.events.onToggleStateChanged(key, newToggled);
       }
       
     } finally {
@@ -268,25 +268,25 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     SummarMenuUtils.handleReply(key, false);
   }
 
-  private handleDeleteResult(key: string): void {
-    SummarMenuUtils.handleDeleteResult(key, this.context);
+  private handleDeleteOutput(key: string): void {
+    SummarMenuUtils.handleDeleteOutput(key, this.context);
   }
 
   private setToggleButtonIcon(button: HTMLButtonElement, folded: boolean): void {
     setIcon(button, folded ? 'square-chevron-down' : 'square-chevron-up');
   }
 
-  private getResultText(key: string): string {
+  private getOutputText(key: string): string {
     // Manager 경유(MAP) → attribute fallback 순서
-    const resultManager = (this.context as any).resultManager as { getResultText: (k: string) => string } | undefined;
-    return resultManager?.getResultText(key) || '';
+    const outputManager = (this.context as any).outputManager as { getOutputText: (k: string) => string } | undefined;
+    return outputManager?.getOutputText(key) || '';
   }
 
   private getNoteName(key: string): string {
-    // ResultManager 경유해 통합 레코드 우선 사용
-    const resultManager = (this.context as any).resultManager as { getNoteName: (k: string) => string } | undefined;
-    if (resultManager) return resultManager.getNoteName(key);
-    const rec = this.context.resultRecords.get(key);
+    // OutputManager 경유해 통합 레코드 우선 사용
+    const outputManager = (this.context as any).outputManager as { getNoteName: (k: string) => string } | undefined;
+    if (outputManager) return outputManager.getNoteName(key);
+    const rec = this.context.outputRecords.get(key);
     return rec?.noteName || "";
   }
 

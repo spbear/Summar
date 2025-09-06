@@ -82,7 +82,7 @@ export default class SummarPlugin extends Plugin {
   // V2 설정 시스템 (통합된 클래스)
   settingsv2: PluginSettingsV2;
 
-  // resultContainer: HTMLTextAreaElement;
+  // outputContainer: HTMLTextAreaElement;
   // uploadNoteToWikiButton: HTMLButtonElement;
   uploadNoteToSlackButton: HTMLButtonElement;
   newNoteButton: HTMLButtonElement;
@@ -1436,66 +1436,66 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
-    pushResultPrompt(key: string, prompt: string) {
+    pushOutputPrompt(key: string, prompt: string) {
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
-        if (summarView && typeof summarView.pushResultPrompt === 'function') {
-          return summarView.pushResultPrompt(key, prompt);
+        if (summarView && typeof summarView.pushOutputPrompt === 'function') {
+          return summarView.pushOutputPrompt(key, prompt);
         }
       }
       return "";
   }
 
-  updateResultText(key: string, label: string, message: string): string {
-      // SummarView의 updateResultText 메서드를 호출
+  updateOutputText(key: string, label: string, message: string): string {
+      // SummarView의 updateOutputText 메서드를 호출
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
-        if (summarView && typeof summarView.updateResultText === 'function') {
-          return summarView.updateResultText(key, label, message);
+        if (summarView && typeof summarView.updateOutputText === 'function') {
+          return summarView.updateOutputText(key, label, message);
         }
       }
       return "";
   }
 
-  appendResultText(key: string, label: string, message: string): string {
-      // SummarView의 appendResultText 메서드를 호출
+  appendOutputText(key: string, label: string, message: string): string {
+      // SummarView의 appendOutputText 메서드를 호출
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-      // SummarDebug.log(2, `appendResultText: Found ${leaves.length} SummarView leaves`);
+      // SummarDebug.log(2, `appendOutputText: Found ${leaves.length} SummarView leaves`);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
-        if (summarView && typeof summarView.appendResultText === 'function') {
-          // SummarDebug.log(2, `appendResultText: Calling SummarView.appendResultText for key: ${key}, message: "${message}"`);
-          return summarView.appendResultText(key, label, message);
+        if (summarView && typeof summarView.appendOutputText === 'function') {
+          // SummarDebug.log(2, `appendOutputText: Calling SummarView.appendOutputText for key: ${key}, message: "${message}"`);
+          return summarView.appendOutputText(key, label, message);
         } else {
-          // SummarDebug.log(1, `appendResultText: SummarView or appendResultText method not found`);
+          // SummarDebug.log(1, `appendOutputText: SummarView or appendOutputText method not found`);
         }
       } else {
-        // SummarDebug.log(1, `appendResultText: No SummarView leaves found`);
+        // SummarDebug.log(1, `appendOutputText: No SummarView leaves found`);
       }
       return "";
   }
 
-  getResultText(key: string): string {
-    // SummarView의 getResultText 메서드를 호출
+  getOutputText(key: string): string {
+    // SummarView의 getOutputText 메서드를 호출
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.getResultText === 'function') {
-        return summarView.getResultText(key);
+      if (summarView && typeof summarView.getOutputText === 'function') {
+        return summarView.getOutputText(key);
       }
     }
     return "";
   }
 
-  updateResultInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
+  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.updateResultInfo === 'function') {
+      if (summarView && typeof summarView.updateOutputInfo === 'function') {
 
-          summarView.updateResultInfo(key, statId, prompts, newNotePath);
+          summarView.updateOutputInfo(key, statId, prompts, newNotePath);
       }
     }
   }
@@ -1513,24 +1513,24 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
-  foldResult(key: string | null, fold: boolean): void {
-    // SummarView의 foldResult 메서드를 호출
+  foldOutput(key: string | null, fold: boolean): void {
+    // SummarView의 foldOutput 메서드를 호출
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.foldResult === 'function') {
-          summarView.foldResult(key, fold);
+      if (summarView && typeof summarView.foldOutput === 'function') {
+          summarView.foldOutput(key, fold);
       }
     }
   }
 
-  clearAllResultItems(): void {
-    // SummarView의 clearAllResultItems 메서드를 호출
+  clearAllOutputItems(): void {
+    // SummarView의 clearAllOutputItems 메서드를 호출
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.clearAllResultItems === 'function') {
-          summarView.clearAllResultItems();
+      if (summarView && typeof summarView.clearAllOutputItems === 'function') {
+          summarView.clearAllOutputItems();
       }
     }
   }

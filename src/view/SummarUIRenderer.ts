@@ -63,14 +63,14 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     return buttonContainer;
   }
 
-  renderResultContainer(container: HTMLElement): HTMLDivElement {
-    const resultContainer: HTMLDivElement = container.createEl("div", {
-      cls: "summarview-result",
+  renderOutputContainer(container: HTMLElement): HTMLDivElement {
+    const outputContainer: HTMLDivElement = container.createEl("div", {
+      cls: "summarview-output",
     });
     
-    this.setupResultContainerStyles(resultContainer);
+    this.setupOutputContainerStyles(outputContainer);
     
-    return resultContainer;
+    return outputContainer;
   }
 
   renderComposerContainer(container: HTMLElement): HTMLDivElement {
@@ -259,24 +259,24 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     return button;
   }
 
-  private setupResultContainerStyles(resultContainer: HTMLDivElement): void {
-    resultContainer.style.position = "relative";
-    resultContainer.style.width = "auto"; // urlInputContainer와 동일하게 auto로 설정
-    resultContainer.style.height = "calc(100% - 140px)"; // 120px + 6px for status bar
-    resultContainer.style.border = "1px solid var(--background-modifier-border)";
-    resultContainer.style.padding = "10px";
-    resultContainer.style.marginTop = "5px";
-    resultContainer.style.marginLeft = "5px";
-    resultContainer.style.marginRight = "5px";
-    resultContainer.style.marginBottom = "25px";
-    resultContainer.style.overflowY = "auto";
-    resultContainer.style.overflowX = "hidden";
-    resultContainer.style.backgroundColor = "var(--background-primary)";
-    resultContainer.style.color = "var(--text-normal)";
-    resultContainer.style.boxSizing = "border-box"; // padding 포함한 크기 계산
+  private setupOutputContainerStyles(outputContainer: HTMLDivElement): void {
+    outputContainer.style.position = "relative";
+    outputContainer.style.width = "auto"; // urlInputContainer와 동일하게 auto로 설정
+    outputContainer.style.height = "calc(100% - 140px)"; // 120px + 6px for status bar
+    outputContainer.style.border = "1px solid var(--background-modifier-border)";
+    outputContainer.style.padding = "10px";
+    outputContainer.style.marginTop = "5px";
+    outputContainer.style.marginLeft = "5px";
+    outputContainer.style.marginRight = "5px";
+    outputContainer.style.marginBottom = "25px";
+    outputContainer.style.overflowY = "auto";
+    outputContainer.style.overflowX = "hidden";
+    outputContainer.style.backgroundColor = "var(--background-primary)";
+    outputContainer.style.color = "var(--text-normal)";
+    outputContainer.style.boxSizing = "border-box"; // padding 포함한 크기 계산
     
     // sticky header positioning을 확실히 하기 위해 강제 설정
-    resultContainer.style.position = "relative !important" as any;
+    outputContainer.style.position = "relative !important" as any;
   }
 
   private setupPlatformSpecificVisibility(buttons: {

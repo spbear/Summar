@@ -1,9 +1,9 @@
 import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
-import { composeStandardResultHeader, getDefaultLabelIcon } from "./ResultHeaderComposer";
-import { ISummarResultManager, ISummarViewContext, SummarResultRecord, SummarViewEvents } from "./SummarViewTypes";
+import { composeStandardOutputHeader, getDefaultLabelIcon } from "./OutputHeaderComposer";
+import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
-export class SummarResultManager implements ISummarResultManager {
+export class SummarOutputManager implements ISummarOutputManager {
   private events: SummarViewEvents = {};
   // key별 지연 렌더 타이머(append 폭주 시 렌더 횟수 축소)
   private renderTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -15,56 +15,56 @@ export class SummarResultManager implements ISummarResultManager {
     this.events = events;
   }
 
-  createResultItem(key: string, label: string): HTMLDivElement {
+  createOutputItem(key: string, label: string): HTMLDivElement {
     // 전체 컨테이너 생성
-    const resultItem = document.createElement('div');
-    resultItem.className = 'result-item';
-    resultItem.style.width = '100%';
-    resultItem.style.marginBottom = '8px';
-    resultItem.setAttribute('result-key', key);
+    const outputItem = document.createElement('div');
+    outputItem.className = 'output-item';
+    outputItem.style.width = '100%';
+    outputItem.style.marginBottom = '8px';
+    outputItem.setAttribute('output-key', key);
     
-    // resultHeader 생성
-    const resultHeader = this.createResultHeader(key, label);
+    // outputHeader 생성
+    const outputHeader = this.createOutputHeader(key, label);
     
-    // resultText 영역 생성
-    const resultText = this.createResultText(key);
+    // outputText 영역 생성
+    const outputText = this.createOutputText(key);
     
-    // resultItem에 헤더와 텍스트 영역 추가
-    resultItem.appendChild(resultHeader);
-    resultItem.appendChild(resultText);
+    // outputItem에 헤더와 텍스트 영역 추가
+    outputItem.appendChild(outputHeader);
+    outputItem.appendChild(outputText);
     
     // 토글 버튼 이벤트 설정은 SummarEventHandler에서 처리
     
     // 결과 아이템을 레코드에 저장
     const rec = this.ensureRecord(key);
-    rec.itemEl = resultItem;
+    rec.itemEl = outputItem;
     rec.label = label;
     
     // 컨테이너에 추가
-    this.context.resultContainer.appendChild(resultItem);
+    this.context.outputContainer.appendChild(outputItem);
     
     // 이벤트 발생
-    this.events.onResultItemCreated?.(key, resultItem);
+    this.events.onOutputItemCreated?.(key, outputItem);
     
-    return resultItem;
+    return outputItem;
   }
 
-  deleteResultItem(key: string): boolean {
+  deleteOutputItem(key: string): boolean {
     // 해당 키의 결과 아이템이 존재하는지 확인
-    const rec = this.context.resultRecords.get(key);
+    const rec = this.context.outputRecords.get(key);
     if (!rec || !rec.itemEl) {
-      SummarDebug.log(1, `Result item not found for key: ${key}`);
+      SummarDebug.log(1, `Output item not found for key: ${key}`);
       return false;
     }
 
-    // 이벤트를 통해 resultItem 제거 알림
-    this.events.onResultItemRemoved?.(key);
+    // 이벤트를 통해 outputItem 제거 알림
+    this.events.onOutputItemRemoved?.(key);
 
     // DOM에서 제거
     rec.itemEl.remove();
 
-    // resultRecords Map에서 제거
-    this.context.resultRecords.delete(key);
+    // outputRecords Map에서 제거
+    this.context.outputRecords.delete(key);
 
     // 해당 키의 렌더 타이머가 있다면 정리
     const renderTimer = this.renderTimers.get(key);
@@ -74,25 +74,25 @@ export class SummarResultManager implements ISummarResultManager {
       this.renderTimers.delete(key);
     }
 
-    SummarDebug.log(1, `Result item deleted: ${key}`);
+    SummarDebug.log(1, `Output item deleted: ${key}`);
     return true;
   }
 
-  appendResultText(key: string, label: string, message: string): string {
-    let resultItem = this.context.resultRecords.get(key)?.itemEl || null;
+  appendOutputText(key: string, label: string, message: string): string {
+    let outputItem = this.context.outputRecords.get(key)?.itemEl || null;
     
-    if (!resultItem) {
-      // 새로운 resultItem 생성
-      resultItem = this.createResultItem(key, label);
-      return this.updateResultText(key, label, message);
+    if (!outputItem) {
+      // 새로운 outputItem 생성
+      outputItem = this.createOutputItem(key, label);
+      return this.updateOutputText(key, label, message);
     }
     
     // Map 우선: 기존 텍스트에 추가
-    const currentText = this.getResult(key);
+    const currentText = this.getOutput(key);
     const newText = currentText + message;
 
     // 저장소 갱신
-    this.setResult(key, newText);
+    this.setOutput(key, newText);
 
     // 렌더는 디바운스로 스케줄링
     this.scheduleRender(key);
@@ -100,27 +100,27 @@ export class SummarResultManager implements ISummarResultManager {
     return key;
   }
 
-  updateResultText(key: string, label: string, message: string): string {
-    let resultItem = this.context.resultRecords.get(key)?.itemEl || null;
+  updateOutputText(key: string, label: string, message: string): string {
+    let outputItem = this.context.outputRecords.get(key)?.itemEl || null;
     
-    if (!resultItem) {
-      // 새로운 resultItem 생성
-      resultItem = this.createResultItem(key, label);
+    if (!outputItem) {
+      // 새로운 outputItem 생성
+      outputItem = this.createOutputItem(key, label);
     }
     
     // 텍스트 완전 교체: Map 저장 → 렌더 반영
-    this.setResult(key, message);
+    this.setOutput(key, message);
     // 즉시 반영 대신 동일한 경로로 디바운스 렌더(일관성)
     this.scheduleRender(key);
     
     return key;
   }
 
-  getResultText(key: string): string {
+  getOutputText(key: string): string {
     if (key === "") {
-      // 빈 키인 경우 모든 resultItem의 텍스트를 합쳐서 반환
+      // 빈 키인 경우 모든 outputItem의 텍스트를 합쳐서 반환
       let allText = "";
-      this.context.resultRecords.forEach((rec, itemKey) => {
+      this.context.outputRecords.forEach((rec, itemKey) => {
         const text = rec.result || '';
         if (text) {
           allText += (allText ? '\n\n' : '') + text;
@@ -129,37 +129,53 @@ export class SummarResultManager implements ISummarResultManager {
       return allText;
     }
     
-    const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
-    if (!resultItem) return "";
-    return this.getResult(key);
+    const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+    if (!outputItem) return "";
+    return this.getOutput(key);
   }
 
 
   /**
-   * Import result items from a JSON file placed in the plugin directory
+   * Import output items from a JSON file placed in the plugin directory
    * and populate the view accordingly.
    * Default filename: summar-results.json
    * Expected JSON shape:
-   * { "resultItems": { "0": { result, prompts, statId, key, label, noteName }, ... } }
+   * { "outputItems": { "0": { result, prompts, statId, key, label, noteName }, ... } }
    */
-  async importResultItemsFromPluginDir(filename: string = "summar-results.json"): Promise<number> {
+  async importOutputItemsFromPluginDir(filename: string = "summar-results.json"): Promise<number> {
     let importedCount = 0;
     try {
       const plugin = this.context.plugin;
       const path = `${plugin.PLUGIN_DIR}/${filename}`;
       const exists = await plugin.app.vault.adapter.exists(path);
-      if (!exists) return importedCount;
+      if (!exists) {
+        SummarDebug.log(1, `File does not exist: ${path}`);
+        return importedCount;
+      }
 
       const jsonText = await plugin.app.vault.adapter.read(path);
+      SummarDebug.log(1, `File content length: ${jsonText.length} characters`);
+      
       const data = JSON.parse(jsonText || '{}');
-      const items = data?.resultItems;
+      const items = data?.outputItems || data?.resultItems; // outputItems와 resultItems 둘 다 지원
+      
+      SummarDebug.log(1, `Parsed data structure:`, data);
+      if (Array.isArray(items)) {
+        SummarDebug.log(1, `Found ${items.length} items in array format`);
+      } else if (items && typeof items === 'object') {
+        SummarDebug.log(1, `Found ${Object.keys(items).length} items in object format`);
+      } else {
+        SummarDebug.log(1, `No valid items structure found in file (looking for 'outputItems' or 'resultItems')`);
+      }
 
       const ingest = (it: any) => {
         if (!it || typeof it !== 'object') return;
         const key: string = it.key || plugin.generateUniqueId();
         
+        SummarDebug.log(1, `Processing item with key: ${key}`);
+        
         // 기존에 동일한 key가 존재하는지 확인
-        if (this.context.resultRecords.has(key)) {
+        if (this.context.outputRecords.has(key)) {
           SummarDebug.log(1, `Skipping import for existing key: ${key}`);
           return;
         }
@@ -171,13 +187,13 @@ export class SummarResultManager implements ISummarResultManager {
         const statId: string | undefined = it.statId || undefined;
 
         // Create the UI item
-        this.createResultItem(key, label);
-        if (result) this.updateResultText(key, label, result);
+        this.createOutputItem(key, label);
+        if (result) this.updateOutputText(key, label, result);
         if (noteName) this.enableNewNote(key, noteName);
-        this.foldResult(key, true);
+        this.foldOutput(key, true);
 
         // Persist fields into record
-        const rec = this.context.resultRecords.get(key);
+        const rec = this.context.outputRecords.get(key);
         if (rec) {
           rec.prompts = prompts;
           rec.statId = statId;
@@ -195,36 +211,36 @@ export class SummarResultManager implements ISummarResultManager {
         // Nothing to import
       }
     } catch (error) {
-      console.error('Failed to import result items:', error);
+      console.error('Failed to import output items:', error);
     }
     
     return importedCount;
   }
 
-  foldResult(key: string | null, fold: boolean): void {
+  foldOutput(key: string | null, fold: boolean): void {
     if (!key || key === "") {
-      // 모든 resultItem에 대해 동일하게 적용
-      this.context.resultRecords.forEach((rec, itemKey) => {
-        if (rec.itemEl) this.applyFoldToResultItem(rec.itemEl, fold);
+      // 모든 outputItem에 대해 동일하게 적용
+      this.context.outputRecords.forEach((rec, itemKey) => {
+        if (rec.itemEl) this.applyFoldToOutputItem(rec.itemEl, fold);
       });
     } else {
-      // 특정 key의 resultItem에만 적용
-      const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
-      if (resultItem) {
-        this.applyFoldToResultItem(resultItem, fold);
+      // 특정 key의 outputItem에만 적용
+      const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+      if (outputItem) {
+        this.applyFoldToOutputItem(outputItem, fold);
       }
     }
   }
 
-  clearAllResultItems(): void {
-    // 이벤트를 통해 각 resultItem 제거 알림
-    this.context.resultRecords.forEach((rec, key) => {
-      this.events.onResultItemRemoved?.(key);
+  clearAllOutputItems(): void {
+    // 이벤트를 통해 각 outputItem 제거 알림
+    this.context.outputRecords.forEach((rec, key) => {
+      this.events.onOutputItemRemoved?.(key);
     });
     
     // 데이터 정리
-    this.context.resultRecords.clear();
-    this.context.resultContainer.empty();
+    this.context.outputRecords.clear();
+    this.context.outputContainer.empty();
 
     // 보류 중인 렌더 타이머 정리
     this.renderTimers.forEach((t) => {
@@ -249,10 +265,10 @@ export class SummarResultManager implements ISummarResultManager {
    * Serialize current result records into a JSON payload and write to plugin directory.
    * Returns the written file path.
    */
-  async saveResultItemsToPluginDir(): Promise<string> {
-    const resultItems: any[] = [];
-    this.context.resultRecords.forEach((rec) => {
-      resultItems.push({
+  async saveOutputItemsToPluginDir(): Promise<string> {
+    const outputItems: any[] = [];
+    this.context.outputRecords.forEach((rec) => {
+      outputItems.push({
         result: rec.result ?? "",
         prompts: Array.isArray(rec.prompts) ? rec.prompts : [],
         statId: rec.statId ?? "",
@@ -262,7 +278,7 @@ export class SummarResultManager implements ISummarResultManager {
       });
     });
 
-    const payload = { resultItems };
+    const payload = { outputItems };
 
     const ts = new Date();
     const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, "0")}${String(ts.getDate()).padStart(2, "0")}-${String(ts.getHours()).padStart(2, "0")}${String(ts.getMinutes()).padStart(2, "0")}${String(ts.getSeconds()).padStart(2, "0")}`;
@@ -281,14 +297,14 @@ export class SummarResultManager implements ISummarResultManager {
     }
     const timer = setTimeout(() => {
       try {
-        const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
-        if (!resultItem) return;
-        const resultTextEl = resultItem.querySelector('.result-text') as HTMLDivElement | null;
-        if (!resultTextEl) return;
-        const raw = this.getResult(key);
+        const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+        if (!outputItem) return;
+        const outputTextEl = outputItem.querySelector('.output-text') as HTMLDivElement | null;
+        if (!outputTextEl) return;
+        const raw = this.getOutput(key);
         const rendered = this.context.markdownRenderer.render(raw);
         const cleaned = this.cleanupMarkdownOutput(rendered);
-        resultTextEl.innerHTML = cleaned;
+        outputTextEl.innerHTML = cleaned;
       } finally {
         // 타이머 해제 및 참조 제거
         const t = this.renderTimers.get(key);
@@ -317,15 +333,15 @@ export class SummarResultManager implements ISummarResultManager {
     const rec2 = this.ensureRecord(key);
     rec2.noteName = noteName;
 
-    // key에 해당하는 resultItem의 버튼들을 활성화
-    const resultItem = this.context.resultRecords.get(key)?.itemEl || null;
-    if (resultItem) {
-      this.enableResultItemButtons(resultItem);
+    // key에 해당하는 outputItem의 버튼들을 활성화
+    const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+    if (outputItem) {
+      this.enableOutputItemButtons(outputItem);
     }
   }
 
   getNoteName(key: string): string {
-    const rec = this.context.resultRecords.get(key);
+    const rec = this.context.outputRecords.get(key);
     return rec?.noteName || "";
   }
 
@@ -348,7 +364,7 @@ export class SummarResultManager implements ISummarResultManager {
       .trim();
   }
 
-  private createResultHeader(key: string, label: string): HTMLDivElement {
+  private createOutputHeader(key: string, label: string): HTMLDivElement {
     const uploadWikiButton = this.createUploadWikiButton(key);
     const uploadSlackButton = this.createUploadSlackButton(key);
     const newNoteButton = this.createNewNoteButton(key);
@@ -364,7 +380,7 @@ export class SummarResultManager implements ISummarResultManager {
     const rec = this.ensureRecord(key);
     rec.label = label;
     rec.icon = icon;
-    return composeStandardResultHeader(label, {
+    return composeStandardOutputHeader(label, {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
       newNote: newNoteButton,
@@ -375,66 +391,66 @@ export class SummarResultManager implements ISummarResultManager {
     }, { icon });
   }
 
-  private createResultText(key: string): HTMLDivElement {
-    const resultText = document.createElement('div');
-    resultText.className = 'result-text';
-    resultText.setAttribute('data-key', key);
+  private createOutputText(key: string): HTMLDivElement {
+    const outputText = document.createElement('div');
+    outputText.className = 'output-text';
+    outputText.setAttribute('data-key', key);
     
     // 스타일 설정
-    resultText.style.width = '100%';
-    resultText.style.minHeight = '10px';
-    resultText.style.border = '1px solid var(--background-modifier-border)';
-    resultText.style.padding = '8px';
-    resultText.style.marginBottom = '0px';
-    resultText.style.backgroundColor = 'var(--background-secondary)';
-    resultText.style.wordWrap = 'break-word';
-    resultText.style.whiteSpace = 'pre-wrap';
-    resultText.style.color = 'var(--text-normal)';
-    resultText.style.fontSize = '12px';
-    resultText.style.lineHeight = '1.4';
-    resultText.style.userSelect = 'text';
-    resultText.style.cursor = 'text';
-    resultText.style.margin = '0';
-    resultText.style.wordBreak = 'break-word';
-    resultText.style.overflowWrap = 'break-word';
-    resultText.style.display = 'block';
-    resultText.style.verticalAlign = 'top';
+    outputText.style.width = '100%';
+    outputText.style.minHeight = '10px';
+    outputText.style.border = '1px solid var(--background-modifier-border)';
+    outputText.style.padding = '8px';
+    outputText.style.marginBottom = '0px';
+    outputText.style.backgroundColor = 'var(--background-secondary)';
+    outputText.style.wordWrap = 'break-word';
+    outputText.style.whiteSpace = 'pre-wrap';
+    outputText.style.color = 'var(--text-normal)';
+    outputText.style.fontSize = '12px';
+    outputText.style.lineHeight = '1.4';
+    outputText.style.userSelect = 'text';
+    outputText.style.cursor = 'text';
+    outputText.style.margin = '0';
+    outputText.style.wordBreak = 'break-word';
+    outputText.style.overflowWrap = 'break-word';
+    outputText.style.display = 'block';
+    outputText.style.verticalAlign = 'top';
     // raw text는 Map/통합 레코드에서만 관리
     
     // 텍스트 선택 이벤트 설정
-    this.setupTextSelectionEvents(resultText);
+    this.setupTextSelectionEvents(outputText);
     
-    return resultText;
+    return outputText;
   }
 
   // ===== Unified record helpers (phase 1: sync with legacy Maps) =====
-  private ensureRecord(key: string): SummarResultRecord {
-    let rec = this.context.resultRecords.get(key);
+  private ensureRecord(key: string): SummarOutputRecord {
+    let rec = this.context.outputRecords.get(key);
     if (!rec) {
       rec = { key, itemEl: null, result: '', noteName: undefined };
-      this.context.resultRecords.set(key, rec);
+      this.context.outputRecords.set(key, rec);
     }
     return rec;
   }
 
-  pushResultPrompt(key: string, prompt: string): void {
+  pushOutputPrompt(key: string, prompt: string): void {
     const rec = this.ensureRecord(key);
     if (!rec.prompts) rec.prompts = [];
     rec.prompts.push(prompt);
   }
 
 
-  private setResult(key: string, text: string): void {
+  private setOutput(key: string, text: string): void {
     const rec = this.ensureRecord(key);
     rec.result = text;
   }
 
-  private getResult(key: string): string {
-    const rec = this.context.resultRecords.get(key);
+  private getOutput(key: string): string {
+    const rec = this.context.outputRecords.get(key);
     return rec?.result || '';
   }
 
-  private setupTextSelectionEvents(resultText: HTMLDivElement): void {
+  private setupTextSelectionEvents(outputText: HTMLDivElement): void {
     let savedSelection: {range: Range, startOffset: number, endOffset: number} | null = null;
     
     const handleSelectionEnd = () => {
@@ -442,7 +458,7 @@ export class SummarResultManager implements ISummarResultManager {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
           const range = selection.getRangeAt(0);
-          if (resultText.contains(range.commonAncestorContainer)) {
+          if (outputText.contains(range.commonAncestorContainer)) {
             savedSelection = {
               range: range.cloneRange(),
               startOffset: range.startOffset,
@@ -457,10 +473,10 @@ export class SummarResultManager implements ISummarResultManager {
     
     const signal = this.context.abortController.signal;
     
-    resultText.addEventListener('mouseup', handleSelectionEnd, { signal });
-    resultText.addEventListener('touchend', handleSelectionEnd, { signal });
+    outputText.addEventListener('mouseup', handleSelectionEnd, { signal });
+    outputText.addEventListener('touchend', handleSelectionEnd, { signal });
     
-    resultText.addEventListener('blur', (e) => {
+    outputText.addEventListener('blur', (e) => {
       if (savedSelection && !Platform.isMobileApp) {
         const timeoutId = setTimeout(() => {
           try {
@@ -517,7 +533,7 @@ export class SummarResultManager implements ISummarResultManager {
   private createUploadWikiButton(key: string): HTMLButtonElement {
     const button = document.createElement('button');
     button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'upload-result-to-wiki-button');
+    button.setAttribute('button-id', 'upload-output-to-wiki-button');
     button.setAttribute('aria-label', 'Upload this result to Confluence');
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
@@ -533,7 +549,7 @@ export class SummarResultManager implements ISummarResultManager {
   private createUploadSlackButton(key: string): HTMLButtonElement {
     const button = document.createElement('button');
     button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'upload-result-to-slack-button');
+    button.setAttribute('button-id', 'upload-output-to-slack-button');
     button.setAttribute('aria-label', 'Upload this result to Slack');
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
@@ -549,7 +565,7 @@ export class SummarResultManager implements ISummarResultManager {
   private createCopyButton(key: string): HTMLButtonElement {
     const button = document.createElement('button');
     button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'copy-result-button');
+    button.setAttribute('button-id', 'copy-output-button');
     button.setAttribute('aria-label', 'Copy this result to clipboard');
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
@@ -578,16 +594,16 @@ export class SummarResultManager implements ISummarResultManager {
     return button;
   }
 
-  private enableResultItemButtons(resultItem: HTMLDivElement): void {
+  private enableOutputItemButtons(outputItem: HTMLDivElement): void {
     const buttons = [
       'new-note-button',
-      'upload-result-to-wiki-button', 
-      'upload-result-to-slack-button',
-      'copy-result-button'
+      'upload-output-to-wiki-button', 
+      'upload-output-to-slack-button',
+      'copy-output-button'
     ];
     
     buttons.forEach(buttonId => {
-      const button = resultItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+      const button = outputItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
       if (button) {
         button.disabled = false;
         button.style.display = '';
@@ -595,14 +611,14 @@ export class SummarResultManager implements ISummarResultManager {
     });
   }
 
-  private applyFoldToResultItem(resultItem: HTMLDivElement, fold: boolean): void {
-    const toggleButton = resultItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
-    const resultText = resultItem.querySelector('.result-text') as HTMLDivElement;
+  private applyFoldToOutputItem(outputItem: HTMLDivElement, fold: boolean): void {
+    const toggleButton = outputItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
+    const outputText = outputItem.querySelector('.output-text') as HTMLDivElement;
     
-    if (toggleButton && resultText) {
+    if (toggleButton && outputText) {
       toggleButton.setAttribute('toggled', fold ? 'true' : 'false');
       setIcon(toggleButton, fold ? 'square-chevron-down' : 'square-chevron-up');
-      resultText.style.display = fold ? 'none' : 'block';
+      outputText.style.display = fold ? 'none' : 'block';
     }
   }
 }

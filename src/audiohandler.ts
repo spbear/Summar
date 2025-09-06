@@ -22,10 +22,10 @@ export class AudioHandler extends SummarViewContainer {
 			file.name.toLowerCase().endsWith(".webm")
 		);
 		const fileNames = audioFiles.map(f => (f as any).webkitRelativePath || f.name).join("\n");
-		this.initResultRecord("transcript");
+		this.initOutputRecord("transcript");
 
-		this.updateResultText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
-		// this.enableNewNote(false, resultKey);
+		this.updateOutputText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
+		// this.enableNewNote(false, outputKey);
 
 		let audioList = "";
 		let transcriptedText = "";
@@ -231,7 +231,7 @@ export class AudioHandler extends SummarViewContainer {
                 let errStr = f.error ? (f.error.status ? `[${f.error.status}] ` : '') + (f.error.message || f.error.toString?.() || f.error) : 'Unknown error';
                 return `- ${f.name}: ${errStr}`;
             }).join('\n');
-            this.updateResultText(errorMsg);
+            this.updateOutputText(errorMsg);
             throw new Error("One or more audio transcriptions failed. Aborting next steps.");
         }
 
@@ -369,7 +369,7 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		await this.plugin.app.vault.create(newFilePath, transcriptionContent);
-		this.updateResultText(transcriptionContent);
+		this.updateOutputText(transcriptionContent);
 
 		this.enableNewNote(true, newFilePath);
 		
@@ -382,7 +382,7 @@ export class AudioHandler extends SummarViewContainer {
 				true
 			);
 		}
-		this.foldResult(true);
+		this.foldOutput(true);
 		
 		// Daily Notes에 전사 완료 링크 추가 (녹음 날짜 기준)
 		const recordingDate = this.extractRecordingDateFromPath(folderPath, filesToSave, noteFilePath);
@@ -529,9 +529,9 @@ export class AudioHandler extends SummarViewContainer {
 		if ((this.plugin.settingsv2.recording.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settingsv2.recording.sttModel === "gpt-4o-transcribe")
 			&& this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]) {
 			addField("prompt", this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
-			this.pushResultPrompt(this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
+			this.pushOutputPrompt(this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
 		} else {
-			this.pushResultPrompt('transcribe using whisper-1');
+			this.pushOutputPrompt('transcribe using whisper-1');
 		}
 
 		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
@@ -545,7 +545,7 @@ export class AudioHandler extends SummarViewContainer {
 	async callWhisperTranscription(requestbody: Blob, contentType: string, duration: number): Promise<any> {
 		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
-		if (!summarai.hasKey(true, this.resultRecord.key, this.resultRecord.label as string)) return '';			
+		if (!summarai.hasKey(true, this.outputRecord.key, this.outputRecord.label as string)) return '';			
 
 		
 		const json = await summarai.audioTranscription((await requestbody.arrayBuffer() as ArrayBuffer), contentType, duration);
@@ -667,7 +667,7 @@ export class AudioHandler extends SummarViewContainer {
 	async callGeminiTranscription(base64: string, mimeType: string, duration: number): Promise<string | null> {
 		const sttModel = this.plugin.settingsv2.recording.sttModel;
 		const summarai = new SummarAI(this.plugin, sttModel, 'stt');
-		if (!summarai.hasKey(true, this.resultRecord.key, this.resultRecord.label as string)) return '';			
+		if (!summarai.hasKey(true, this.outputRecord.key, this.outputRecord.label as string)) return '';			
 
 		// sttModel에 따라 적절한 prompt 선택
 		let systemInstruction = "";
@@ -682,7 +682,7 @@ export class AudioHandler extends SummarViewContainer {
 			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settingsv2.recording.recordingLanguage)}.`;
 		}
 
-		this.pushResultPrompt(systemInstruction);
+		this.pushOutputPrompt(systemInstruction);
 
 		try {
 			const bodyContent = JSON.stringify({

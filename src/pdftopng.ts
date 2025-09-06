@@ -20,7 +20,7 @@ export class PdfToPng extends SummarViewContainer {
 
   /**
    * Initializes a new instance of the PdfToPng class.
-   * @param resultContainer The container to display results.
+   * @param outputContainer The container to display results.
    */
   constructor(plugin: SummarPlugin) {
     super(plugin);
@@ -37,15 +37,15 @@ export class PdfToPng extends SummarViewContainer {
     }
   }
 
-  async convert(file: any, resultKey: string, label: string, removeflag: boolean): Promise<string[]> {
+  async convert(file: any, outputKey: string, label: string, removeflag: boolean): Promise<string[]> {
     this.file = file;
     this.page = 0; // initial value
     let result: string[] = [];
 
     SummarDebug.log(1, "Starting PDF to PNG conversion...");
-    this.setResultRecord(resultKey, label);
-    this.updateResultText("Initial rendering...");
-    // this.enableNewNote(false, resultKey);
+    this.setOutputRecord(outputKey, label);
+    this.updateOutputText("Initial rendering...");
+    // this.enableNewNote(false, outputKey);
 
     // Save the PDF file to a temporary location
     this.tempDir = normalizePath((this.plugin.app.vault.adapter as any).basePath + "/" + (this.plugin as any).PLUGIN_DIR + "/pdf_converion/temp");
@@ -54,19 +54,19 @@ export class PdfToPng extends SummarViewContainer {
     if (!fs.existsSync(this.tempDir)) {
       await this.createDirectory(this.tempDir);
       SummarDebug.log(1, `Temporary directory created: ${this.tempDir}`);
-      this.updateResultText(`Temporary directory created: ${this.tempDir}`);
-      // this.enableNewNote(false, resultKey);
+      this.updateOutputText(`Temporary directory created: ${this.tempDir}`);
+      // this.enableNewNote(false, outputKey);
     } else {
       SummarDebug.log(1, `Temporary directory already exists: ${this.tempDir}`);
-      this.updateResultText(`Temporary directory already exists: ${this.tempDir}`);
-      // this.enableNewNote(false, resultKey);
+      this.updateOutputText(`Temporary directory already exists: ${this.tempDir}`);
+      // this.enableNewNote(false, outputKey);
     }
 
     SummarDebug.log(1, "PDF file will be save at:", this.pdfName);
     fs.writeFileSync(this.pdfName, Buffer.from(await this.file.arrayBuffer()));
     SummarDebug.log(1, "PDF file saved at:", this.pdfName);
-    this.updateResultText(`PDF file saved at: ${this.pdfName}`);
-    // this.enableNewNote(false, resultKey);
+    this.updateOutputText(`PDF file saved at: ${this.pdfName}`);
+    // this.enableNewNote(false, outputKey);
 
     // Output directory for PNGs
     const pdfName = this.file.name.replace(".pdf", "");
@@ -74,8 +74,8 @@ export class PdfToPng extends SummarViewContainer {
     await this.createDirectory(this.outputDir);
 
     SummarDebug.log(1, "Converting PDF to images using Poppler...");
-    this.updateResultText("Converting PDF to images using Poppler...");
-    // this.enableNewNote(false, resultKey);
+    this.updateOutputText("Converting PDF to images using Poppler...");
+    // this.enableNewNote(false, outputKey);
 
     SummarDebug.log(1, this.pdfName);
 
@@ -84,7 +84,7 @@ export class PdfToPng extends SummarViewContainer {
       await this.deleteIfExists(this.pdfName);
     }
 
-    result = this.listPngFiles(resultKey, label);
+    result = this.listPngFiles(outputKey, label);
     SummarDebug.log(1, "outputDir: ", this.outputDir);
 
     if (removeflag) {
@@ -197,7 +197,7 @@ export class PdfToPng extends SummarViewContainer {
    * 
    * @returns A sorted array of matching PNG file names.
    */
-  private listPngFiles(resultKey: string, label: string): string[] {
+  private listPngFiles(outputKey: string, label: string): string[] {
     const fs = require("fs");
     const path = require("path");
 
@@ -231,8 +231,8 @@ export class PdfToPng extends SummarViewContainer {
           base64Values.push(base64String); // Add Base64 to result
         } catch (readError) {
           SummarDebug.error(1,`Error reading file ${file}:`, readError);
-          this.updateResultText(`Failed to process ${file}`);
-          // this.enableNewNote(false, resultKey);
+          this.updateOutputText(`Failed to process ${file}`);
+          // this.enableNewNote(false, outputKey);
         }
       });
       return base64Values;

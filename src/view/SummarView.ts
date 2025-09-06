@@ -6,7 +6,7 @@ import MarkdownIt from "markdown-it";
 // 매니저 클래스들 import
 import { SummarStyleManager } from "./SummarStyleManager";
 import { SummarUIRenderer } from "./SummarUIRenderer";
-import { SummarResultManager } from "./SummarResultManager";
+import { SummarOutputManager } from "./SummarOutputManager";
 import { SummarStickyHeaderManager } from "./SummarStickyHeaderManager";
 import { SummarEventHandler } from "./SummarEventHandler";
 import { SummarUploadManager } from "./SummarUploadManager";
@@ -17,13 +17,13 @@ import {
   ISummarViewContext, 
   ISummarStyleManager,
   ISummarUIRenderer,
-  ISummarResultManager,
+  ISummarOutputManager,
   ISummarStickyHeaderManager,
   ISummarEventHandler,
   ISummarUploadManager,
   ISummarComposerManager,
   SummarViewEvents,
-  SummarResultRecord
+  SummarOutputRecord
 } from "./SummarViewTypes";
 
 export class SummarView extends View {
@@ -31,7 +31,7 @@ export class SummarView extends View {
 
   // Core properties
   plugin: SummarPlugin;
-  resultContainer: HTMLDivElement;
+  outputContainer: HTMLDivElement;
   composerContainer: HTMLDivElement;
   // 통합 레코드로 전환: 개별 Map 제거
   markdownRenderer: MarkdownIt;
@@ -43,7 +43,7 @@ export class SummarView extends View {
   // Managers
   private styleManager: ISummarStyleManager;
   private uiRenderer: ISummarUIRenderer;
-  private resultManager: ISummarResultManager;
+  private outputManager: ISummarOutputManager;
   private stickyHeaderManager: ISummarStickyHeaderManager;
   private eventHandler: ISummarEventHandler;
   private uploadManager: ISummarUploadManager;
@@ -70,9 +70,9 @@ export class SummarView extends View {
       leaf: leaf,
       view: this, // SummarView 참조 추가
       containerEl: this.containerEl,
-      resultContainer: this.resultContainer, // Will be set in renderView
+      outputContainer: this.outputContainer, // Will be set in renderView
       composerContainer: this.composerContainer, // Will be set in renderView
-      resultRecords: new Map<string, SummarResultRecord>(),
+      outputRecords: new Map<string, SummarOutputRecord>(),
       markdownRenderer: this.markdownRenderer,
       abortController: this.abortController,
       timeoutRefs: this.timeoutRefs
@@ -85,22 +85,22 @@ export class SummarView extends View {
   private initializeManagers(): void {
     this.styleManager = new SummarStyleManager();
     this.uiRenderer = new SummarUIRenderer(this.context);
-    this.resultManager = new SummarResultManager(this.context);
+    this.outputManager = new SummarOutputManager(this.context);
     this.stickyHeaderManager = new SummarStickyHeaderManager(this.context);
     this.eventHandler = new SummarEventHandler(this.context);
     this.uploadManager = new SummarUploadManager(this.context);
     this.composerManager = new SummarComposerManager(this.context);
 
-    // Set up event handlers for result manager
+    // Set up event handlers for output manager
     const events: SummarViewEvents = {
-      onResultItemCreated: (key: string, element: HTMLDivElement) => {
-        const resultHeader = element.querySelector('.result-header') as HTMLDivElement;
-        if (resultHeader) {
-          this.stickyHeaderManager.observeHeader(resultHeader);
+      onOutputItemCreated: (key: string, element: HTMLDivElement) => {
+        const outputHeader = element.querySelector('.output-header') as HTMLDivElement;
+        if (outputHeader) {
+          this.stickyHeaderManager.observeHeader(outputHeader);
         }
       },
-      onResultItemRemoved: (key: string) => {
-        // Cleanup sticky header when result item is removed
+      onOutputItemRemoved: (key: string) => {
+        // Cleanup sticky header when output item is removed
         this.stickyHeaderManager.updateStickyHeaderVisibility();
       },
       onToggleStateChanged: (key: string, folded: boolean) => {
@@ -108,12 +108,12 @@ export class SummarView extends View {
       }
     };
     
-    this.resultManager.setEventHandlers(events);
+    this.outputManager.setEventHandlers(events);
 
     // Add upload manager reference to context for event handler
     (this.context as any).uploadManager = this.uploadManager;
-    // Add result manager reference for event handler to fetch raw text via Map
-    (this.context as any).resultManager = this.resultManager;
+    // Add output manager reference for event handler to fetch raw text via Map
+    (this.context as any).outputManager = this.outputManager;
     // Add sticky header manager reference to context for event handler
     (this.context as any).stickyHeaderManager = this.stickyHeaderManager;
     // Add composer manager reference to context for event handler
@@ -142,7 +142,7 @@ export class SummarView extends View {
     SummarDebug.log(1, "Summar View closed");
     
     // Cleanup all managers
-    this.resultManager.cleanup();
+    this.outputManager.cleanup();
     this.stickyHeaderManager.cleanup();
     this.eventHandler.cleanup();
     this.composerManager.cleanup();
@@ -153,7 +153,7 @@ export class SummarView extends View {
     this.timeoutRefs.clear();
     
     // Clear data
-    this.context.resultRecords.clear();
+    this.context.outputRecords.clear();
     
     // Create new AbortController for potential reuse
     this.abortController = new AbortController();
@@ -213,13 +213,13 @@ export class SummarView extends View {
     // Render UI components
     const urlInputContainer = this.uiRenderer.renderUrlInputContainer(container);
     const buttonContainer = this.uiRenderer.renderButtonContainer(container);
-    const resultContainer = this.uiRenderer.renderResultContainer(container);
+    const outputContainer = this.uiRenderer.renderOutputContainer(container);
     const composerContainer = this.uiRenderer.renderComposerContainer(container);
 
     // Store container references
-    this.resultContainer = resultContainer;
+    this.outputContainer = outputContainer;
     this.composerContainer = composerContainer;
-    this.context.resultContainer = resultContainer;
+    this.context.outputContainer = outputContainer;
     this.context.composerContainer = composerContainer;
 
     // Copilot 등 다른 플러그인의 스타일 간섭 방지를 위한 MutationObserver 설정
@@ -244,39 +244,39 @@ export class SummarView extends View {
   // ==================== Public API Methods ====================
   // These methods maintain the existing interface for external components
 
-  pushResultPrompt(key: string, prompt: string): void {
-    return this.resultManager.pushResultPrompt(key, prompt);
+  pushOutputPrompt(key: string, prompt: string): void {
+    return this.outputManager.pushOutputPrompt(key, prompt);
   }
 
-  updateResultText(key: string, label: string, message: string): string {
-    return this.resultManager.updateResultText(key, label, message);
+  updateOutputText(key: string, label: string, message: string): string {
+    return this.outputManager.updateOutputText(key, label, message);
   }
 
-  appendResultText(key: string, label: string, message: string): string {
-    return this.resultManager.appendResultText(key, label, message);
+  appendOutputText(key: string, label: string, message: string): string {
+    return this.outputManager.appendOutputText(key, label, message);
   }
 
-  getResultText(key: string): string {
-    return this.resultManager.getResultText(key);
+  getOutputText(key: string): string {
+    return this.outputManager.getOutputText(key);
   }
 
-  updateResultInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
+  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
   }
 
   enableNewNote(key: string, newNotePath?: string): void {
-    this.resultManager.enableNewNote(key, newNotePath);
+    this.outputManager.enableNewNote(key, newNotePath);
   }
 
   getNoteName(key: string): string {
-    return this.resultManager.getNoteName(key);
+    return this.outputManager.getNoteName(key);
   }
 
-  foldResult(key: string | null, fold: boolean): void {
-    this.resultManager.foldResult(key, fold);
+  foldOutput(key: string | null, fold: boolean): void {
+    this.outputManager.foldOutput(key, fold);
   }
 
-  clearAllResultItems(): void {
-    this.resultManager.clearAllResultItems();
+  clearAllOutputItems(): void {
+    this.outputManager.clearAllOutputItems();
   }
 
   getCurrentMainPaneTabType(): string {
@@ -291,7 +291,7 @@ export class SummarView extends View {
    * MarkdownIt 렌더링 결과에서 불필요한 줄바꿈을 제거합니다.
    */
   cleanupMarkdownOutput(html: string): string {
-    return this.resultManager.cleanupMarkdownOutput(html);
+    return this.outputManager.cleanupMarkdownOutput(html);
   }
 
   // ==================== Upload Methods ====================
@@ -304,30 +304,30 @@ export class SummarView extends View {
     return this.uploadManager.uploadContentToWiki(title, content);
   }
 
-  // ==================== Result Item Management ====================
+  // ==================== Output Item Management ====================
 
   /**
-   * 개별 resultItem을 안전하게 삭제합니다.
+   * 개별 outputItem을 안전하게 삭제합니다.
    */
-  private removeResultItem(key: string): void {
-    const rec = this.context.resultRecords.get(key);
-    const resultItem = rec?.itemEl || null;
-    if (resultItem) {
+  private removeOutputItem(key: string): void {
+    const rec = this.context.outputRecords.get(key);
+    const outputItem = rec?.itemEl || null;
+    if (outputItem) {
       // Observer에서 제거
-      const resultHeader = resultItem.querySelector('.result-header') as HTMLDivElement;
-      if (resultHeader) {
-        this.stickyHeaderManager.unobserveHeader(resultHeader);
+      const outputHeader = outputItem.querySelector('.output-header') as HTMLDivElement;
+      if (outputHeader) {
+        this.stickyHeaderManager.unobserveHeader(outputHeader);
       }
       
       // DOM에서 제거
-      if (resultItem.parentElement) {
-        resultItem.parentElement.removeChild(resultItem);
+      if (outputItem.parentElement) {
+        outputItem.parentElement.removeChild(outputItem);
       }
       
       // Map에서 제거
-      this.context.resultRecords.delete(key);
+      this.context.outputRecords.delete(key);
       
-      SummarDebug.log(1, `Result item ${key} removed successfully`);
+      SummarDebug.log(1, `Output item ${key} removed successfully`);
     }
   }
 
@@ -346,13 +346,13 @@ export class SummarView extends View {
     this.timeoutRefs.add(timeoutId);
   }
 
-  updateResultContainerMargin(): void {
+  updateOutputContainerMargin(): void {
     const composerVisible = this.composerContainer.style.display !== 'none';
     const marginValue = composerVisible ? "1px" : "25px";
     
-    this.resultContainer.style.marginBottom = marginValue;
+    this.outputContainer.style.marginBottom = marginValue;
     
-    SummarDebug.log(1, `ResultContainer margin updated to ${marginValue} (composer visible: ${composerVisible})`);
+    SummarDebug.log(1, `OutputContainer margin updated to ${marginValue} (composer visible: ${composerVisible})`);
   }
 
   private handleResize(): void {
@@ -360,6 +360,6 @@ export class SummarView extends View {
     this.composerManager.handleViewResize();
     
     // 마진 업데이트
-    this.updateResultContainerMargin();
+    this.updateOutputContainerMargin();
   }
 }

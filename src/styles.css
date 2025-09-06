@@ -151,10 +151,10 @@
     cursor: not-allowed;
 }
 
-/* 🔹 SummarView의 urlInputField, fetchButton, pdfButton, recordButton, resultContainer 스타일 개선 */
+/* 🔹 SummarView의 urlInputField, fetchButton, pdfButton, recordButton, outputContainer 스타일 개선 */
 .summarview-url-input,
 .summarview-button,
-.summarview-result {
+.summarview-output {
     border: 1px solid var(--color-border); /* Obsidian 기본 테두리 색상 */
     background: var(--background-primary);
     color: var(--text-normal);
@@ -164,7 +164,7 @@
 }
 
 /* 🔹 결과 텍스트 영역 스크롤 설정 */
-.summarview-result {
+.summarview-output {
     overflow-y: auto;
     overflow-x: hidden;
     white-space: pre-wrap;
@@ -174,7 +174,7 @@
 /* 🔹 다크 테마에서 자연스러운 테두리 색상 적용 */
 .theme-dark .summarview-url-input,
 .theme-dark .summarview-button,
-.theme-dark .summarview-result {
+.theme-dark .summarview-output {
     border-color: var(--color-border-muted); /* 기존보다 부드러운 테두리 색상 */
 }
 

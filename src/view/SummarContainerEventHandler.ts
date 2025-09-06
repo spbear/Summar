@@ -150,9 +150,9 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     // 메뉴 아이템들 생성
     const menuItems = [
       { label: 'Composer', action: () => this.handleComposer() },
-      { label: 'Load output', action: () => this.handleLoadAllResult() },
-      { label: 'Save all output', action: () => this.handleSaveAllResult() },
-      { label: 'Clear all output', action: () => this.handleDeleteAllResult() }
+      { label: 'Load output', action: () => this.handleLoadAllOutputs() },
+      { label: 'Save all outputs', action: () => this.handleSaveAllOutputs() },
+      { label: 'Clear all outputs', action: () => this.handleDeleteAllOutputs() }
     ];
 
     menuItems.forEach(item => {
@@ -199,22 +199,22 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     }, 100);
   }
 
-  private handleDeleteAllResult(): void {
-    this.context.resultRecords.clear();
-    this.context.resultContainer.empty();
-    SummarDebug.Notice(1, "All result items have been deleted");
+  private handleDeleteAllOutputs(): void {
+    this.context.outputRecords.clear();
+    this.context.outputContainer.empty();
+    SummarDebug.Notice(1, "All output items have been deleted");
   }
 
-  private async handleSaveAllResult(): Promise<void> {
+  private async handleSaveAllOutputs(): Promise<void> {
     try {
-      const mgr = (this.context as any).resultManager as { saveResultItemsToPluginDir: () => Promise<string> } | undefined;
-      const path = await mgr?.saveResultItemsToPluginDir();
+      const mgr = (this.context as any).outputManager as { saveOutputItemsToPluginDir: () => Promise<string> } | undefined;
+      const path = await mgr?.saveOutputItemsToPluginDir();
       if (path) {
-        SummarDebug.Notice(1, `Saved result items to ${path}`);
+        SummarDebug.Notice(1, `Saved output items to ${path}`);
       }
     } catch (error) {
-      SummarDebug.error(1, 'Failed to save result items:', error);
-      SummarDebug.Notice(0, 'Failed to save result items. Check console for details.');
+      SummarDebug.error(1, 'Failed to save output items:', error);
+      SummarDebug.Notice(0, 'Failed to save output items. Check console for details.');
     }
   }
 
@@ -225,7 +225,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     }
   }
 
-  private async handleLoadAllResult(): Promise<void> {
+  private async handleLoadAllOutputs(): Promise<void> {
     try {
       // 플러그인 디렉토리에서 JSON 파일들 찾기
       const plugin = this.context.plugin;
@@ -373,19 +373,19 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
   private async loadSelectedFile(filename: string): Promise<void> {
     try {
-      const mgr = (this.context as any).resultManager as { importResultItemsFromPluginDir: (filename?: string) => Promise<number> } | undefined;
-      const importedCount = await mgr?.importResultItemsFromPluginDir(filename);
+      const mgr = (this.context as any).outputManager as { importOutputItemsFromPluginDir: (filename?: string) => Promise<number> } | undefined;
+      const importedCount = await mgr?.importOutputItemsFromPluginDir(filename);
       
       if (importedCount !== undefined && importedCount > 0) {
-        SummarDebug.Notice(1, `Loaded ${importedCount} result items from ${filename}`);
+        SummarDebug.Notice(1, `Loaded ${importedCount} output items from ${filename}`);
       } else if (importedCount === 0) {
-        SummarDebug.Notice(1, `No new result items to load from ${filename} (all items already exist)`);
+        SummarDebug.Notice(1, `No new output items to load from ${filename} (all items already exist)`);
       } else {
-        SummarDebug.Notice(1, `No result items found in ${filename}`);
+        SummarDebug.Notice(1, `No output items found in ${filename}`);
       }
     } catch (error) {
-      SummarDebug.error(1, `Failed to load result items from ${filename}:`, error);
-      SummarDebug.Notice(0, `Failed to load result items from ${filename}. Check console for details.`);
+      SummarDebug.error(1, `Failed to load output items from ${filename}:`, error);
+      SummarDebug.Notice(0, `Failed to load output items from ${filename}. Check console for details.`);
     }
   }
 

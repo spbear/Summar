@@ -22,7 +22,7 @@ export class SummarStyleManager implements ISummarStyleManager {
 
   private getStyleContent(): string {
     return `
-      .result-text {
+      .output-text {
         -webkit-touch-callout: text;
         -webkit-user-select: text;
         -khtml-user-select: text;
@@ -39,40 +39,40 @@ export class SummarStyleManager implements ISummarStyleManager {
         overflow-wrap: break-word;
         hyphens: auto;
       }
-      .result-text > *:first-child {
+      .output-text > *:first-child {
         margin-top: 0 !important;
         padding-top: 0 !important;
       }
-      .result-text > *:last-child {
+      .output-text > *:last-child {
         margin-bottom: 0 !important;
         padding-bottom: 0 !important;
       }
-      .result-text p {
+      .output-text p {
         margin-top: 0 !important;
         margin-bottom: 0 !important;
       }
-      .result-text p:first-child {
+      .output-text p:first-child {
         margin-top: 0 !important;
       }
-      .result-text p:last-child {
+      .output-text p:last-child {
         margin-bottom: 0 !important;
       }
-      .result-text::selection {
+      .output-text::selection {
         background-color: var(--text-selection) !important;
         color: var(--text-on-accent) !important;
       }
-      .result-text::-moz-selection {
+      .output-text::-moz-selection {
         background-color: var(--text-selection) !important;
         color: var(--text-on-accent) !important;
       }
-      .result-text * {
+      .output-text * {
         -webkit-user-select: text !important;
         -moz-user-select: text !important;
         -ms-user-select: text !important;
         user-select: text !important;
       }
       
-      /* Sticky header 스타일 - resultContainer 위쪽 별도 레이어 */
+      /* Sticky header 스타일 - outputContainer 위쪽 별도 레이어 */
       .sticky-header-container {
         position: absolute !important;
         z-index: 10000 !important;
@@ -90,7 +90,7 @@ export class SummarStyleManager implements ISummarStyleManager {
         display: block;
       }
       
-      .sticky-header-container .result-header {
+      .sticky-header-container .output-header {
         border: none !important;
         background-color: var(--background-primary) !important;
         margin: 0 !important;

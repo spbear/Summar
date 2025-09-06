@@ -13,7 +13,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 	/*
 	 * fetchAndSummarize 함수는 URL을 가져와서 요약을 생성합니다.
-	 * @param resultContainer 결과를 표시할 textarea 엘리먼트
+	 * @param outputContainer 결과를 표시할 textarea 엘리먼트
 	 * @param url 가져올 URL
 	 * @param plugin 플러그인 인스턴스
 	 */
@@ -39,21 +39,21 @@ export class CustomCommandHandler extends SummarViewContainer {
 		const appendToNote = command.appendToNote;
 		const copyToClipboard = command.copyToClipboard;
 
-		this.initResultRecord("custom");
+		this.initOutputRecord("custom");
 
 		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 
-		if (!summarai.hasKey(true, this.resultRecord.key, this.resultRecord.label as string)) return;			
+		if (!summarai.hasKey(true, this.outputRecord.key, this.outputRecord.label as string)) return;			
 
 
-		this.updateResultText(`Execute prompt with selected text using [${cmdModel}]...`);
-		// this.enableNewNote(false, resultKey);
+		this.updateOutputText(`Execute prompt with selected text using [${cmdModel}]...`);
+		// this.enableNewNote(false, outputKey);
 
 		try {
 			this.startTimer();
 
 			const message = `${cmdPrompt}\n\n${selectedText}`;
-			this.pushResultPrompt(message);
+			this.pushOutputPrompt(message);
 
 			await summarai.chat([message]);
 			const responseStatus = summarai.response.status;
@@ -63,14 +63,14 @@ export class CustomCommandHandler extends SummarViewContainer {
 			if (responseStatus !== 200) {
 				const errorText = responseText || "Unknown error occurred.";
 				SummarDebug.error(1, "AI API Error:", errorText);
-				this.updateResultText(`Error: ${responseStatus} - ${errorText}`);
-				// this.enableNewNote(false, resultKey);
+				this.updateOutputText(`Error: ${responseStatus} - ${errorText}`);
+				// this.enableNewNote(false, outputKey);
 
 				return;
 			}
 
 			if (responseText && responseText.length > 0) {
-				this.updateResultText(responseText);
+				this.updateOutputText(responseText);
 				this.enableNewNote(true);
 
 				// 결과를 노트에 append (설정에 따라)
@@ -114,8 +114,8 @@ export class CustomCommandHandler extends SummarViewContainer {
 					}
 				}
 			} else {
-				this.updateResultText("No valid response from OpenAI API.");
-				// this.enableNewNote(false, resultKey);
+				this.updateOutputText("No valid response from OpenAI API.");
+				// this.enableNewNote(false, outputKey);
 			}
 
 		} catch (error) {
@@ -125,8 +125,8 @@ export class CustomCommandHandler extends SummarViewContainer {
 			if (error) {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
-			this.updateResultText(msg);
-			// this.enableNewNote(false, resultKey);
+			this.updateOutputText(msg);
+			// this.enableNewNote(false, outputKey);
 		}
 	}
 

@@ -39,22 +39,22 @@ export function getDefaultLabelIcon(label: string): string {
   return 'tag';
 }
 
-// Build a standardized result header: label + buttons in fixed order.
-export function composeStandardResultHeader(label: string, buttons: HeaderButtonsSet, options?: LabelOptions): HTMLDivElement {
-  const resultHeader = document.createElement('div');
-  resultHeader.className = 'result-header';
-  resultHeader.style.width = '100%';
-  resultHeader.style.display = 'flex';
-  resultHeader.style.alignItems = 'center';
-  resultHeader.style.gap = '0px';
-  resultHeader.style.marginBottom = '0px';
-  resultHeader.style.padding = '0px';
-  resultHeader.style.border = '1px solid var(--background-modifier-border)';
-  resultHeader.style.backgroundColor = 'var(--background-primary)';
+// Build a standardized output header: label + buttons in fixed order.
+export function composeStandardOutputHeader(label: string, buttons: HeaderButtonsSet, options?: LabelOptions): HTMLDivElement {
+  const outputHeader = document.createElement('div');
+  outputHeader.className = 'output-header';
+  outputHeader.style.width = '100%';
+  outputHeader.style.display = 'flex';
+  outputHeader.style.alignItems = 'center';
+  outputHeader.style.gap = '0px';
+  outputHeader.style.marginBottom = '0px';
+  outputHeader.style.padding = '0px';
+  outputHeader.style.border = '1px solid var(--background-modifier-border)';
+  outputHeader.style.backgroundColor = 'var(--background-primary)';
 
   // Label
   const labelChip = document.createElement('div');
-  labelChip.classList.add('result-label-chip');
+  labelChip.classList.add('output-label-chip');
   labelChip.style.display = 'inline-flex';
   labelChip.style.alignItems = 'center';
   labelChip.style.gap = '4px';
@@ -70,7 +70,7 @@ export function composeStandardResultHeader(label: string, buttons: HeaderButton
 
   if (options?.icon) {
     const iconHolder = document.createElement('span');
-    iconHolder.classList.add('result-label-icon');
+    iconHolder.classList.add('output-label-icon');
     iconHolder.style.display = 'inline-flex';
     iconHolder.style.width = '12px';
     iconHolder.style.height = '12px';
@@ -88,23 +88,23 @@ export function composeStandardResultHeader(label: string, buttons: HeaderButton
   }
 
   const labelText = document.createElement('span');
-  labelText.classList.add('result-label-text');
+  labelText.classList.add('output-label-text');
   labelText.textContent = label;
   labelChip.appendChild(labelText);
-  resultHeader.appendChild(labelChip);
+  outputHeader.appendChild(labelChip);
   // Sticky header에서 안전하게 라벨을 추출할 수 있도록 data 속성도 부여
-  resultHeader.setAttribute('data-label', label);
+  outputHeader.setAttribute('data-label', label);
 
   // Buttons in canonical order
-  resultHeader.appendChild(buttons.uploadWiki);
-  resultHeader.appendChild(buttons.uploadSlack);
-  resultHeader.appendChild(buttons.newNote);
-  resultHeader.appendChild(buttons.toggle);
-  resultHeader.appendChild(buttons.copy);
-  resultHeader.appendChild(buttons.spacer);
-  resultHeader.appendChild(buttons.menu);
+  outputHeader.appendChild(buttons.uploadWiki);
+  outputHeader.appendChild(buttons.uploadSlack);
+  outputHeader.appendChild(buttons.newNote);
+  outputHeader.appendChild(buttons.toggle);
+  outputHeader.appendChild(buttons.copy);
+  outputHeader.appendChild(buttons.spacer);
+  outputHeader.appendChild(buttons.menu);
 
-  return resultHeader;
+  return outputHeader;
 }
 
 // Build a standardized composer header: label + buttons in fixed order.

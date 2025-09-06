@@ -13,7 +13,7 @@ export interface MenuOptions {
 
 /**
  * 공통 팝업 메뉴 유틸리티
- * result item과 sticky header에서 공통으로 사용
+ * output item과 sticky header에서 공통으로 사용
  */
 export class SummarMenuUtils {
   
@@ -143,7 +143,7 @@ export class SummarMenuUtils {
     };
     
     // 스크롤 이벤트 리스너 추가 (AbortController로 관리)
-    context.resultContainer.addEventListener('scroll', closeMenuOnScroll, { signal });
+    context.outputContainer.addEventListener('scroll', closeMenuOnScroll, { signal });
     
     // 약간의 지연 후 이벤트 리스너 추가 (현재 클릭 이벤트가 즉시 닫히는 것을 방지)
     const timeoutId = setTimeout(() => {
@@ -169,7 +169,7 @@ export class SummarMenuUtils {
    * @param isFromStickyHeader sticky header에서 호출되었는지 여부
    */
   static handleReply(key: string, isFromStickyHeader: boolean = false): void {
-    const source = isFromStickyHeader ? 'sticky header' : 'result item';
+    const source = isFromStickyHeader ? 'sticky header' : 'output item';
     SummarDebug.Notice(1, `Reply from ${source}: ${key}`);
   }
 
@@ -178,10 +178,10 @@ export class SummarMenuUtils {
    * @param key 결과 아이템의 키
    * @param context 뷰 컨텍스트
    */
-  static handleDeleteResult(key: string, context: ISummarViewContext): void {
-    const resultManager = (context as any).resultManager;
-    if (resultManager && resultManager.deleteResultItem) {
-      resultManager.deleteResultItem(key);
+  static handleDeleteOutput(key: string, context: ISummarViewContext): void {
+    const outputManager = (context as any).outputManager;
+    if (outputManager && outputManager.deleteOutputItem) {
+      outputManager.deleteOutputItem(key);
     }
   }
 
@@ -203,8 +203,8 @@ export class SummarMenuUtils {
         action: () => this.handleReply(key, isFromStickyHeader) 
       },
       { 
-        label: 'Delete result', 
-        action: () => this.handleDeleteResult(key, context) 
+        label: 'Delete Output', 
+        action: () => this.handleDeleteOutput(key, context) 
       }
     ];
   }

@@ -1,7 +1,7 @@
 import { setIcon } from "obsidian";
 import { ISummarComposerManager, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
-import { setStandardComposerHeader, ComposerHeaderButtonsSet } from "./ResultHeaderComposer";
+import { setStandardComposerHeader, ComposerHeaderButtonsSet } from "./OutputHeaderComposer";
 
 /**
  * Composer 기능 관리자
@@ -115,7 +115,7 @@ export class SummarComposerManager implements ISummarComposerManager {
       icon: 'message-circle'
     });
 
-    // 높이 설정 (ResultHeaderComposer에서 주석처리된 부분 적용)
+    // 높이 설정 (OutputHeaderComposer에서 주석처리된 부분 적용)
     header.style.height = '28px';
     header.style.padding = '4px 6px';
 
@@ -162,7 +162,7 @@ export class SummarComposerManager implements ISummarComposerManager {
   private updatePromptEditorHeight(promptEditor: HTMLTextAreaElement): void {
     if (!this.composerHeader) return;
     
-    // composerHeader의 실제 높이를 getBoundingClientRect로 계산 (resultHeader와 동일한 방식)
+    // composerHeader의 실제 높이를 getBoundingClientRect로 계산 (outputHeader와 동일한 방식)
     const composerHeaderRect = this.composerHeader.getBoundingClientRect();
     const composerHeaderHeight = composerHeaderRect.height;
     
@@ -241,14 +241,14 @@ export class SummarComposerManager implements ISummarComposerManager {
   private resizeComposerContainer(height: number): void {
     this.context.composerContainer.style.height = `${height}px`;
     
-    // Result container height 조정 - composerContainer의 마진을 고려
+    // Output container height 조정 - composerContainer의 마진을 고려
     const containerRect = this.context.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
     const splitterHeight = 4;
-    const composerMargins = 6; // composerContainer의 하단 마진 (resultContainer와 동일한 간격)
-    const newResultHeight = containerRect.height - inputHeight - height - splitterHeight - composerMargins;
+    const composerMargins = 6; // composerContainer의 하단 마진 (outputContainer와 동일한 간격)
+    const newOutputHeight = containerRect.height - inputHeight - height - splitterHeight - composerMargins;
     
-    this.context.resultContainer.style.height = `${newResultHeight}px`;
+    this.context.outputContainer.style.height = `${newOutputHeight}px`;
   }
 
   handleViewResize(): void {
@@ -261,15 +261,15 @@ export class SummarComposerManager implements ISummarComposerManager {
       
       SummarDebug.log(1, `View resized: composer visible, maintained height ${currentComposerHeight}px`);
     } else {
-      // composerContainer가 숨겨진 경우 resultContainer를 전체 크기로 복원
+      // composerContainer가 숨겨진 경우 outputContainer를 전체 크기로 복원
       const containerRect = this.context.containerEl.getBoundingClientRect();
       const inputHeight = 60; // 대략적인 input + button 영역 높이
-      const statusBarMargin = 6; // resultContainer의 기본 하단 간격
-      const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
+      const statusBarMargin = 6; // outputContainer의 기본 하단 간격
+      const fullOutputHeight = containerRect.height - inputHeight - statusBarMargin;
       
-      this.context.resultContainer.style.height = `${fullResultHeight}px`;
+      this.context.outputContainer.style.height = `${fullOutputHeight}px`;
       
-      SummarDebug.log(1, `View resized: composer hidden, result height restored to ${fullResultHeight}px`);
+      SummarDebug.log(1, `View resized: composer hidden, output height restored to ${fullOutputHeight}px`);
     }
   }
 
@@ -295,21 +295,21 @@ export class SummarComposerManager implements ISummarComposerManager {
       this.splitter.style.display = 'block';
     }
     
-    // Result container height 조정 - composerContainer의 마진(좌우 2px + 하단 6px)을 고려
+    // Output container height 조정 - composerContainer의 마진(좌우 2px + 하단 6px)을 고려
     const containerRect = this.context.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
     const splitterHeight = 4;
-    const composerMargins = 6; // composerContainer의 하단 마진 (resultContainer와 동일한 간격)
-    const newResultHeight = containerRect.height - inputHeight - composerHeight - splitterHeight - composerMargins;
+    const composerMargins = 6; // composerContainer의 하단 마진 (outputContainer와 동일한 간격)
+    const newOutputHeight = containerRect.height - inputHeight - composerHeight - splitterHeight - composerMargins;
     
-    this.context.resultContainer.style.height = `${newResultHeight}px`;
+    this.context.outputContainer.style.height = `${newOutputHeight}px`;
     
     // 중앙 마진 관리 함수 호출
-    if (this.context.view && this.context.view.updateResultContainerMargin) {
-      this.context.view.updateResultContainerMargin();
+    if (this.context.view && this.context.view.updateOutputContainerMargin) {
+      this.context.view.updateOutputContainerMargin();
     }
     
-    SummarDebug.log(1, `Composer container shown, result height adjusted to ${newResultHeight}px with composer margins`);
+    SummarDebug.log(1, `Composer container shown, output height adjusted to ${newOutputHeight}px with composer margins`);
   }
 
   private hideComposerContainer(): void {
@@ -321,20 +321,20 @@ export class SummarComposerManager implements ISummarComposerManager {
       this.splitter.style.display = 'none';
     }
     
-    // Result container height 복원 - composerContainer가 없을 때의 하단 간격 (6px)
+    // Output container height 복원 - composerContainer가 없을 때의 하단 간격 (6px)
     const containerRect = this.context.containerEl.getBoundingClientRect();
     const inputHeight = 60; // 대략적인 input + button 영역 높이
-    const statusBarMargin = 6; // resultContainer의 기본 하단 간격
-    const fullResultHeight = containerRect.height - inputHeight - statusBarMargin;
+    const statusBarMargin = 6; // outputContainer의 기본 하단 간격
+    const fullOutputHeight = containerRect.height - inputHeight - statusBarMargin;
     
-    this.context.resultContainer.style.height = `${fullResultHeight}px`;
+    this.context.outputContainer.style.height = `${fullOutputHeight}px`;
     
     // 중앙 마진 관리 함수 호출
-    if (this.context.view && this.context.view.updateResultContainerMargin) {
-      this.context.view.updateResultContainerMargin();
+    if (this.context.view && this.context.view.updateOutputContainerMargin) {
+      this.context.view.updateOutputContainerMargin();
     }
     
-    SummarDebug.log(1, 'Composer container hidden, result height restored with original bottom margin');
+    SummarDebug.log(1, 'Composer container hidden, output height restored with original bottom margin');
   }
 
   async sendMessage(message: string): Promise<void> {
