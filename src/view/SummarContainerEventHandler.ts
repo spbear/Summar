@@ -1,4 +1,4 @@
-import { MarkdownView } from "obsidian";
+import { MarkdownView, normalizePath } from "obsidian";
 import { ISummarEventHandler, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
@@ -229,20 +229,38 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     try {
       // 플러그인 디렉토리에서 JSON 파일들 찾기
       const plugin = this.context.plugin;
-      const pluginDir = plugin.PLUGIN_DIR;
+      const conversationsDir = normalizePath(`${plugin.PLUGIN_DIR}/conversations`);
+
+      try {
+        // conversations 디렉토리만 생성 (파일명이 아닌 디렉토리)
+        const exists = await this.context.plugin.app.vault.adapter.exists(conversationsDir);
+        if (!exists) {
+          await this.context.plugin.app.vault.createFolder(conversationsDir);
+          SummarDebug.log(1, "Directory created:", conversationsDir);
+        }
+      } catch (error) {
+        // 폴백으로 adapter.mkdir 시도
+        try {
+          await this.context.plugin.app.vault.adapter.mkdir(conversationsDir);
+          SummarDebug.log(1, "Directory created via adapter:", conversationsDir);
+        } catch (adapterError) {
+          SummarDebug.error(1, "Failed to create directory:", conversationsDir, adapterError);
+          throw new Error(`Failed to create directory: ${conversationsDir}`);
+        }
+      }
       
       // 디렉토리가 존재하는지 확인
-      const dirExists = await plugin.app.vault.adapter.exists(pluginDir);
+      const dirExists = await plugin.app.vault.adapter.exists(conversationsDir);
       if (!dirExists) {
-        SummarDebug.Notice(0, "Plugin directory not found");
+        SummarDebug.Notice(0, "conversations directory not found");
         return;
       }
 
       // 디렉토리의 파일 목록 가져오기
-      const files = await plugin.app.vault.adapter.list(pluginDir);
+      const files = await plugin.app.vault.adapter.list(conversationsDir);
       const jsonFiles = files.files
-        .filter(file => file.endsWith('.json') && file.includes('summar-results'))
-        .map(file => file.replace(`${pluginDir}/`, '')) // 상대 경로로 변환
+        .filter(file => file.endsWith('.json') && file.includes('summar-conversations'))
+        .map(file => file.replace(`${conversationsDir}/`, '')) // 상대 경로로 변환
         .sort((a, b) => b.localeCompare(a)); // 최신 파일이 위로 오도록 정렬
 
       if (jsonFiles.length === 0) {

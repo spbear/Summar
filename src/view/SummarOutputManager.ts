@@ -138,11 +138,11 @@ export class SummarOutputManager implements ISummarOutputManager {
   /**
    * Import output items from a JSON file placed in the plugin directory
    * and populate the view accordingly.
-   * Default filename: summar-results.json
+   * Default filename: summar-conversations.json
    * Expected JSON shape:
    * { "outputItems": { "0": { result, prompts, statId, key, label, noteName }, ... } }
    */
-  async importOutputItemsFromPluginDir(filename: string = "summar-results.json"): Promise<number> {
+  async importOutputItemsFromPluginDir(filename: string = "summar-conversations.json"): Promise<number> {
     let importedCount = 0;
     try {
       const plugin = this.context.plugin;
@@ -349,10 +349,32 @@ export class SummarOutputManager implements ISummarOutputManager {
 
     const ts = new Date();
     const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, "0")}${String(ts.getDate()).padStart(2, "0")}-${String(ts.getHours()).padStart(2, "0")}${String(ts.getMinutes()).padStart(2, "0")}${String(ts.getSeconds()).padStart(2, "0")}`;
-    const basePath = `${this.context.plugin.PLUGIN_DIR}/summar-results-${stamp}`;
-    const targetPath = `${basePath}.json`;
+    
+    // 올바른 경로 분리: 디렉토리와 파일 경로를 명확히 구분
+    const conversationsDir = normalizePath(`${this.context.plugin.PLUGIN_DIR}/conversations`);
+    const targetPath = normalizePath(`${conversationsDir}/summar-conversations-${stamp}.json`);
+    
+    try {
+      // conversations 디렉토리만 생성 (파일명이 아닌 디렉토리)
+      const exists = await this.context.plugin.app.vault.adapter.exists(conversationsDir);
+      if (!exists) {
+        await this.context.plugin.app.vault.createFolder(conversationsDir);
+        SummarDebug.log(1, "Directory created:", conversationsDir);
+      }
+    } catch (error) {
+      // 폴백으로 adapter.mkdir 시도
+      try {
+        await this.context.plugin.app.vault.adapter.mkdir(conversationsDir);
+        SummarDebug.log(1, "Directory created via adapter:", conversationsDir);
+      } catch (adapterError) {
+        SummarDebug.error(1, "Failed to create directory:", conversationsDir, adapterError);
+        throw new Error(`Failed to create directory: ${conversationsDir}`);
+      }
+    }
+
+    // JSON 파일 생성
     await this.context.plugin.app.vault.adapter.write(targetPath, JSON.stringify(payload, null, 2));
-    return targetPath
+    return targetPath;
   }
 
   private scheduleRender(key: string): void {
