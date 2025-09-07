@@ -9,6 +9,11 @@ export interface SummarAIResponse {
   statsId: string;
 }
 
+export class SummarAIParam {
+  role: string;
+  text: string;
+}
+
 export class SummarAI extends SummarViewContainer {
   aiModel: string = '';
   aiProvider: string = '';
@@ -75,12 +80,12 @@ export class SummarAI extends SummarViewContainer {
     return false
   }
 
-  async complete( messages : string[] ): Promise<boolean> {
+  async complete( messages : SummarAIParam[] ): Promise<boolean> {
     if (messages && messages.length > 0) {
       if (this.aiProvider === 'openai') {
         const openaiMessages = messages.map(message => ({
-          role: "user",
-          content: message
+          role: message.role,
+          content: message.text
         }));
         const bodyContent = JSON.stringify({
           model: this.aiModel,
@@ -89,10 +94,10 @@ export class SummarAI extends SummarViewContainer {
         return await this.completeWithBody(bodyContent);
       } else if (this.aiProvider === 'gemini') {
         const contents = messages.map(message => ({
-          role: "user",
+          role: message.role,
           parts: [
             {
-              text: message
+              text: message.text
             }
           ]
         }));

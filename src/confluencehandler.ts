@@ -92,7 +92,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 			
 			this.pushOutputPrompt(message);
 
-			await summarai.complete([message]);
+			await summarai.complete([{role:'user', text:message}]);
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
 

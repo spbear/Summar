@@ -59,7 +59,8 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 			const message = `${transcriptSummaryPrompt}\n\n${transcripted}`;
 			this.pushOutputPrompt(message);
-			await summarai.complete([message]);
+
+			await summarai.complete([{role: 'user', text: message}]);
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
 
@@ -144,18 +145,19 @@ export class AudioRecordingManager extends SummarViewContainer {
 			const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.recording.transcriptSummaryModel, 'stt-refine');
 			// if (!summarai.hasKey(true, outputKey, label)) return '';
 			if (!summarai.hasKey(true, this.outputRecord.key, this.outputRecord.label as string)) return '';			
-			const messages: string[] = [];
-			messages.push(refineSummaryPrompt);
-			messages.push(`=====회의록 요약본 시작=====\n\n${summarized}\n\n=====회의록 요약본 끝=====\n\n=====원본 transcript 시작=====\n\n${transcripted}\n\n====원본 transcript 끝====`);
+			const messages = [
+				{role: 'user', text: refineSummaryPrompt},
+				{role: 'user', text: `=====회의록 요약본 시작=====\n\n${summarized}\n\n=====회의록 요약본 끝=====\n\n=====원본 transcript 시작=====\n\n${transcripted}\n\n====원본 transcript 끝====`}
+			];
 
-			SummarDebug.log(1, `messages1\n${messages[0]}`);
-			SummarDebug.log(1, `messages2\n${messages[1]}`);
+			SummarDebug.log(1, `messages1\n${messages[0].text}`);
+			SummarDebug.log(1, `messages2\n${messages[1].text}`);
 			
 			this.updateOutputText(`Refining summary using [${this.plugin.settingsv2.recording.transcriptSummaryModel}]...`);
 			// this.enableNewNote(false, outputKey);
 
-			this.pushOutputPrompt(messages[0]);
-			this.pushOutputPrompt(messages[1]);
+			this.pushOutputPrompt(messages[0].text);
+			this.pushOutputPrompt(messages[1].text);
 			this.startTimer();
 
 			await summarai.complete(messages);

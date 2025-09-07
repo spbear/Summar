@@ -1436,15 +1436,15 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
-    pushOutputPrompt(key: string, prompt: string) {
-      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-      if (leaves.length > 0) {
-        const summarView = leaves[0].view as SummarView;
-        if (summarView && typeof summarView.pushOutputPrompt === 'function') {
-          return summarView.pushOutputPrompt(key, prompt);
-        }
+  pushOutputPrompt(key: string, prompt: string) {
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    if (leaves.length > 0) {
+      const summarView = leaves[0].view as SummarView;
+      if (summarView && typeof summarView.pushOutputPrompt === 'function') {
+        return summarView.pushOutputPrompt(key, prompt);
       }
-      return "";
+    }
+    return "";
   }
 
   updateOutputText(key: string, label: string, message: string): string {
