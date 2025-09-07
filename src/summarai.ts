@@ -75,7 +75,7 @@ export class SummarAI extends SummarViewContainer {
     return false
   }
 
-  async chat( messages : string[] ): Promise<boolean> {
+  async complete( messages : string[] ): Promise<boolean> {
     if (messages && messages.length > 0) {
       if (this.aiProvider === 'openai') {
         const openaiMessages = messages.map(message => ({
@@ -86,7 +86,7 @@ export class SummarAI extends SummarViewContainer {
           model: this.aiModel,
           messages: openaiMessages,
         });
-        return await this.chatWithBody(bodyContent);
+        return await this.completeWithBody(bodyContent);
       } else if (this.aiProvider === 'gemini') {
         const contents = messages.map(message => ({
           role: "user",
@@ -99,24 +99,24 @@ export class SummarAI extends SummarViewContainer {
         const bodyContent = JSON.stringify({
           contents: contents,
         });
-        return await this.chatWithBody(bodyContent);
+        return await this.completeWithBody(bodyContent);
       }
     }
     return false;
   }
 
-//   async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
-  async chatWithBody( bodyContent: string, duration = -1 ): Promise<boolean> {
+//   async completeWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
+  async completeWithBody( bodyContent: string, duration = -1 ): Promise<boolean> {
     try {
       const trackapi = new TrackedAPIClient(this.plugin);
 
       if ( bodyContent && bodyContent.length > 0 ) {
     //   if (bodyContent && (typeof bodyContent === 'string' ? bodyContent.length > 0 : bodyContent.byteLength > 0)) {
         if (this.aiProvider === 'openai') {
-          // SummarDebug.log(1, `SummarAI.chat() - Using OpenAI chat/completion with model: ${this.aiModel}`);
+          // SummarDebug.log(1, `SummarAI.complete() - Using OpenAI chat/completion with model: ${this.aiModel}`);
           
-        //   const response = await this.chatOpenai(bodyContent, false, contentType, apiUrl);
-        const response = await this.chatOpenai(bodyContent, false);
+        //   const response = await this.completeOpenai(bodyContent, false, contentType, apiUrl);
+        const response = await this.completeOpenai(bodyContent, false);
           if (response.json &&
             response.json.choices &&
             response.json.choices.length > 0 &&
@@ -140,7 +140,7 @@ export class SummarAI extends SummarViewContainer {
             })) || '';
             this.response.statsId = statsid;
             if (statsid) {
-              await trackapi.logChat(statsid, bodyContent, this.response.text);
+              await trackapi.logConversation(statsid, bodyContent, this.response.text);
             }
             return true;
           } else {
@@ -161,16 +161,16 @@ export class SummarAI extends SummarViewContainer {
             })) || '';
             this.response.statsId = statsid;
             if (statsid) {
-              await trackapi.logChat(statsid, bodyContent, this.response.text);
+              await trackapi.logConversation(statsid, bodyContent, this.response.text);
             }
             return false
           }
         }
         else if (this.aiProvider === 'gemini') {
-          // SummarDebug.log(1, `SummarAI.chat() - Using Gemini generateContent with model: ${this.aiModel}`);
+          // SummarDebug.log(1, `SummarAI.complete() - Using Gemini generateContent with model: ${this.aiModel}`);
 
-        //   const response = await this.chatGemini(bodyContent as string, false, contentType);
-          const response = await this.chatGemini(bodyContent, false);
+        //   const response = await this.completeGemini(bodyContent as string, false, contentType);
+          const response = await this.completeGemini(bodyContent, false);
           if (response.json &&
             response.json.candidates &&
             response.json.candidates.length > 0 &&
@@ -194,7 +194,7 @@ export class SummarAI extends SummarViewContainer {
             })) || '';
             this.response.statsId = statsid;
             if (statsid) {
-              await trackapi.logChat(statsid, bodyContent, this.response.text);
+              await trackapi.logConversation(statsid, bodyContent, this.response.text);
             }
             return true;
           } else {
@@ -215,7 +215,7 @@ export class SummarAI extends SummarViewContainer {
             })) || '';
             this.response.statsId = statsid;
             if (statsid) {
-              await trackapi.logChat(statsid, bodyContent, this.response.text);
+              await trackapi.logConversation(statsid, bodyContent, this.response.text);
             }
             return false
           }
@@ -230,7 +230,7 @@ export class SummarAI extends SummarViewContainer {
     return false;
   }
 
-//   async chatWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
+//   async completeWithBody( bodyContent: string | ArrayBuffer, contentType: string = 'application/json', apiUrl?: string ): Promise<boolean> {
   async audioTranscription( bodyContent: ArrayBuffer, contentType: string, duration: number ): Promise<any> {
     try {
       const trackapi = new TrackedAPIClient(this.plugin);
@@ -276,7 +276,7 @@ export class SummarAI extends SummarViewContainer {
               this.response.statsId = statsid;
               if (statsid) {
                 const promptSummary = `[audio] duration=${duration}s, model=${this.aiModel}, feature=${this.feature}`;
-                await trackapi.logChat(statsid, promptSummary, this.response.text);
+                await trackapi.logConversation(statsid, promptSummary, this.response.text);
               }
             }
             else {
@@ -296,7 +296,7 @@ export class SummarAI extends SummarViewContainer {
               this.response.statsId = statsid;
               if (statsid) {
                 const promptSummary = `[audio] duration=${duration}s, model=${this.aiModel}, feature=${this.feature}`;
-                await trackapi.logChat(statsid, promptSummary, this.response.text);
+                await trackapi.logConversation(statsid, promptSummary, this.response.text);
               }
             }
           }
@@ -315,7 +315,7 @@ export class SummarAI extends SummarViewContainer {
   }
 
   
-  private async chatOpenai(
+  private async completeOpenai(
     bodyContent: string | ArrayBuffer, 
     throwFlag: boolean = true, 
     contentType: string = 'application/json',
@@ -335,7 +335,7 @@ export class SummarAI extends SummarViewContainer {
         const endpoint = this.plugin.settingsv2.common.openaiApiEndpoint?.trim() || "https://api.openai.com";
         url = `${endpoint.replace(/\/$/, "")}/v1/chat/completions`;
       }
-      SummarDebug.log(1, `SummarAI.chatOpenai() with model: ${this.aiModel}, feature: ${this.feature}`);
+      SummarDebug.log(1, `SummarAI.completeOpenai() with model: ${this.aiModel}, feature: ${this.feature}`);
 
       const response = await SummarRequestUrl(this.plugin, {
         url: url,
@@ -347,7 +347,7 @@ export class SummarAI extends SummarViewContainer {
         body: bodyContent,
         throw: throwFlag,
       });
-      SummarDebug.log(1, `SummarAI.chatOpenai() response: \n${JSON.stringify(response.json)}`);
+      SummarDebug.log(1, `SummarAI.completeOpenai() response: \n${JSON.stringify(response.json)}`);
 
       return response;
     } catch (error) {
@@ -356,7 +356,7 @@ export class SummarAI extends SummarViewContainer {
     }
   }
 
-  private async chatGemini(
+  private async completeGemini(
     bodyContent: string, 
     throwFlag: boolean = true, 
     contentType: string = 'application/json' 
@@ -364,7 +364,7 @@ export class SummarAI extends SummarViewContainer {
     try {
       // SummarDebug.log(1, `geminiApiKey: ${this.aiKey}`);
       // SummarDebug.log(1, `bodyContent: ${bodyContent}`);
-      SummarDebug.log(1, `SummarAI.chatGemini() with model: ${this.aiModel}, feature: ${this.feature}`);
+      SummarDebug.log(1, `SummarAI.completeGemini() with model: ${this.aiModel}, feature: ${this.feature}`);
 
       const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${this.aiModel}:generateContent?key=${this.aiKey}`;
 
@@ -378,7 +378,7 @@ export class SummarAI extends SummarViewContainer {
         throw: throwFlag,
       });
 
-      SummarDebug.log(1, `SummarAI.chatGemini() response: \n${JSON.stringify(response.json)}`);
+      SummarDebug.log(1, `SummarAI.completeGemini() response: \n${JSON.stringify(response.json)}`);
       return response;
     } catch (error) {
       SummarDebug.error(1, "Error fetching data from Gemini API:", error);

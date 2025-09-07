@@ -608,7 +608,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     button.style.transformOrigin = 'center';
     button.style.margin = '0';
     
-    setIcon(button, 'message-circle-reply');
+    setIcon(button, 'message-square-reply');
     
     // 이벤트 리스너는 별도 매니저에서 처리
     

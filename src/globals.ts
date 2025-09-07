@@ -23,7 +23,7 @@ export class SummarViewContainer {
     this.outputRecord = this.createOutputRecord();
   }
 
-  private createOutputRecord(label: string = "chat", icon: string = "message-square-more"): SummarOutputRecord {
+  private createOutputRecord(label: string = "compose prompt", icon: string = "message-square-more"): SummarOutputRecord {
     return {
       key: this.plugin.generateUniqueId(),
       itemEl: null,

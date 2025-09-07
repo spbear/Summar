@@ -80,7 +80,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     // Clear 버튼
     const clearButton = document.createElement('button');
     clearButton.setAttribute('button-id', 'composer-clear-button');
-    clearButton.setAttribute('aria-label', 'Clear composer');
+    clearButton.setAttribute('aria-label', 'Clear prompt');
     clearButton.style.cssText = `
       background: none;
       border: none;
@@ -98,7 +98,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     // Close 버튼
     const closeButton = document.createElement('button');
     closeButton.setAttribute('button-id', 'composer-close-button');
-    closeButton.setAttribute('aria-label', 'Close composer');
+    closeButton.setAttribute('aria-label', 'Close');
     closeButton.style.cssText = `
       background: none;
       border: none;
@@ -121,8 +121,8 @@ export class SummarComposerManager implements ISummarComposerManager {
     };
 
     // setStandardComposerHeader 사용
-    const header = setStandardComposerHeader('composer', buttons, { 
-      icon: 'message-circle'
+    const header = setStandardComposerHeader('compose prompt', buttons, { 
+      icon: 'message-square'
     });
 
     // label element 참조 저장
@@ -484,7 +484,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     if (!this.composerHeaderLabel) return;
 
     // 저장된 label element 직접 사용
-    this.composerHeaderLabel.textContent = 'composer';
+    this.composerHeaderLabel.textContent = 'compose prompt';
     SummarDebug.log(1, 'Composer label reset to default');
   }
 

@@ -59,7 +59,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 			const message = `${transcriptSummaryPrompt}\n\n${transcripted}`;
 			this.pushOutputPrompt(message);
-			await summarai.chat([message]);
+			await summarai.complete([message]);
 			const status = summarai.response.status;
 			const summary = summarai.response.text;
 
@@ -158,7 +158,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 			this.pushOutputPrompt(messages[1]);
 			this.startTimer();
 
-			await summarai.chat(messages);
+			await summarai.complete(messages);
 			const status = summarai.response.status;
 			refined = summarai.response.text;
 

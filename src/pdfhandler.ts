@@ -143,7 +143,7 @@ export class PdfHandler extends SummarViewContainer {
 				this.updateOutputText(`[${currentProgress}%] AI analysis in progress... [${modelName}] (${progressTime})`);
 			}, 5000); // 5초마다 업데이트
 
-			await summarai.chatWithBody(body_content);
+			await summarai.completeWithBody(body_content);
 			
 			// 진행 상태 업데이트 중지
 			clearInterval(progressInterval);

@@ -55,7 +55,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 			const message = `${cmdPrompt}\n\n${selectedText}`;
 			this.pushOutputPrompt(message);
 
-			await summarai.chat([message]);
+			await summarai.complete([message]);
 			const responseStatus = summarai.response.status;
 			const responseText = summarai.response.text;
 			this.stopTimer();

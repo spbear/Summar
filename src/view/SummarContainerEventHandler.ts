@@ -149,10 +149,10 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
     // 메뉴 아이템들 생성
     const menuItems = [
-      { label: 'Composer', action: () => this.handleComposer() },
-      { label: 'Load output', action: () => this.handleLoadAllOutputs() },
-      { label: 'Save all outputs', action: () => this.handleSaveAllOutputs() },
-      { label: 'Clear all outputs', action: () => this.handleDeleteAllOutputs() }
+      { label: 'New prompt', action: () => this.handleComposer() },
+      { label: 'Load conversation', action: () => this.handleLoadAllOutputs() },
+      { label: 'Save all conversations', action: () => this.handleSaveAllOutputs() },
+      { label: 'Clear all conversations', action: () => this.handleDeleteAllOutputs() }
     ];
 
     menuItems.forEach(item => {
