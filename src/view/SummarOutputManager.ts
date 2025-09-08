@@ -61,6 +61,13 @@ export class SummarOutputManager implements ISummarOutputManager {
     // 이벤트를 통해 outputItem 제거 알림
     this.events.onOutputItemRemoved?.(key);
 
+    // DOM 요소의 이벤트 리스너 정리 (AbortController가 처리하지만 명시적으로 정리)
+    const outputText = rec.itemEl.querySelector('.output-text') as HTMLDivElement;
+    if (outputText) {
+      // 추가적인 정리가 필요한 경우 여기서 처리
+      outputText.removeAttribute('data-key');
+    }
+
     // DOM에서 제거
     rec.itemEl.remove();
 
@@ -73,6 +80,11 @@ export class SummarOutputManager implements ISummarOutputManager {
       clearTimeout(renderTimer);
       this.context.timeoutRefs.delete(renderTimer);
       this.renderTimers.delete(key);
+    }
+
+    // conversations 배열의 메모리 정리
+    if (rec.conversations) {
+      rec.conversations.length = 0; // 배열 내용 정리
     }
 
     SummarDebug.log(1, `Output item deleted: ${key}`);
@@ -308,6 +320,11 @@ export class SummarOutputManager implements ISummarOutputManager {
     // 이벤트를 통해 각 outputItem 제거 알림
     this.context.outputRecords.forEach((rec, key) => {
       this.events.onOutputItemRemoved?.(key);
+      
+      // conversations 배열의 메모리 정리
+      if (rec.conversations) {
+        rec.conversations.length = 0;
+      }
     });
     
     // 데이터 정리
@@ -408,13 +425,13 @@ export class SummarOutputManager implements ISummarOutputManager {
     const outputItems: any[] = [];
     this.context.outputRecords.forEach((rec) => {
       outputItems.push({
-        result: rec.result ?? "",
-        prompts: Array.isArray(rec.prompts) ? rec.prompts : [],
-        conversations: Array.isArray(rec.conversations) ? rec.conversations : [],
-        statId: rec.statId ?? "",
         key: rec.key ?? "",
         label: rec.label ?? "",
         noteName: rec.noteName ?? "",
+        // prompts: Array.isArray(rec.prompts) ? rec.prompts : [],
+        conversations: Array.isArray(rec.conversations) ? rec.conversations : [],
+        result: rec.result ?? "",
+        // statId: rec.statId ?? "",
       });
     });
 
@@ -605,16 +622,20 @@ export class SummarOutputManager implements ISummarOutputManager {
 
   pushOutputPrompt(key: string, prompt: string): void {
     const rec = this.ensureRecord(key);
-    if (!rec.prompts) rec.prompts = [];
-    rec.prompts.push(prompt);
+    // if (!rec.prompts) rec.prompts = [];
+    // rec.prompts.push(prompt);
+
+    this.pushConversations(key, new SummarAIParam('user', prompt));
   }
 
 
   private setOutput(key: string, text: string, isFinal: boolean = false): void {
     const rec = this.ensureRecord(key);
     rec.result = text;
+    // SummarDebug.log(1, `setOutput() - rec.result, isFinal=${isFinal}`);
     if (isFinal) {
-      this.pushConversations(key, { role: 'assistant', text: text });
+      this.pushConversations(key, new SummarAIParam('assistant', text));
+      // SummarDebug.log(1, "setOutput() - pushConversations('assistant')");
     }
   }
 
@@ -661,6 +682,8 @@ export class SummarOutputManager implements ISummarOutputManager {
           } catch (error) {
             console.debug('Selection restoration failed (normal on mobile):', error);
           }
+          // 메모리 누수 방지: savedSelection 참조 해제
+          savedSelection = null;
         }, 10);
         
         this.context.timeoutRefs.add(timeoutId);

@@ -70,7 +70,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 			}
 
 			if (responseText && responseText.length > 0) {
-				this.updateOutputText(responseText);
+				this.updateOutputText(responseText, true);
 				this.enableNewNote(true);
 
 				// 결과를 노트에 append (설정에 따라)

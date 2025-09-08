@@ -84,7 +84,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 				const summaryNote = getAvailableFilePath(summaryCandidate, ".md", this.plugin);
 
-				this.updateOutputText(summary);
+				this.updateOutputText(summary, true);
 				this.enableNewNote(true, summaryNote);
 				
 				SummarDebug.log(1,`newFilePath = ${newFilePath}`);
@@ -186,7 +186,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				}
 				const refinementNote = getAvailableFilePath(refinementCandidate, ".md", this.plugin);
 
-				this.updateOutputText(refined);
+				this.updateOutputText(refined, true);
 				this.enableNewNote(true, refinementNote);
 
 				if (this.plugin.settingsv2.recording.saveTranscriptAndRefineToNewNote) {

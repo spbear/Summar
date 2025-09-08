@@ -107,7 +107,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 			}
 
 			if (summary && summary.length > 0) {
-				this.updateOutputText(summary);
+				this.updateOutputText(summary, true);
 				this.enableNewNote(true);
 			} else {
 				this.updateOutputText("No valid response from OpenAI API.");

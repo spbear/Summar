@@ -12,6 +12,11 @@ export interface SummarAIResponse {
 export class SummarAIParam {
   role: string;
   text: string;
+
+  constructor(role: string = '', text: string = '') {
+    this.role = role;
+    this.text = text;
+  }
 }
 
 export class SummarAI extends SummarViewContainer {

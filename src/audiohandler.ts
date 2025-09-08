@@ -5,6 +5,7 @@ import { SummarAI } from "./summarai";
 import { get } from "http";
 
 export class AudioHandler extends SummarViewContainer {
+	private sttPrompt: string ='';
 
 	constructor(plugin: SummarPlugin) {
 		super(plugin);
@@ -369,7 +370,9 @@ export class AudioHandler extends SummarViewContainer {
 		}
 
 		await this.plugin.app.vault.create(newFilePath, transcriptionContent);
-		this.updateOutputText(transcriptionContent);
+
+		this.pushOutputPrompt(this.sttPrompt);
+		this.updateOutputText(transcriptionContent, true);
 
 		this.enableNewNote(true, newFilePath);
 		
@@ -529,9 +532,11 @@ export class AudioHandler extends SummarViewContainer {
 		if ((this.plugin.settingsv2.recording.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settingsv2.recording.sttModel === "gpt-4o-transcribe")
 			&& this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]) {
 			addField("prompt", this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
-			this.pushOutputPrompt(this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
+			// this.pushOutputPrompt(this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
+			this.sttPrompt = this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel];
 		} else {
-			this.pushOutputPrompt('transcribe using whisper-1');
+			// this.pushOutputPrompt('transcribe using whisper-1');
+			this.sttPrompt = 'transcribe using whisper-1';
 		}
 
 		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
@@ -682,7 +687,8 @@ export class AudioHandler extends SummarViewContainer {
 			systemInstruction += ` The input language is ${this.mapLanguageToWhisperCode(this.plugin.settingsv2.recording.recordingLanguage)}.`;
 		}
 
-		this.pushOutputPrompt(systemInstruction);
+		// this.pushOutputPrompt(systemInstruction);
+		this.sttPrompt = systemInstruction;
 
 		try {
 			const bodyContent = JSON.stringify({

@@ -72,11 +72,12 @@ export class SummarViewContainer {
    * @param outputContainer The container object to update.
    * @param message The message to set as the value.
    */
-  updateOutputText(message: string): string {
+  updateOutputText(message: string, isFinal=false): string {
       this.outputRecord.result = message;
       return this.plugin.updateOutputText(this.outputRecord.key, 
                                           this.outputRecord.label as string, 
-                                          this.outputRecord.result);
+                                          this.outputRecord.result,
+                                          isFinal);
   }
 
   appendOutputText(message: string): string {

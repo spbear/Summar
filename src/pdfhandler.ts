@@ -230,7 +230,7 @@ export class PdfHandler extends SummarViewContainer {
 			// 새 노트 생성
 			const createdFile = await this.plugin.app.vault.create(filePath, content);
 			await this.plugin.app.workspace.openLinkText(filePath, "", true);
-			this.updateOutputText(content);
+			this.updateOutputText(content,true);
 			this.enableNewNote(true, filePath);
 			this.foldOutput(true);
 
