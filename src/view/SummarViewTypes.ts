@@ -1,6 +1,7 @@
 import { WorkspaceLeaf } from "obsidian";
 import SummarPlugin from "../main";
 import MarkdownIt from "markdown-it";
+import { SummarAIParam } from "src/summarai";
 
 // 공통 인터페이스
 export interface ISummarViewContext {
@@ -37,6 +38,7 @@ export class SummarOutputRecord {
   icon?: string;
   folded?: boolean;
   prompts?: string[];
+  conversations?: SummarAIParam[];
 }
 
 // 매니저 인터페이스들
@@ -54,9 +56,9 @@ export interface ISummarUIRenderer {
 }
 
 export interface ISummarOutputManager {
-  createOutputItem(key: string, label: string): HTMLDivElement;
+  createOutputItem(key: string, label: string): SummarOutputRecord;
   appendOutputText(key: string, label: string, message: string): string;
-  updateOutputText(key: string, label: string, message: string): string;
+  updateOutputText(key: string, label: string, message: string, isFinal: boolean): string;
   getOutputText(key: string): string;
   pushOutputPrompt(key: string, prompt: string): void;
   importOutputItemsFromPluginDir(filename?: string): Promise<number>;
@@ -97,7 +99,6 @@ export interface ISummarEventHandler {
 export interface ISummarUploadManager {
   uploadContentToWiki(title: string, content: string): Promise<void>;
   uploadContentToSlack(title: string, content: string): Promise<void>;
-  getCurrentMainPaneTabType(): string;
   updateSlackButtonTooltip(): void;
 }
 

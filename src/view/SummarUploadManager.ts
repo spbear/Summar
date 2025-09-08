@@ -56,12 +56,6 @@ export class SummarUploadManager implements ISummarUploadManager {
     }
   }
 
-  getCurrentMainPaneTabType(): string {
-    const existingLeaf = this.context.plugin.app.workspace.getMostRecentLeaf();
-    if (!existingLeaf) return ""; 
-    return existingLeaf.view.getViewType();
-  }
-
   updateSlackButtonTooltip(): void {
     const uploadSlackButton = this.context.plugin.uploadNoteToSlackButton;
     if (!uploadSlackButton) return;

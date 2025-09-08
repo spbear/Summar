@@ -167,13 +167,13 @@ export class PdfHandler extends SummarViewContainer {
 				const markdownContent = this.extractMarkdownContent(summary);
 				if (markdownContent) {
 					this.updateOutputText(`[95%] Creating new note...`);
-					this.enableNewNote(true);
+					// this.enableNewNote(true);
 					this.updateOutputText(`[100%] Markdown conversion completed! New note has been created.`);
 					// PDF 파일명 기반으로 새 노트 자동 생성
 					await this.createNewNoteFromPdf(file.name, markdownContent);
 				} else {
 					this.updateOutputText(`[95%] Creating new note...`);
-					this.enableNewNote(true);
+					// this.enableNewNote(true);
 					this.updateOutputText(`[100%] Conversion completed! New note has been created.`);
 					// PDF 파일명 기반으로 새 노트 자동 생성
 					await this.createNewNoteFromPdf(file.name, summary);

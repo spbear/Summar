@@ -17,6 +17,7 @@ import { SummarStatsModal } from "./summarstatsmodal";
 import { IndexedDBManager } from "./summarailog";
 import semver from "semver";
 import { TrackedAPIClient } from "./summarailog";
+import { ISummarOutputManager } from "./view/SummarViewTypes";
 
 export default class SummarPlugin extends Plugin {
   settings: PluginSettings = {
@@ -1436,103 +1437,133 @@ export default class SummarPlugin extends Plugin {
     }
   }
 
+  /**
+   * 현재 활성화된 메인 패널의 탭 타입을 반환합니다.
+   * @returns 현재 활성 탭의 view type (예: "markdown", "canvas" 등)
+   */
+  getCurrentMainPaneTabType(): string {
+    const existingLeaf = this.app.workspace.getMostRecentLeaf();
+    if (!existingLeaf) return ""; 
+    return existingLeaf.view.getViewType();
+  }
+
   pushOutputPrompt(key: string, prompt: string) {
-    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-    if (leaves.length > 0) {
-      const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.pushOutputPrompt === 'function') {
-        return summarView.pushOutputPrompt(key, prompt);
-      }
-    }
+    this.safeCallOutputManager(
+      (outputManager) => {
+        outputManager.pushOutputPrompt(key, prompt);
+        return true;
+      },
+      false
+    );
     return "";
   }
 
-  updateOutputText(key: string, label: string, message: string): string {
-      // SummarView의 updateOutputText 메서드를 호출
+  updateOutputText(key: string, label: string, message: string, isFinal: boolean = false): string {
+    return this.safeCallOutputManager(
+      (outputManager) => outputManager.updateOutputText(key, label, message, isFinal),
+      ""
+    );
+  }
+
+  /**
+   * 안전하게 SummarView에 접근하여 작업을 실행합니다.
+   * @param operation SummarView에서 실행할 작업
+   * @param defaultValue 실패 시 반환할 기본값
+   * @returns 작업 결과 또는 기본값
+   */
+  private safeCallSummarView<T>(
+    operation: (summarView: SummarView) => T,
+    defaultValue: T
+  ): T {
+    try {
       const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
       if (leaves.length > 0) {
         const summarView = leaves[0].view as SummarView;
-        if (summarView && typeof summarView.updateOutputText === 'function') {
-          return summarView.updateOutputText(key, label, message);
+        if (summarView) {
+          return operation(summarView);
         }
       }
-      return "";
+    } catch (error) {
+      SummarDebug.error(1, "Error calling SummarView operation:", error);
+    }
+    return defaultValue;
+  }
+
+  /**
+   * 안전하게 SummarView의 outputManager에 접근하여 작업을 실행합니다.
+   * @param operation outputManager에서 실행할 작업
+   * @param defaultValue 실패 시 반환할 기본값
+   * @returns 작업 결과 또는 기본값
+   */
+  private safeCallOutputManager<T>(
+    operation: (outputManager: ISummarOutputManager) => T,
+    defaultValue: T
+  ): T {
+    return this.safeCallSummarView(
+      (summarView) => {
+        const outputManager = summarView.getOutputManager();
+        if (outputManager) {
+          return operation(outputManager);
+        }
+        return defaultValue;
+      },
+      defaultValue
+    );
   }
 
   appendOutputText(key: string, label: string, message: string): string {
-      // SummarView의 appendOutputText 메서드를 호출
-      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-      // SummarDebug.log(2, `appendOutputText: Found ${leaves.length} SummarView leaves`);
-      if (leaves.length > 0) {
-        const summarView = leaves[0].view as SummarView;
-        if (summarView && typeof summarView.appendOutputText === 'function') {
-          // SummarDebug.log(2, `appendOutputText: Calling SummarView.appendOutputText for key: ${key}, message: "${message}"`);
-          return summarView.appendOutputText(key, label, message);
-        } else {
-          // SummarDebug.log(1, `appendOutputText: SummarView or appendOutputText method not found`);
-        }
-      } else {
-        // SummarDebug.log(1, `appendOutputText: No SummarView leaves found`);
-      }
-      return "";
+    return this.safeCallOutputManager(
+      (outputManager) => outputManager.appendOutputText(key, label, message),
+      ""
+    );
   }
 
   getOutputText(key: string): string {
-    // SummarView의 getOutputText 메서드를 호출
-    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-    if (leaves.length > 0) {
-      const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.getOutputText === 'function') {
-        return summarView.getOutputText(key);
-      }
-    }
-    return "";
+    return this.safeCallOutputManager(
+      (outputManager) => outputManager.getOutputText(key),
+      ""
+    );
   }
 
   updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
+    // updateOutputInfo는 현재 SummarView에만 있고 outputManager에는 없으므로 기존 방식 유지
     const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
     if (leaves.length > 0) {
       const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.updateOutputInfo === 'function') {
-
-          summarView.updateOutputInfo(key, statId, prompts, newNotePath);
-      }
+      // if (summarView && typeof summarView.updateOutputInfo === 'function') {
+          // summarView.updateOutputInfo(key, statId, prompts, newNotePath);
+      // }
     }
   }
 
   enableNewNote(enabled:boolean, key: string, newNotePath?: string) {
-    // SummarView의 enableNewNote 메서드를 호출
-    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-    if (leaves.length > 0) {
-      const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.enableNewNote === 'function') {
-        if (enabled) {
-          summarView.enableNewNote(key, newNotePath);
-        }
-      }
-    }
+    this.safeCallOutputManager(
+      (outputManager) => {
+        outputManager.enableNewNote(key, newNotePath);
+        return true;
+      },
+      false
+    );
   }
 
   foldOutput(key: string | null, fold: boolean): void {
-    // SummarView의 foldOutput 메서드를 호출
-    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-    if (leaves.length > 0) {
-      const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.foldOutput === 'function') {
-          summarView.foldOutput(key, fold);
-      }
-    }
+    this.safeCallOutputManager(
+      (outputManager) => {
+        outputManager.foldOutput(key, fold);
+        return true;
+      },
+      false
+    );
   }
 
   clearAllOutputItems(): void {
-    // SummarView의 clearAllOutputItems 메서드를 호출
-    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-    if (leaves.length > 0) {
-      const summarView = leaves[0].view as SummarView;
-      if (summarView && typeof summarView.clearAllOutputItems === 'function') {
-          summarView.clearAllOutputItems();
-      }
-    }
+    this.safeCallOutputManager(
+      (outputManager) => {
+        outputManager.clearAllOutputItems();
+        return true;
+      },
+      false
+    );
   }
 
   /**

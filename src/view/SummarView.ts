@@ -30,7 +30,7 @@ export class SummarView extends View {
   static VIEW_TYPE = "summar-view";
 
   // Core properties
-  plugin: SummarPlugin;
+  // plugin: SummarPlugin;
   outputContainer: HTMLDivElement;
   composerContainer: HTMLDivElement;
   // 통합 레코드로 전환: 개별 Map 제거
@@ -55,7 +55,7 @@ export class SummarView extends View {
 
   constructor(leaf: WorkspaceLeaf, plugin: SummarPlugin) {
     super(leaf);
-    this.plugin = plugin;
+    // this.plugin = plugin;
     
     // Initialize markdown renderer
     this.markdownRenderer = new MarkdownIt({
@@ -67,7 +67,8 @@ export class SummarView extends View {
 
     // Create context for managers
     this.context = {
-      plugin: this.plugin,
+      // plugin: this.plugin,
+      plugin: plugin,
       leaf: leaf,
       view: this, // SummarView 참조 추가
       containerEl: this.containerEl,
@@ -253,66 +254,16 @@ export class SummarView extends View {
   // ==================== Public API Methods ====================
   // These methods maintain the existing interface for external components
 
-  pushOutputPrompt(key: string, prompt: string): void {
-    return this.outputManager.pushOutputPrompt(key, prompt);
-  }
-
-  updateOutputText(key: string, label: string, message: string): string {
-    return this.outputManager.updateOutputText(key, label, message);
-  }
-
-  appendOutputText(key: string, label: string, message: string): string {
-    return this.outputManager.appendOutputText(key, label, message);
-  }
-
-  getOutputText(key: string): string {
-    return this.outputManager.getOutputText(key);
-  }
-
-  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string): void {
-    // 현재 사용되지 않음 - 필요 시 구현
-    SummarDebug.log(1, `updateOutputInfo called for key: ${key}, statId: ${statId}`);
-  }
-
-  enableNewNote(key: string, newNotePath?: string): void {
-    this.outputManager.enableNewNote(key, newNotePath);
-  }
-
-  getNoteName(key: string): string {
-    return this.outputManager.getNoteName(key);
-  }
-
-  foldOutput(key: string | null, fold: boolean): void {
-    this.outputManager.foldOutput(key, fold);
-  }
-
-  clearAllOutputItems(): void {
-    this.outputManager.clearAllOutputItems();
-  }
-
-  getCurrentMainPaneTabType(): string {
-    return this.uploadManager.getCurrentMainPaneTabType();
+  /**
+   * outputManager에 대한 안전한 접근을 제공합니다.
+   * @returns ISummarOutputManager 인스턴스
+   */
+  getOutputManager(): ISummarOutputManager {
+    return this.outputManager;
   }
 
   updateSlackButtonTooltip(): void {
     this.uploadManager.updateSlackButtonTooltip();
-  }
-
-  /**
-   * MarkdownIt 렌더링 결과에서 불필요한 줄바꿈을 제거합니다.
-   */
-  cleanupMarkdownOutput(html: string): string {
-    return this.outputManager.cleanupMarkdownOutput(html);
-  }
-
-  // ==================== Upload Methods ====================
-
-  private async uploadContentToSlack(title: string, content: string): Promise<void> {
-    return this.uploadManager.uploadContentToSlack(title, content);
-  }
-
-  private async uploadContentToWiki(title: string, content: string): Promise<void> {
-    return this.uploadManager.uploadContentToWiki(title, content);
   }
 
   // ==================== Output Item Management ====================

@@ -2,6 +2,7 @@ import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
 import { composeStandardOutputHeader, getDefaultLabelIcon } from "./OutputHeaderComposer";
 import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
+import { SummarAIParam } from "../summarai";
 
 export class SummarOutputManager implements ISummarOutputManager {
   private events: SummarViewEvents = {};
@@ -15,7 +16,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     this.events = events;
   }
 
-  createOutputItem(key: string, label: string): HTMLDivElement {
+  createOutputItem(key: string, label: string='compose prompt'): SummarOutputRecord {
     // 전체 컨테이너 생성
     const outputItem = document.createElement('div');
     outputItem.className = 'output-item';
@@ -46,7 +47,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     // 이벤트 발생
     this.events.onOutputItemCreated?.(key, outputItem);
     
-    return outputItem;
+    return rec;
   }
 
   deleteOutputItem(key: string): boolean {
@@ -79,11 +80,11 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   appendOutputText(key: string, label: string, message: string): string {
-    let outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+    let rec = this.context.outputRecords.get(key) || null;
     
-    if (!outputItem) {
+    if (!rec || !rec.itemEl) {
       // 새로운 outputItem 생성
-      outputItem = this.createOutputItem(key, label);
+      this.createOutputItem(key, label);
       return this.updateOutputText(key, label, message);
     }
     
@@ -100,20 +101,44 @@ export class SummarOutputManager implements ISummarOutputManager {
     return key;
   }
 
-  updateOutputText(key: string, label: string, message: string): string {
-    let outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+  updateOutputText(key: string, label: string, message: string, isFinal: boolean = false): string {
+    let rec = this.context.outputRecords.get(key) || null;
     
-    if (!outputItem) {
+    if (!rec || !rec.itemEl) {
       // 새로운 outputItem 생성
-      outputItem = this.createOutputItem(key, label);
+      this.createOutputItem(key, label);
     }
     
     // 텍스트 완전 교체: Map 저장 → 렌더 반영
-    this.setOutput(key, message);
+    this.setOutput(key, message, isFinal);
     // 즉시 반영 대신 동일한 경로로 디바운스 렌더(일관성)
     this.scheduleRender(key);
     
     return key;
+  }
+
+  pushConversations(key: string, conversation: SummarAIParam) : number {
+    let rec = this.context.outputRecords.get(key);
+    if (!rec || !rec.itemEl) {
+      SummarDebug.log(1, `Output item not found for key: ${key}`);
+      rec = this.createOutputItem(key);
+    }
+    
+    // conversations 배열이 없으면 초기화
+    if (!rec.conversations) {
+      rec.conversations = [];
+    }
+    
+    // conversation 추가하고 새로운 배열 길이 반환
+    return rec.conversations.push(conversation);
+  }
+
+  getConversations(key: string): SummarAIParam[] | null {
+    if (key === "") {
+      return null;
+    }
+    const conversations = this.context.outputRecords.get(key)?.conversations || null;
+    return conversations;
   }
 
   getOutputText(key: string): string {
@@ -140,14 +165,46 @@ export class SummarOutputManager implements ISummarOutputManager {
    * and populate the view accordingly.
    * Default filename: summar-conversations.json
    * Expected JSON shape:
-   * { "outputItems": { "0": { result, prompts, statId, key, label, noteName }, ... } }
+   * { "outputItems": [ { result, prompts, statId, key, label, noteName }, ... ] }
    */
   async importOutputItemsFromPluginDir(filename: string = "summar-conversations.json"): Promise<number> {
     let importedCount = 0;
     try {
       const plugin = this.context.plugin;
-      const path = `${plugin.PLUGIN_DIR}/${filename}`;
-      const exists = await plugin.app.vault.adapter.exists(path);
+      
+      // conversations 디렉토리에서 파일 찾기
+      let path = `${plugin.PLUGIN_DIR}/conversations/${filename}`;
+      let exists = await plugin.app.vault.adapter.exists(path);
+      
+      // conversations 디렉토리에 없으면 플러그인 루트에서 찾기
+      if (!exists) {
+        path = `${plugin.PLUGIN_DIR}/${filename}`;
+        exists = await plugin.app.vault.adapter.exists(path);
+      }
+      
+      // 파일명에 타임스탬프가 없으면 최신 파일 찾기
+      if (!exists && filename === "summar-conversations.json") {
+        try {
+          const conversationsDir = `${plugin.PLUGIN_DIR}/conversations`;
+          const dirExists = await plugin.app.vault.adapter.exists(conversationsDir);
+          if (dirExists) {
+            const files = await plugin.app.vault.adapter.list(conversationsDir);
+            const conversationFiles = files.files
+              .filter(f => f.startsWith('summar-conversations-') && f.endsWith('.json'))
+              .sort()
+              .reverse(); // 최신 파일 우선
+            
+            if (conversationFiles.length > 0) {
+              path = `${conversationsDir}/${conversationFiles[0]}`;
+              exists = true;
+              SummarDebug.log(1, `Found latest conversation file: ${conversationFiles[0]}`);
+            }
+          }
+        } catch (error) {
+          SummarDebug.log(1, `Error searching for conversation files:`, error);
+        }
+      }
+      
       if (!exists) {
         SummarDebug.log(1, `File does not exist: ${path}`);
         return importedCount;
@@ -169,9 +226,12 @@ export class SummarOutputManager implements ISummarOutputManager {
       }
 
       const ingest = (it: any) => {
-        if (!it || typeof it !== 'object') return;
-        const key: string = it.key || plugin.generateUniqueId();
+        if (!it || typeof it !== 'object') {
+          SummarDebug.log(1, `Invalid item structure, skipping:`, it);
+          return;
+        }
         
+        const key: string = it.key || plugin.generateUniqueId();
         SummarDebug.log(1, `Processing item with key: ${key}`);
         
         // 기존에 동일한 key가 존재하는지 확인
@@ -180,27 +240,39 @@ export class SummarOutputManager implements ISummarOutputManager {
           return;
         }
         
-        const label: string = it.label || "imported";
-        const result: string = it.result || "";
-        const noteName: string | undefined = it.noteName || undefined;
-        const prompts: string[] = Array.isArray(it.prompts) ? it.prompts : [];
-        const statId: string | undefined = it.statId || undefined;
+        try {
+          const label: string = it.label || "imported";
+          const result: string = it.result || "";
+          const noteName: string | undefined = it.noteName || undefined;
+          const prompts: string[] = Array.isArray(it.prompts) ? it.prompts : [];
+          const statId: string | undefined = it.statId || undefined;
+          const conversations: any[] = Array.isArray(it.conversations) ? it.conversations : [];
 
-        // Create the UI item
-        this.createOutputItem(key, label);
-        if (result) this.updateOutputText(key, label, result);
-        if (noteName) this.enableNewNote(key, noteName);
-        this.foldOutput(key, true);
+          // Create the UI item
+          this.createOutputItem(key, label);
+          if (result) this.updateOutputText(key, label, result);
+          if (noteName) this.enableNewNote(key, noteName);
+          this.foldOutput(key, true);
 
-        // Persist fields into record
-        const rec = this.context.outputRecords.get(key);
-        if (rec) {
-          rec.prompts = prompts;
-          rec.statId = statId;
+          // Persist fields into record
+          const rec = this.context.outputRecords.get(key);
+          if (rec) {
+            rec.prompts = prompts;
+            rec.statId = statId;
+            // conversations 필드도 복원
+            if (conversations.length > 0) {
+              rec.conversations = conversations;
+            }
+          }
+          
+          // 성공적으로 추가된 경우 카운트 증가
+          importedCount++;
+          SummarDebug.log(1, `Successfully imported item with key: ${key}, total imported: ${importedCount}`);
+          
+        } catch (error) {
+          SummarDebug.error(1, `Failed to import item with key: ${key}`, error);
+          // 에러가 발생해도 카운트는 증가시키지 않음
         }
-        
-        // 성공적으로 추가된 경우 카운트 증가
-        importedCount++;
       };
 
       if (Array.isArray(items)) {
@@ -338,6 +410,7 @@ export class SummarOutputManager implements ISummarOutputManager {
       outputItems.push({
         result: rec.result ?? "",
         prompts: Array.isArray(rec.prompts) ? rec.prompts : [],
+        conversations: Array.isArray(rec.conversations) ? rec.conversations : [],
         statId: rec.statId ?? "",
         key: rec.key ?? "",
         label: rec.label ?? "",
@@ -518,7 +591,13 @@ export class SummarOutputManager implements ISummarOutputManager {
   private ensureRecord(key: string): SummarOutputRecord {
     let rec = this.context.outputRecords.get(key);
     if (!rec) {
-      rec = { key, itemEl: null, result: '', noteName: undefined };
+      rec = { 
+        key, 
+        itemEl: null, 
+        result: '', 
+        noteName: undefined,
+        conversations: [] // SummarAIParam[] 초기화
+      };
       this.context.outputRecords.set(key, rec);
     }
     return rec;
@@ -531,9 +610,12 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
 
-  private setOutput(key: string, text: string): void {
+  private setOutput(key: string, text: string, isFinal: boolean = false): void {
     const rec = this.ensureRecord(key);
     rec.result = text;
+    if (isFinal) {
+      this.pushConversations(key, { role: 'assistant', text: text });
+    }
   }
 
   private getOutput(key: string): string {

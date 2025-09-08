@@ -24,7 +24,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     const uploadWikiButton = this.context.containerEl.querySelector('button[aria-label*="Upload Note to Confluence"]') as HTMLButtonElement;
     if (uploadWikiButton) {
       uploadWikiButton.addEventListener("click", async() => {
-        const viewType = await this.getCurrentMainPaneTabType();
+        const viewType = this.getCurrentMainPaneTabType();
         if (viewType === "markdown") {
           const file = this.context.plugin.app.workspace.getActiveFile();
           if (file) {
@@ -44,7 +44,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     const uploadSlackButton = this.context.containerEl.querySelector('button[aria-label*="Slack"]') as HTMLButtonElement;
     if (uploadSlackButton) {
       uploadSlackButton.addEventListener("click", async() => {
-        const viewType = await this.getCurrentMainPaneTabType();
+        const viewType = this.getCurrentMainPaneTabType();
         if (viewType === "markdown") {
           const file = this.context.plugin.app.workspace.getActiveFile();
           if (file) {
@@ -408,9 +408,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   }
 
   private getCurrentMainPaneTabType(): string {
-    const existingLeaf = this.context.plugin.app.workspace.getMostRecentLeaf();
-    if (!existingLeaf) return ""; 
-    return existingLeaf.view.getViewType();
+    return this.context.plugin.getCurrentMainPaneTabType();
   }
 
   private showUploadFailedMessage(title: string, message: string): void {
