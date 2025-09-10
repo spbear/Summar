@@ -526,7 +526,16 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   cleanupMarkdownOutput(html: string): string {
-    return html
+    // 코드 블록 내용을 임시로 보호하기 위해 플레이스홀더로 대체
+    const codeBlocks: string[] = [];
+    let processedHtml = html.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, (match, codeContent) => {
+      const index = codeBlocks.length;
+      codeBlocks.push(codeContent);
+      return `<pre><code>__CODE_PLACEHOLDER_${index}__</code></pre>`;
+    });
+    
+    // 일반적인 정리 작업 수행
+    processedHtml = processedHtml
       // 연속된 <br> 태그를 하나로 줄임
       .replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '<br>')
       // p 태그 사이의 불필요한 공백 제거
@@ -542,6 +551,14 @@ export class SummarOutputManager implements ISummarOutputManager {
       .replace(/>\s*\n\s*</gi, '><')
       // 시작과 끝의 공백 제거
       .trim();
+    
+    // 코드 블록 내용을 복원
+    processedHtml = processedHtml.replace(/<pre><code>__CODE_PLACEHOLDER_(\d+)__<\/code><\/pre>/gi, (match, index) => {
+      const codeContent = codeBlocks[parseInt(index)];
+      return `<pre><code>${codeContent}</code></pre>`;
+    });
+    
+    return processedHtml;
   }
 
   /**
@@ -553,10 +570,11 @@ export class SummarOutputManager implements ISummarOutputManager {
     return html.replace(
       /<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
       (match, codeContent) => {
-        const cleanedContent = codeContent.trim();
+        // 코드 내용에서 줄바꿈을 보존하되, 앞뒤 공백만 제거
+        const preservedContent = codeContent.replace(/^\s+|\s+$/g, '');
         
         return `<div class="summar-code-block-container">
-  <pre class="summar-code-block"><code>${cleanedContent}</code></pre>
+  <pre class="summar-code-block"><code>${preservedContent}</code></pre>
 </div>`;
       }
     );
