@@ -573,9 +573,7 @@ export class SummarOutputManager implements ISummarOutputManager {
         // 코드 내용에서 줄바꿈을 보존하되, 앞뒤 공백만 제거
         const preservedContent = codeContent.replace(/^\s+|\s+$/g, '');
         
-        return `<div class="summar-code-block-container">
-  <pre class="summar-code-block"><code>${preservedContent}</code></pre>
-</div>`;
+        return `<div class="summar-code-block-container"><pre class="summar-code-block"><code>${preservedContent}</code></pre></div>`;
       }
     );
   }
