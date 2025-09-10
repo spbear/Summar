@@ -483,7 +483,8 @@ export class SummarOutputManager implements ISummarOutputManager {
         const raw = this.getOutput(key);
         const rendered = this.context.markdownRenderer.render(raw);
         const cleaned = this.cleanupMarkdownOutput(rendered);
-        outputTextEl.innerHTML = cleaned;
+        const enhanced = this.enhanceCodeBlocks(cleaned);
+        outputTextEl.innerHTML = enhanced;
       } finally {
         // 타이머 해제 및 참조 제거
         const t = this.renderTimers.get(key);
@@ -541,6 +542,24 @@ export class SummarOutputManager implements ISummarOutputManager {
       .replace(/>\s*\n\s*</gi, '><')
       // 시작과 끝의 공백 제거
       .trim();
+  }
+
+  /**
+   * Enhance code blocks in rendered HTML with visual styling and proper boxing
+   * Finds <pre><code> blocks and wraps them with enhanced styling classes
+   */
+  private enhanceCodeBlocks(html: string): string {
+    // <pre><code>...</code></pre> 패턴을 찾아서 박스 스타일로 래핑
+    return html.replace(
+      /<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+      (match, codeContent) => {
+        const cleanedContent = codeContent.trim();
+        
+        return `<div class="summar-code-block-container">
+  <pre class="summar-code-block"><code>${cleanedContent}</code></pre>
+</div>`;
+      }
+    );
   }
 
   private createOutputHeader(key: string, label: string): HTMLDivElement {

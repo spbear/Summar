@@ -566,3 +566,49 @@
     margin: 0;
     position: relative;
 }
+
+/* Enhanced code block styling */
+.summar-code-block-container {
+    margin: 8px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background-color: var(--background-primary-alt);
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.summar-code-block {
+    margin: 0;
+    padding: 12px;
+    background-color: transparent;
+    font-family: var(--font-monospace);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-normal);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.summar-code-block code {
+    background-color: transparent;
+    padding: 0;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Ensure code blocks fit within outputText area */
+.output-text .summar-code-block-container {
+    margin: 6px -8px;
+    width: calc(100% + 16px);
+}
