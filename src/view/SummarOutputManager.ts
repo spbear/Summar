@@ -98,6 +98,10 @@ export class SummarOutputManager implements ISummarOutputManager {
       // 새로운 outputItem 생성
       this.createOutputItem(key, label);
       return this.updateOutputText(key, label, message);
+    } else if (rec.label !== label) {
+      rec.label = label;
+      this.context.outputRecords.set(key, rec);
+      this.scheduleHeaderRender(key);
     }
     
     // Map 우선: 기존 텍스트에 추가
@@ -119,7 +123,12 @@ export class SummarOutputManager implements ISummarOutputManager {
     if (!rec || !rec.itemEl) {
       // 새로운 outputItem 생성
       this.createOutputItem(key, label);
+    } else if (rec.label !== label) {
+      rec.label = label;
+      this.context.outputRecords.set(key, rec);
+      this.scheduleHeaderRender(key);
     }
+
     
     // 텍스트 완전 교체: Map 저장 → 렌더 반영
     this.setOutput(key, message, isFinal);
@@ -496,6 +505,31 @@ export class SummarOutputManager implements ISummarOutputManager {
     this.context.timeoutRefs.add(timer);
   }
 
+  private updateOutputHeader(key: string, outputItem: HTMLDivElement): void {
+    const rec = this.context.outputRecords.get(key);
+    if (!rec) return;
+    
+    // 기존 헤더 찾기
+    const existingHeader = outputItem.querySelector('.output-header') as HTMLDivElement;
+    if (!existingHeader) return;
+    
+    // 새로운 헤더 생성
+    const newHeader = this.createOutputHeader(key, rec.label || 'compose prompt');
+    
+    // 기존 헤더를 새 헤더로 교체
+    outputItem.replaceChild(newHeader, existingHeader);
+  }
+
+  /**
+   * 특정 키의 헤더만 다시 렌더링
+   */
+  scheduleHeaderRender(key: string): void {
+    const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+    if (outputItem) {
+      this.updateOutputHeader(key, outputItem);
+    }
+  }
+
   setNewNoteName(key: string, newNotePath?: string): void {
     const now = new Date();
     const formattedDate = now.getFullYear().toString().slice(2) +
@@ -512,7 +546,16 @@ export class SummarOutputManager implements ISummarOutputManager {
     rec2.noteName = noteName;
 
     // key에 해당하는 outputItem의 버튼들을 활성화
-    const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+    let outputItem = this.context.outputRecords.get(key)?.itemEl || null;
+    if (!outputItem) {
+      // UI가 없으면 생성 (레코드는 이미 ensureRecord로 존재함)
+      const rec = this.context.outputRecords.get(key);
+      if (rec) {
+        this.createOutputItem(key, rec.label || 'compose prompt');
+        outputItem = rec.itemEl || null;
+      }
+    }
+    
     if (outputItem) {
       this.enableOutputItemButtons(outputItem);
     }
@@ -763,6 +806,8 @@ export class SummarOutputManager implements ISummarOutputManager {
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
     button.style.margin = '0';
+    button.disabled = true;
+    button.style.display = 'none';
     
     setIcon(button, 'message-square-reply');
     
@@ -840,7 +885,8 @@ export class SummarOutputManager implements ISummarOutputManager {
       'new-note-button',
       'upload-output-to-wiki-button', 
       'upload-output-to-slack-button',
-      'copy-output-button'
+      'copy-output-button',
+      'reply-output-button'
     ];
     
     buttons.forEach(buttonId => {

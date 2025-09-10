@@ -30,8 +30,8 @@ export interface ISummarViewContext {
 // 결과 아이템에 대한 통합 상태 레코드
 export class SummarOutputRecord {
   key: string;
-  itemEl: HTMLDivElement | null;
-  result: string;
+  itemEl?: HTMLDivElement | null;
+  result?: string;
   label?: string;
   statId?: string;
   noteName?: string;
@@ -57,20 +57,24 @@ export interface ISummarOutputManager {
   createOutputItem(key: string, label: string): SummarOutputRecord;
   appendOutputText(key: string, label: string, message: string): string;
   updateOutputText(key: string, label: string, message: string, isFinal: boolean): string;
-  getOutputText(key: string): string;
+  setNewNoteName(key: string, newNotePath?: string): void;
   pushOutputPrompt(key: string, prompt: string): void;
+
+  getOutputText(key: string): string;
+  foldOutput(key: string | null, fold: boolean): void;
+  getNoteName(key: string): string;
+  highlightOutputHeader(key: string): void;
+
+  setEventHandlers(events: SummarViewEvents): void;
+
   importOutputItemsFromPluginDir(filename?: string): Promise<number>;
   saveOutputItemsToPluginDir(): Promise<string>;
-  foldOutput(key: string | null, fold: boolean): void;
   clearAllOutputItems(): void;
-  setNewNoteName(key: string, newNotePath?: string): void;
-  getNoteName(key: string): string;
+  
   cleanupMarkdownOutput(html: string): string;
-  setEventHandlers(events: SummarViewEvents): void;
   cleanup(): void;
   
   // 하이라이트 관련 메서드
-  highlightOutputHeader(key: string): void;
   clearAllHeaderHighlights(): void;
 }
 

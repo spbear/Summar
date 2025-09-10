@@ -80,6 +80,7 @@ export class AudioRecordingManager extends SummarViewContainer {
 				const summaryNote = getAvailableFilePath(summaryCandidate, ".md", this.plugin);
 
 				this.updateOutputText(summary, true);
+				this.setNewNoteName(summaryNote);
 				
 				SummarDebug.log(1,`newFilePath = ${newFilePath}`);
 
