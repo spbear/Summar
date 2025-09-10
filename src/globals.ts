@@ -23,36 +23,32 @@ export class SummarViewContainer {
     this.outputRecord = this.createOutputRecord();
   }
 
-  private createOutputRecord(label: string = "compose prompt", icon: string = "message-square-more"): SummarOutputRecord {
+  private createOutputRecord(label: string = "compose prompt"): SummarOutputRecord {
     return {
       key: this.plugin.generateUniqueId(),
       itemEl: null,
       result: "",
       noteName: undefined,
       label,
-      icon,
       folded: false,
-      // prompt: "",
-      prompts: [],
     };
   }
 
   // 오버로드: 문자열 또는 옵션 객체 모두 지원 + clearOldItems 제어
   initOutputRecord(label?: string, clearOldItems?: boolean): void;
-  initOutputRecord(opts?: { label?: string; icon?: string; clearOldItems?: boolean }): void;
+  initOutputRecord(opts?: { label?: string; clearOldItems?: boolean }): void;
   initOutputRecord(
-    arg: string | { label?: string; icon?: string; clearOldItems?: boolean } = {},
+    arg: string | { label?: string; clearOldItems?: boolean } = {},
     clearOldItems?: boolean
   ): void {
     let label = "";
-    let icon = "tag";
     let shouldClear: boolean | undefined = clearOldItems;
     if (typeof arg === "string") {
       label = arg;
     } else if (arg && typeof arg === "object") {
-      ({ label = "", icon = "tag", clearOldItems: shouldClear } = arg);
+      ({ label = "", clearOldItems: shouldClear } = arg);
     }
-    this.outputRecord = this.createOutputRecord(label, icon);
+    this.outputRecord = this.createOutputRecord(label);
     const doClear = typeof shouldClear === "boolean" ? shouldClear : (this.plugin.settingsv2.system.debugLevel < 3);
     if (doClear) this.clearAllOutputItems();
   }
@@ -63,7 +59,6 @@ export class SummarViewContainer {
   }
 
   pushOutputPrompt(prompt: string) {
-    this.outputRecord.prompts?.push(prompt);
     return this.plugin.pushOutputPrompt(this.outputRecord.key, prompt);
   }
 
@@ -90,20 +85,9 @@ export class SummarViewContainer {
       return this.plugin.getOutputText(this.outputRecord.key);
   }
 
-  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
-    this.plugin.enableNewNote(true, key, newNotePath);
-    this.outputRecord.statId = statId;
-    this.outputRecord.prompts = prompts;
+  setNewNoteName(newNotePath?: string) {
     this.outputRecord.noteName = newNotePath;
-    this.plugin.updateOutputInfo(this.outputRecord.key, 
-                                 this.outputRecord.statId, 
-                                 this.outputRecord.prompts, 
-                                 this.outputRecord.noteName);
-  }
-
-  enableNewNote(enabled: boolean, newNotePath?: string) {
-    this.outputRecord.noteName = newNotePath;
-    this.plugin.enableNewNote(enabled, this.outputRecord.key, this.outputRecord.noteName);
+    this.plugin.setNewNoteName(this.outputRecord.key, this.outputRecord.noteName);
   } 
 
   foldOutput(fold: boolean): void {

@@ -43,7 +43,6 @@ export class PdfHandler extends SummarViewContainer {
 			if (!(await pdftopng.isPopplerInstalled())) {
 				SummarDebug.Notice(0, "Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.", 0);
 				this.updateOutputText("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
-				// this.enableNewNote(false, outputKey);
 				throw new Error("Poppler is not installed. Please install Poppler using the following command in your shell: \n% brew install poppler.");
 			}
 
@@ -56,7 +55,6 @@ export class PdfHandler extends SummarViewContainer {
 
 			// 단계 1: PDF 파일 준비
 			this.updateOutputText(`[10%] Preparing PDF file... (${file.name})`);
-			// this.enableNewNote(false, outputKey);
 
 			// 단계 2: 이미지 변환
 			this.updateOutputText(`[15%] Converting to images... Will use [${modelName}]`);
@@ -65,7 +63,6 @@ export class PdfHandler extends SummarViewContainer {
 			const pageCount = base64Values.length;
 
 			this.updateOutputText(`[30%] Image conversion completed (${pageCount} pages detected)`);
-			// this.enableNewNote(false, outputKey);
 
 			// JsonBuilder 인스턴스 생성
 			const jsonBuilder = new JsonBuilder();
@@ -156,7 +153,6 @@ export class PdfHandler extends SummarViewContainer {
 			if (status !== 200) {
 				SummarDebug.error(1, `OpenAI API Error: ${status} - ${summary}`);
 				this.updateOutputText(`[ERROR] AI analysis failed: ${status} - ${summary}`);
-				// this.enableNewNote(false, outputKey);
 				return;
 			}
 
@@ -167,20 +163,17 @@ export class PdfHandler extends SummarViewContainer {
 				const markdownContent = this.extractMarkdownContent(summary);
 				if (markdownContent) {
 					this.updateOutputText(`[95%] Creating new note...`);
-					// this.enableNewNote(true);
 					this.updateOutputText(`[100%] Markdown conversion completed! New note has been created.`);
 					// PDF 파일명 기반으로 새 노트 자동 생성
 					await this.createNewNoteFromPdf(file.name, markdownContent);
 				} else {
 					this.updateOutputText(`[95%] Creating new note...`);
-					// this.enableNewNote(true);
 					this.updateOutputText(`[100%] Conversion completed! New note has been created.`);
 					// PDF 파일명 기반으로 새 노트 자동 생성
 					await this.createNewNoteFromPdf(file.name, summary);
 				}
 			} else {
 				this.updateOutputText("[ERROR] No valid response received from AI API.");
-				// this.enableNewNote(false, outputKey);
 			}
 
 			SummarDebug.log(1, "PDF conversion to images complete.");
@@ -190,7 +183,6 @@ export class PdfHandler extends SummarViewContainer {
 
 			SummarDebug.error(1, "Error during PDF to PNG conversion:", error);
 			this.updateOutputText(`[ERROR] Error occurred during PDF conversion: ${error}`);
-			// this.enableNewNote(false, outputKey);
 			SummarDebug.Notice(0, "Failed to convert PDF to PNG. Check console for details.");
 		}
 	}
@@ -231,7 +223,7 @@ export class PdfHandler extends SummarViewContainer {
 			const createdFile = await this.plugin.app.vault.create(filePath, content);
 			await this.plugin.app.workspace.openLinkText(filePath, "", true);
 			this.updateOutputText(content,true);
-			this.enableNewNote(true, filePath);
+			this.setNewNoteName(filePath);
 			this.foldOutput(true);
 
 			SummarDebug.Notice(1, `Created new note: ${uniqueFileName}`, 3000);

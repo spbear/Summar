@@ -1525,21 +1525,10 @@ export default class SummarPlugin extends Plugin {
     );
   }
 
-  updateOutputInfo(key: string, statId: string, prompts: string[], newNotePath: string) {
-    // updateOutputInfo는 현재 SummarView에만 있고 outputManager에는 없으므로 기존 방식 유지
-    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
-    if (leaves.length > 0) {
-      const summarView = leaves[0].view as SummarView;
-      // if (summarView && typeof summarView.updateOutputInfo === 'function') {
-          // summarView.updateOutputInfo(key, statId, prompts, newNotePath);
-      // }
-    }
-  }
-
-  enableNewNote(enabled:boolean, key: string, newNotePath?: string) {
+  setNewNoteName(key: string, newNotePath?: string) {
     this.safeCallOutputManager(
       (outputManager) => {
-        outputManager.enableNewNote(key, newNotePath);
+        outputManager.setNewNoteName(key, newNotePath);
         return true;
       },
       false

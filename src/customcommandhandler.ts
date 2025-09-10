@@ -47,7 +47,6 @@ export class CustomCommandHandler extends SummarViewContainer {
 
 
 		this.updateOutputText(`Execute prompt with selected text using [${cmdModel}]...`);
-		// this.enableNewNote(false, outputKey);
 
 		try {
 			this.startTimer();
@@ -64,14 +63,12 @@ export class CustomCommandHandler extends SummarViewContainer {
 				const errorText = responseText || "Unknown error occurred.";
 				SummarDebug.error(1, "AI API Error:", errorText);
 				this.updateOutputText(`Error: ${responseStatus} - ${errorText}`);
-				// this.enableNewNote(false, outputKey);
-
 				return;
 			}
 
 			if (responseText && responseText.length > 0) {
 				this.updateOutputText(responseText, true);
-				this.enableNewNote(true);
+				this.setNewNoteName();
 
 				// 결과를 노트에 append (설정에 따라)
 				if (appendToNote) {
@@ -115,7 +112,6 @@ export class CustomCommandHandler extends SummarViewContainer {
 				}
 			} else {
 				this.updateOutputText("No valid response from OpenAI API.");
-				// this.enableNewNote(false, outputKey);
 			}
 
 		} catch (error) {
@@ -126,7 +122,6 @@ export class CustomCommandHandler extends SummarViewContainer {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
 			this.updateOutputText(msg);
-			// this.enableNewNote(false, outputKey);
 		}
 	}
 

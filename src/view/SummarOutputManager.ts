@@ -256,20 +256,18 @@ export class SummarOutputManager implements ISummarOutputManager {
           const label: string = it.label || "imported";
           const result: string = it.result || "";
           const noteName: string | undefined = it.noteName || undefined;
-          const prompts: string[] = Array.isArray(it.prompts) ? it.prompts : [];
           const statId: string | undefined = it.statId || undefined;
           const conversations: any[] = Array.isArray(it.conversations) ? it.conversations : [];
 
           // Create the UI item
           this.createOutputItem(key, label);
           if (result) this.updateOutputText(key, label, result);
-          if (noteName) this.enableNewNote(key, noteName);
+          if (noteName) this.setNewNoteName(key, noteName);
           this.foldOutput(key, true);
 
           // Persist fields into record
           const rec = this.context.outputRecords.get(key);
           if (rec) {
-            rec.prompts = prompts;
             rec.statId = statId;
             // conversations 필드도 복원
             if (conversations.length > 0) {
@@ -498,7 +496,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     this.context.timeoutRefs.add(timer);
   }
 
-  enableNewNote(key: string, newNotePath?: string): void {
+  setNewNoteName(key: string, newNotePath?: string): void {
     const now = new Date();
     const formattedDate = now.getFullYear().toString().slice(2) +
       String(now.getMonth() + 1).padStart(2, "0") +
@@ -594,7 +592,6 @@ export class SummarOutputManager implements ISummarOutputManager {
     const icon = getDefaultLabelIcon(label);
     const rec = this.ensureRecord(key);
     rec.label = label;
-    rec.icon = icon;
     return composeStandardOutputHeader(label, {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
@@ -657,9 +654,6 @@ export class SummarOutputManager implements ISummarOutputManager {
 
   pushOutputPrompt(key: string, prompt: string): void {
     const rec = this.ensureRecord(key);
-    // if (!rec.prompts) rec.prompts = [];
-    // rec.prompts.push(prompt);
-
     this.pushConversations(key, new SummarAIParam('user', prompt));
   }
 

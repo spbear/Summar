@@ -32,7 +32,6 @@ export class ConfluenceHandler extends SummarViewContainer {
 		}
 
 		this.updateOutputText("Fetching and summarizing...");
-		// this.enableNewNote(false, outputKey);
 
 		try {
 			this.startTimer();
@@ -80,13 +79,10 @@ export class ConfluenceHandler extends SummarViewContainer {
 				page_content = response.text;
 			}
 			this.updateOutputText("Fedtched page content");
-			// this.enableNewNote(false, outputKey);
-
 			SummarDebug.log(2, "Fetched page content:", page_content);
 
 
 			this.updateOutputText(`Generating summary using [${this.plugin.settingsv2.web.webModel}]...` );
-			// this.enableNewNote(false, outputKey);
 
 			const message = `${webPrompt}\n\n${page_content}`;
 			
@@ -101,17 +97,14 @@ export class ConfluenceHandler extends SummarViewContainer {
 			if (status !== 200) {
 				SummarDebug.error(1, "OpenAI API Error:", summary);
 				this.updateOutputText(`Error: ${status} - ${summary}`);
-				// this.enableNewNote(false, outputKey);
-
 				return;
 			}
 
 			if (summary && summary.length > 0) {
 				this.updateOutputText(summary, true);
-				this.enableNewNote(true);
+				this.setNewNoteName();
 			} else {
 				this.updateOutputText("No valid response from OpenAI API.");
-				// this.enableNewNote(false, outputKey);
 			}
 
 		} catch (error) {
@@ -122,7 +115,6 @@ export class ConfluenceHandler extends SummarViewContainer {
 				msg += ` | ${error?.status || ''} ${error?.message || error?.toString?.() || error}`;
 			}
 			this.updateOutputText(msg);
-			// this.enableNewNote(false, outputKey);
 		}
 	}
 

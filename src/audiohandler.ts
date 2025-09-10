@@ -26,7 +26,6 @@ export class AudioHandler extends SummarViewContainer {
 		this.initOutputRecord("transcript");
 
 		this.updateOutputText(`Audio files to be sent:\n${fileNames}\n\nConverting audio to text using [${this.plugin.settingsv2.recording.sttModel}] ...`);
-		// this.enableNewNote(false, outputKey);
 
 		let audioList = "";
 		let transcriptedText = "";
@@ -373,8 +372,7 @@ export class AudioHandler extends SummarViewContainer {
 
 		this.pushOutputPrompt(this.sttPrompt);
 		this.updateOutputText(transcriptionContent, true);
-
-		this.enableNewNote(true, newFilePath);
+		this.setNewNoteName(newFilePath);
 		
 		// summary가 활성화되어 있지 않으면 transcript 파일을 열기
 		// summary가 활성화되어 있으면 나중에 summary나 refined 파일이 열릴 예정이므로 transcript는 열지 않음

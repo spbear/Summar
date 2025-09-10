@@ -35,9 +35,7 @@ export class SummarOutputRecord {
   label?: string;
   statId?: string;
   noteName?: string;
-  icon?: string;
   folded?: boolean;
-  prompts?: string[];
   conversations?: SummarAIParam[];
 }
 
@@ -65,7 +63,7 @@ export interface ISummarOutputManager {
   saveOutputItemsToPluginDir(): Promise<string>;
   foldOutput(key: string | null, fold: boolean): void;
   clearAllOutputItems(): void;
-  enableNewNote(key: string, newNotePath?: string): void;
+  setNewNoteName(key: string, newNotePath?: string): void;
   getNoteName(key: string): string;
   cleanupMarkdownOutput(html: string): string;
   setEventHandlers(events: SummarViewEvents): void;

@@ -496,7 +496,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
 
     // Use unified record if present to keep header consistent
     const rec = this.context.outputRecords.get(key);
-    const icon = rec?.icon || getDefaultLabelIcon(label);
+    const icon = getDefaultLabelIcon(label);
     const stickyLabel = rec?.label || label;
     const header = composeStandardOutputHeader(stickyLabel, {
       uploadWiki: uploadWikiButton,

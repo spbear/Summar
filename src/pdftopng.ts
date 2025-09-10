@@ -45,7 +45,6 @@ export class PdfToPng extends SummarViewContainer {
     SummarDebug.log(1, "Starting PDF to PNG conversion...");
     this.setOutputRecord(outputKey, label);
     this.updateOutputText("Initial rendering...");
-    // this.enableNewNote(false, outputKey);
 
     // Save the PDF file to a temporary location
     this.tempDir = normalizePath((this.plugin.app.vault.adapter as any).basePath + "/" + (this.plugin as any).PLUGIN_DIR + "/pdf_converion/temp");
@@ -55,18 +54,15 @@ export class PdfToPng extends SummarViewContainer {
       await this.createDirectory(this.tempDir);
       SummarDebug.log(1, `Temporary directory created: ${this.tempDir}`);
       this.updateOutputText(`Temporary directory created: ${this.tempDir}`);
-      // this.enableNewNote(false, outputKey);
     } else {
       SummarDebug.log(1, `Temporary directory already exists: ${this.tempDir}`);
       this.updateOutputText(`Temporary directory already exists: ${this.tempDir}`);
-      // this.enableNewNote(false, outputKey);
     }
 
     SummarDebug.log(1, "PDF file will be save at:", this.pdfName);
     fs.writeFileSync(this.pdfName, Buffer.from(await this.file.arrayBuffer()));
     SummarDebug.log(1, "PDF file saved at:", this.pdfName);
     this.updateOutputText(`PDF file saved at: ${this.pdfName}`);
-    // this.enableNewNote(false, outputKey);
 
     // Output directory for PNGs
     const pdfName = this.file.name.replace(".pdf", "");
@@ -75,7 +71,6 @@ export class PdfToPng extends SummarViewContainer {
 
     SummarDebug.log(1, "Converting PDF to images using Poppler...");
     this.updateOutputText("Converting PDF to images using Poppler...");
-    // this.enableNewNote(false, outputKey);
 
     SummarDebug.log(1, this.pdfName);
 
@@ -232,7 +227,6 @@ export class PdfToPng extends SummarViewContainer {
         } catch (readError) {
           SummarDebug.error(1,`Error reading file ${file}:`, readError);
           this.updateOutputText(`Failed to process ${file}`);
-          // this.enableNewNote(false, outputKey);
         }
       });
       return base64Values;
