@@ -160,6 +160,63 @@ export class SummarOutputManager implements ISummarOutputManager {
     return conversations;
   }
 
+  addConversation(key: string, role: string, text: string): void {
+    // outputRecords에서 해당 key의 itemEl 찾기
+    const rec = this.context.outputRecords.get(key);
+    if (!rec || !rec.itemEl) {
+      SummarDebug.log(1, `Output item not found for key: ${key}`);
+      return;
+    }
+
+    // conversations에 데이터 저장
+    const conversationParam = new SummarAIParam(role, text, SummarAIParamType.CONVERSATION);
+    rec.conversations.push(conversationParam);
+
+    // 대화 요소 UI 생성
+    const conversationDiv = document.createElement('div');
+    conversationDiv.className = 'conversation-item';
+    conversationDiv.setAttribute('data-role', role);
+    conversationDiv.setAttribute('data-key', key);
+    
+    // createOutputText() 참고한 스타일 설정
+    conversationDiv.style.width = '100%';
+    conversationDiv.style.minHeight = '10px';
+    conversationDiv.style.border = '1px solid var(--background-modifier-border)';
+    conversationDiv.style.padding = '0px 8px'; // 상하 패딩을 4px로 줄임 (기존 8px의 절반)
+    conversationDiv.style.marginBottom = '0px'; // 간격 제거
+    conversationDiv.style.wordWrap = 'break-word';
+    conversationDiv.style.whiteSpace = 'pre-wrap';
+    conversationDiv.style.color = 'var(--text-normal)';
+    conversationDiv.style.fontSize = '12px';
+    conversationDiv.style.lineHeight = '1.4';
+    conversationDiv.style.userSelect = 'text';
+    conversationDiv.style.cursor = 'text';
+    conversationDiv.style.wordBreak = 'break-word';
+    conversationDiv.style.overflowWrap = 'break-word';
+    conversationDiv.style.display = 'block';
+    conversationDiv.style.verticalAlign = 'top';
+    
+    // role에 따른 배경색 설정
+    if (role === 'user') {
+      conversationDiv.style.backgroundColor = 'var(--background-primary)';
+    } else if (role === 'assistant') {
+      conversationDiv.style.backgroundColor = 'var(--background-secondary)';
+    } else {
+      conversationDiv.style.backgroundColor = 'var(--background-secondary)';
+    }
+
+    // scheduleRender()와 동일한 마크다운 렌더링 로직 적용
+    const rendered = this.context.markdownRenderer.render(text);
+    const cleaned = this.cleanupMarkdownOutput(rendered);
+    const enhanced = this.enhanceCodeBlocks(cleaned);
+    conversationDiv.innerHTML = enhanced;
+
+    // itemEl에 appendChild
+    rec.itemEl.appendChild(conversationDiv);
+
+    SummarDebug.log(1, `Conversation added for key: ${key}, role: ${role}`);
+  }
+
   getOutputText(key: string): string {
     if (key === "") {
       // 빈 키인 경우 모든 outputItem의 텍스트를 합쳐서 반환
@@ -952,5 +1009,19 @@ export class SummarOutputManager implements ISummarOutputManager {
       setIcon(toggleButton, fold ? 'square-chevron-down' : 'square-chevron-up');
       outputText.style.display = fold ? 'none' : 'block';
     }
+
+    // conversation-item 요소들도 함께 숨기거나 보여주기
+    // outputItem 내부의 모든 conversation-item 요소를 직접 자식으로 찾기
+    const conversationItems = outputItem.querySelectorAll('.conversation-item') as NodeListOf<HTMLDivElement>;
+    SummarDebug.log(1, `applyFoldToOutputItem: Found ${conversationItems.length} conversation items, fold=${fold}`);
+    
+    conversationItems.forEach((conversationItem, index) => {
+      // 추가 안전장치: conversation-item이 실제로 현재 outputItem의 직접 자식인지 확인
+      if (conversationItem.parentElement === outputItem) {
+        SummarDebug.log(1, `applyFoldToOutputItem: Setting conversation item ${index} display to ${fold ? 'none' : 'block'}`);
+        conversationItem.style.display = fold ? 'none' : 'block';
+        conversationItem.style.visibility = fold ? 'hidden' : 'visible';
+      }
+    });
   }
 }

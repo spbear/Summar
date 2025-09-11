@@ -164,13 +164,13 @@ export class SummarComposerManager implements ISummarComposerManager {
     // IME 조합 시작 이벤트
     promptEditor.addEventListener('compositionstart', () => {
       isComposing = true;
-      SummarDebug.log(2, 'IME composition started');
+      // SummarDebug.log(2, 'IME composition started');
     });
 
     // IME 조합 완료 이벤트
     promptEditor.addEventListener('compositionend', () => {
       isComposing = false;
-      SummarDebug.log(2, 'IME composition ended');
+      // SummarDebug.log(2, 'IME composition ended');
     });
 
     // Enter 키 이벤트 추가 (IME 조합 중일 때는 무시)
@@ -178,14 +178,14 @@ export class SummarComposerManager implements ISummarComposerManager {
       if (e.key === 'Enter' && !e.shiftKey) {
         // IME 조합 중일 때는 엔터 이벤트 무시
         if (isComposing) {
-          SummarDebug.log(2, 'Enter key ignored during IME composition');
+          // SummarDebug.log(2, 'Enter key ignored during IME composition');
           return;
         }
         
         e.preventDefault();
         const message = promptEditor.value.trim();
         if (message) {
-          SummarDebug.log(1, `Sending message: "${message}"`);
+          // SummarDebug.log(1, `Sending message: "${message}"`);
           this.sendMessage(message);
         }
       }
@@ -412,7 +412,14 @@ export class SummarComposerManager implements ISummarComposerManager {
       this.promptEditor.value = '';
     }
     
-    // TODO: 실제 채팅 로직 구현
+    // targetKey가 있으면 해당 output에 대화 추가
+    if (this.targetKey && this.context.outputManager) {
+      this.context.outputManager.addConversation(this.targetKey, 'user', message);
+      this.context.outputManager.addConversation(this.targetKey, 'assistant', `#### reply\n${message}`);
+      SummarDebug.log(1, `Message sent to output key: ${this.targetKey}`);
+    } else {
+      SummarDebug.log(1, `No target key set for conversation`);
+    }
   }
 
   clearComposer(): void {
