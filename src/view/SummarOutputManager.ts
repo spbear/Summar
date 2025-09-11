@@ -151,6 +151,8 @@ export class SummarOutputManager implements ISummarOutputManager {
     }
     
     // conversation 추가하고 새로운 배열 길이 반환
+
+// SummarDebug.log(1, `pushConversations()\n${conversation.role}\n${conversation.text}`);    
     return rec.conversations.push(conversation);
   }
 
@@ -683,19 +685,14 @@ export class SummarOutputManager implements ISummarOutputManager {
   private ensureRecord(key: string): SummarOutputRecord {
     let rec = this.context.outputRecords.get(key);
     if (!rec) {
-      rec = { 
-        key, 
-        itemEl: null, 
-        result: '', 
-        noteName: undefined,
-        conversations: [] // SummarAIParam[] 초기화
-      };
+      rec = new SummarOutputRecord(key);
       this.context.outputRecords.set(key, rec);
     }
     return rec;
   }
 
   pushOutputPrompt(key: string, prompt: string): void {
+  // SummarDebug.log(1, `pushOutputPrompt()\nkey=${key}\nprompt=${prompt}`);
     const rec = this.ensureRecord(key);
     this.pushConversations(key, new SummarAIParam('user', prompt));
   }
@@ -703,11 +700,15 @@ export class SummarOutputManager implements ISummarOutputManager {
 
   private setOutput(key: string, text: string, isFinal: boolean = false): void {
     const rec = this.ensureRecord(key);
-    rec.result = text;
-    // SummarDebug.log(1, `setOutput() - rec.result, isFinal=${isFinal}`);
+    
     if (isFinal) {
-      this.pushConversations(key, new SummarAIParam('assistant', text));
-      // SummarDebug.log(1, "setOutput() - pushConversations('assistant')");
+      // Final result: add to conversations as 'assistant' message
+      rec.addFinalResult(text);
+      // SummarDebug.log(1, `setOutput() - added final result to conversations, isFinal=${isFinal}`);
+    } else {
+      // Intermediate result: only update the cached value
+      rec.result = text;
+      // SummarDebug.log(1, `setOutput() - updated cached result only, isFinal=${isFinal}`);
     }
   }
 

@@ -1,23 +1,10 @@
 import { SummarDebug, SummarViewContainer, showSettingsTab, SummarRequestUrl } from "./globals";
 import SummarPlugin from "./main";
 import { IndexedDBManager, TrackedAPIClient } from "./summarailog";
+import { SummarAIResponse, SummarAIParam, SummarAIParamType } from "./summarai-types";
 
-export interface SummarAIResponse {
-  status: number;
-  json: any;
-  text: string;
-  statsId: string;
-}
-
-export class SummarAIParam {
-  role: string;
-  text: string;
-
-  constructor(role: string = '', text: string = '') {
-    this.role = role;
-    this.text = text;
-  }
-}
+export type { SummarAIResponse, SummarAIParamType };
+export { SummarAIParam };
 
 export class SummarAI extends SummarViewContainer {
   aiModel: string = '';
@@ -84,10 +71,19 @@ export class SummarAI extends SummarViewContainer {
     return false
   }
 
-  async complete( messages : SummarAIParam[] ): Promise<boolean> {
+  async complete( messages : (SummarAIParam | {role: string, text: string})[] ): Promise<boolean> {
     if (messages && messages.length > 0) {
+      // Convert plain objects to SummarAIParam instances for backward compatibility
+      const summarAIMessages = messages.map(message => {
+        if (message instanceof SummarAIParam) {
+          return message;
+        } else {
+          return SummarAIParam.from(message);
+        }
+      });
+
       if (this.aiProvider === 'openai') {
-        const openaiMessages = messages.map(message => ({
+        const openaiMessages = summarAIMessages.map(message => ({
           role: message.role,
           content: message.text
         }));
@@ -97,7 +93,7 @@ export class SummarAI extends SummarViewContainer {
         });
         return await this.completeWithBody(bodyContent);
       } else if (this.aiProvider === 'gemini') {
-        const contents = messages.map(message => ({
+        const contents = summarAIMessages.map(message => ({
           role: message.role,
           parts: [
             {

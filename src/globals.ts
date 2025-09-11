@@ -24,14 +24,13 @@ export class SummarViewContainer {
   }
 
   private createOutputRecord(label: string = "compose prompt"): SummarOutputRecord {
-    return {
-      key: this.plugin.generateUniqueId(),
-      itemEl: null,
-      result: "",
-      noteName: undefined,
-      label,
-      folded: false,
-    };
+    const record = new SummarOutputRecord(this.plugin.generateUniqueId());
+    record.label = label;
+    record.itemEl = null;
+    record.result = "";
+    record.noteName = undefined;
+    record.folded = false;
+    return record;
   }
 
   // 오버로드: 문자열 또는 옵션 객체 모두 지원 + clearOldItems 제어

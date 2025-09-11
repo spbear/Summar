@@ -1,7 +1,7 @@
 import { WorkspaceLeaf } from "obsidian";
 import SummarPlugin from "../main";
 import MarkdownIt from "markdown-it";
-import { SummarAIParam } from "src/summarai";
+import { SummarAIParam, SummarAIParamType } from "../summarai-types";
 
 // 공통 인터페이스
 export interface ISummarViewContext {
@@ -31,12 +31,67 @@ export interface ISummarViewContext {
 export class SummarOutputRecord {
   key: string;
   itemEl?: HTMLDivElement | null;
-  result?: string;
+  private _result?: string; // Private field for caching
   label?: string;
   statId?: string;
   noteName?: string;
   folded?: boolean;
-  conversations?: SummarAIParam[];
+  conversations: SummarAIParam[] = [];
+
+  constructor(key: string = '') {
+    this.key = key;
+    this.conversations = [];
+  }
+
+  // Getter for result - returns latest output from conversations
+  get result(): string | undefined {
+    if (this._result !== undefined) {
+      return this._result;
+    }
+    
+    // Find the latest output message
+    const outputMessages = this.conversations.filter(param => param.isOutput());
+    if (outputMessages.length > 0) {
+      this._result = outputMessages[outputMessages.length - 1].text;
+      return this._result;
+    }
+    
+    return undefined;
+  }
+
+  // Setter for result - only updates the cached value, does not modify conversations
+  set result(value: string | undefined) {
+    this._result = value; // Cache the value only
+  }
+
+  // Helper method to add final assistant response to conversations
+  addFinalResult(text: string): void {
+    this._result = text; // Update cache
+    const outputParam = new SummarAIParam('assistant', text, SummarAIParamType.OUTPUT);
+    this.conversations.push(outputParam);
+  }
+
+  // Helper method to add conversation messages
+  addConversation(role: string, text: string): void {
+    const conversationParam = new SummarAIParam(role, text, SummarAIParamType.CONVERSATION);
+    this.conversations.push(conversationParam);
+    this._result = undefined; // Invalidate cache
+  }
+
+  // Helper method to get conversation history (excluding outputs)
+  getConversationHistory(): SummarAIParam[] {
+    return this.conversations.filter(param => param.isConversation());
+  }
+
+  // Helper method to get all output messages
+  getOutputHistory(): SummarAIParam[] {
+    return this.conversations.filter(param => param.isOutput());
+  }
+
+  // Clear cache method
+  private clearCache(): void {
+    this._result = undefined;
+  }
 }
 
 // 매니저 인터페이스들
