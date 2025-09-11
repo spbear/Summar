@@ -31,7 +31,7 @@ export interface ISummarViewContext {
 export class SummarOutputRecord {
   key: string;
   itemEl?: HTMLDivElement | null;
-  private _result?: string; // Private field for caching
+  private _tempResult?: string; // 임시 결과용 캐시 (중간 결과)
   label?: string;
   statId?: string;
   noteName?: string;
@@ -43,30 +43,35 @@ export class SummarOutputRecord {
     this.conversations = [];
   }
 
-  // Getter for result - returns latest output from conversations
+  // Getter for result - returns temp result or latest output from conversations
   get result(): string | undefined {
-    if (this._result !== undefined) {
-      return this._result;
+    // 임시 결과가 있으면 그것을 반환 (중간 결과)
+    if (this._tempResult !== undefined) {
+      return this._tempResult;
     }
     
-    // Find the latest output message
-    const outputMessages = this.conversations.filter(param => param.isOutput());
+    // 없으면 conversations에서 마지막 OUTPUT 반환 (최종 결과)
+    const outputMessages = this.getOutputHistory();
     if (outputMessages.length > 0) {
-      this._result = outputMessages[outputMessages.length - 1].text;
-      return this._result;
+      return outputMessages[outputMessages.length - 1].text;
     }
     
     return undefined;
   }
 
-  // Setter for result - only updates the cached value, does not modify conversations
+  // Setter for result - sets temporary result (for intermediate updates)
   set result(value: string | undefined) {
-    this._result = value; // Cache the value only
+    this._tempResult = value;
   }
 
-  // Helper method to add final assistant response to conversations
+  // Set temporary result for intermediate updates
+  setTempResult(text: string): void {
+    this._tempResult = text;
+  }
+
+  // Add final assistant response to conversations and clear temp result
   addFinalResult(text: string): void {
-    this._result = text; // Update cache
+    this._tempResult = undefined; // 임시 결과 클리어
     const outputParam = new SummarAIParam('assistant', text, SummarAIParamType.OUTPUT);
     this.conversations.push(outputParam);
   }
@@ -75,7 +80,6 @@ export class SummarOutputRecord {
   addConversation(role: string, text: string): void {
     const conversationParam = new SummarAIParam(role, text, SummarAIParamType.CONVERSATION);
     this.conversations.push(conversationParam);
-    this._result = undefined; // Invalidate cache
   }
 
   // Helper method to get conversation history (excluding outputs)
@@ -88,9 +92,24 @@ export class SummarOutputRecord {
     return this.conversations.filter(param => param.isOutput());
   }
 
-  // Clear cache method
-  private clearCache(): void {
-    this._result = undefined;
+  // Clear temporary result
+  clearTempResult(): void {
+    this._tempResult = undefined;
+  }
+
+  // Memory cleanup method
+  cleanup(): void {
+    // Clear temporary result
+    this._tempResult = undefined;
+    
+    // Clear conversations array completely
+    if (this.conversations) {
+      this.conversations.length = 0;
+      this.conversations = [];
+    }
+    
+    // Clear DOM reference
+    this.itemEl = null;
   }
 }
 

@@ -2,7 +2,7 @@ import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
 import { composeStandardOutputHeader, getDefaultLabelIcon } from "./OutputHeaderComposer";
 import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
-import { SummarAIParam } from "../summarai";
+import { SummarAIParam, SummarAIParamType } from "../summarai-types";
 
 export class SummarOutputManager implements ISummarOutputManager {
   private events: SummarViewEvents = {};
@@ -83,9 +83,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     }
 
     // conversations 배열의 메모리 정리
-    if (rec.conversations) {
-      rec.conversations.length = 0; // 배열 내용 정리
-    }
+    rec.cleanup(); // 새로운 cleanup 메서드 사용
 
     SummarDebug.log(1, `Output item deleted: ${key}`);
     return true;
@@ -118,10 +116,13 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   updateOutputText(key: string, label: string, message: string, isFinal: boolean = false): string {
+    SummarDebug.log(1, `updateOutputText called - key: ${key}, label: ${label}, messageLength: ${message.length}, isFinal: ${isFinal}`);
+    
     let rec = this.context.outputRecords.get(key) || null;
     
     if (!rec || !rec.itemEl) {
       // 새로운 outputItem 생성
+      SummarDebug.log(1, `Creating new output item for key: ${key}`);
       this.createOutputItem(key, label);
     } else if (rec.label !== label) {
       rec.label = label;
@@ -135,6 +136,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     // 즉시 반영 대신 동일한 경로로 디바운스 렌더(일관성)
     this.scheduleRender(key);
     
+    SummarDebug.log(1, `updateOutputText completed for key: ${key}`);
     return key;
   }
 
@@ -145,14 +147,8 @@ export class SummarOutputManager implements ISummarOutputManager {
       rec = this.createOutputItem(key);
     }
     
-    // conversations 배열이 없으면 초기화
-    if (!rec.conversations) {
-      rec.conversations = [];
-    }
-    
     // conversation 추가하고 새로운 배열 길이 반환
-
-// SummarDebug.log(1, `pushConversations()\n${conversation.role}\n${conversation.text}`);    
+    // SummarDebug.log(1, `pushConversations()\n${conversation.role}\n${conversation.text}`);    
     return rec.conversations.push(conversation);
   }
 
@@ -265,26 +261,62 @@ export class SummarOutputManager implements ISummarOutputManager {
         
         try {
           const label: string = it.label || "imported";
-          const result: string = it.result || "";
           const noteName: string | undefined = it.noteName || undefined;
           const statId: string | undefined = it.statId || undefined;
           const conversations: any[] = Array.isArray(it.conversations) ? it.conversations : [];
 
           // Create the UI item
           this.createOutputItem(key, label);
-          if (result) this.updateOutputText(key, label, result);
-          if (noteName) this.setNewNoteName(key, noteName);
-          this.foldOutput(key, true);
-
-          // Persist fields into record
+          
+          // Persist fields into record first
           const rec = this.context.outputRecords.get(key);
           if (rec) {
             rec.statId = statId;
-            // conversations 필드도 복원
+            // conversations 필드 먼저 복원
             if (conversations.length > 0) {
               rec.conversations = conversations;
             }
           }
+          
+          // Process conversations array for UI display
+          if (conversations.length > 0) {
+            SummarDebug.log(1, `Processing ${conversations.length} conversations for key: ${key}`);
+            
+            // Find the last assistant OUTPUT message to display in UI
+            let lastAssistantOutput = '';
+            for (let i = conversations.length - 1; i >= 0; i--) {
+              const conv = conversations[i];
+              SummarDebug.log(1, `Conversation ${i}: role="${conv.role}", type="${conv.type}", textLength=${conv.text?.length || 0}`);
+              
+              if (conv.role === 'assistant' && 
+                  (conv.type === 'output' || conv.type === SummarAIParamType.OUTPUT)) {
+                lastAssistantOutput = conv.text || '';
+                SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
+                break;
+              }
+            }
+            
+            if (lastAssistantOutput) {
+              SummarDebug.log(1, `Found assistant OUTPUT message for key: ${key}`);
+              SummarDebug.log(1, `Message length: ${lastAssistantOutput.length}, content preview: ${lastAssistantOutput.substring(0, 100)}...`);
+              // isFinal=false로 설정하여 conversations에 추가하지 않고 UI만 업데이트
+              this.updateOutputText(key, label, lastAssistantOutput, false);
+              
+              // 추가 디버깅: 업데이트 후 상태 확인
+              const updatedRec = this.context.outputRecords.get(key);
+              SummarDebug.log(1, `After updateOutputText - record exists: ${!!updatedRec}, result length: ${updatedRec?.result?.length || 0}`);
+            } else {
+              SummarDebug.log(1, `No assistant OUTPUT message found for key: ${key}`);
+            }
+          } else if (it.result) {
+            // For backward compatibility: if no conversations but has result, 
+            // create a conversation from the result
+            SummarDebug.log(1, `Converting legacy result field to conversation for key: ${key}`);
+            this.updateOutputText(key, label, it.result, true); // isFinal=true to add to conversations
+          }
+          
+          if (noteName) this.setNewNoteName(key, noteName);
+          this.foldOutput(key, true);
           
           // 성공적으로 추가된 경우 카운트 증가
           importedCount++;
@@ -331,9 +363,7 @@ export class SummarOutputManager implements ISummarOutputManager {
       this.events.onOutputItemRemoved?.(key);
       
       // conversations 배열의 메모리 정리
-      if (rec.conversations) {
-        rec.conversations.length = 0;
-      }
+      rec.cleanup(); // 새로운 cleanup 메서드 사용
     });
     
     // 데이터 정리
@@ -437,9 +467,8 @@ export class SummarOutputManager implements ISummarOutputManager {
         key: rec.key ?? "",
         label: rec.label ?? "",
         noteName: rec.noteName ?? "",
-        // prompts: Array.isArray(rec.prompts) ? rec.prompts : [],
         conversations: Array.isArray(rec.conversations) ? rec.conversations : [],
-        result: rec.result ?? "",
+        // result field removed - data is now only in conversations
         // statId: rec.statId ?? "",
       });
     });
@@ -477,6 +506,7 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   private scheduleRender(key: string): void {
+    SummarDebug.log(1, `scheduleRender called for key: ${key}`);
     // 기존 타이머가 있으면 취소
     const prev = this.renderTimers.get(key);
     if (prev) {
@@ -485,15 +515,24 @@ export class SummarOutputManager implements ISummarOutputManager {
     }
     const timer = setTimeout(() => {
       try {
+        SummarDebug.log(1, `scheduleRender timer executing for key: ${key}`);
         const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
-        if (!outputItem) return;
+        if (!outputItem) {
+          SummarDebug.log(1, `scheduleRender - no outputItem found for key: ${key}`);
+          return;
+        }
         const outputTextEl = outputItem.querySelector('.output-text') as HTMLDivElement | null;
-        if (!outputTextEl) return;
+        if (!outputTextEl) {
+          SummarDebug.log(1, `scheduleRender - no outputTextEl found for key: ${key}`);
+          return;
+        }
         const raw = this.getOutput(key);
+        SummarDebug.log(1, `scheduleRender - raw text length: ${raw.length} for key: ${key}`);
         const rendered = this.context.markdownRenderer.render(raw);
         const cleaned = this.cleanupMarkdownOutput(rendered);
         const enhanced = this.enhanceCodeBlocks(cleaned);
         outputTextEl.innerHTML = enhanced;
+        SummarDebug.log(1, `scheduleRender - innerHTML set for key: ${key}`);
       } finally {
         // 타이머 해제 및 참조 제거
         const t = this.renderTimers.get(key);
@@ -699,17 +738,22 @@ export class SummarOutputManager implements ISummarOutputManager {
 
 
   private setOutput(key: string, text: string, isFinal: boolean = false): void {
+    SummarDebug.log(1, `setOutput called - key: ${key}, textLength: ${text.length}, isFinal: ${isFinal}`);
     const rec = this.ensureRecord(key);
     
     if (isFinal) {
       // Final result: add to conversations as 'assistant' message
       rec.addFinalResult(text);
-      // SummarDebug.log(1, `setOutput() - added final result to conversations, isFinal=${isFinal}`);
+      SummarDebug.log(1, `setOutput() - added final result to conversations, isFinal=${isFinal}`);
     } else {
-      // Intermediate result: only update the cached value
-      rec.result = text;
-      // SummarDebug.log(1, `setOutput() - updated cached result only, isFinal=${isFinal}`);
+      // Intermediate result: set as temporary result
+      rec.setTempResult(text);
+      SummarDebug.log(1, `setOutput() - set temporary result, isFinal=${isFinal}`);
     }
+    
+    // 결과 확인
+    const resultAfter = rec.result;
+    SummarDebug.log(1, `setOutput completed - result length: ${resultAfter?.length || 0}`);
   }
 
   private getOutput(key: string): string {

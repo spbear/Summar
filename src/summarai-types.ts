@@ -12,13 +12,13 @@ export enum SummarAIParamType {
 
 export class SummarAIParam {
   role: string;
-  text: string;
   type: SummarAIParamType;
+  text: string;
 
   constructor(role: string = '', text: string = '', type: SummarAIParamType = SummarAIParamType.OUTPUT) {
     this.role = role;
-    this.text = text;
     this.type = type;
+    this.text = text;
   }
 
   // Helper methods for type checking
