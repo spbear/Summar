@@ -243,12 +243,19 @@ export class SummarItemEventHandler implements ISummarEventHandler {
       const currentToggled = toggleButton.getAttribute('toggled') === 'true';
       const newToggled = !currentToggled;
       
-      // 버튼 상태 업데이트
-      toggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
-      this.setToggleButtonIcon(toggleButton, newToggled);
+      // SummarDebug.log(1, `handleToggleClick - key: ${key}, currentToggled: ${currentToggled}, newToggled: ${newToggled}`);
       
-      // outputText 표시/숨김
-      outputText.style.display = newToggled ? 'none' : 'block';
+      // OutputManager의 foldOutput 메서드를 사용하여 일관된 fold/unfold 처리
+      const outputManager = (this.context as any).outputManager;
+      if (outputManager && outputManager.foldOutput) {
+        outputManager.foldOutput(key, newToggled);
+      } else {
+        // Fallback: 직접 DOM 조작
+        // SummarDebug.log(1, `handleToggleClick - using fallback DOM manipulation`);
+        toggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
+        this.setToggleButtonIcon(toggleButton, newToggled);
+        outputText.style.display = newToggled ? 'none' : 'block';
+      }
       
       // 통합 레코드에 접힘 상태 반영
       const rec = this.context.outputRecords.get(key);
@@ -257,8 +264,6 @@ export class SummarItemEventHandler implements ISummarEventHandler {
       }
       
       // 이벤트 발생 (StickyHeader 업데이트 등을 위해)
-      // Note: 이벤트 시스템이 필요하면 outputManager를 통해 호출
-      const outputManager = (this.context as any).outputManager;
       if (outputManager && outputManager.events && outputManager.events.onToggleStateChanged) {
         outputManager.events.onToggleStateChanged(key, newToggled);
       }

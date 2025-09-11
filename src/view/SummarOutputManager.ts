@@ -116,13 +116,13 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   updateOutputText(key: string, label: string, message: string, isFinal: boolean = false): string {
-    SummarDebug.log(1, `updateOutputText called - key: ${key}, label: ${label}, messageLength: ${message.length}, isFinal: ${isFinal}`);
+    // SummarDebug.log(1, `updateOutputText called - key: ${key}, label: ${label}, messageLength: ${message.length}, isFinal: ${isFinal}`);
     
     let rec = this.context.outputRecords.get(key) || null;
     
     if (!rec || !rec.itemEl) {
       // 새로운 outputItem 생성
-      SummarDebug.log(1, `Creating new output item for key: ${key}`);
+      // SummarDebug.log(1, `Creating new output item for key: ${key}`);
       this.createOutputItem(key, label);
     } else if (rec.label !== label) {
       rec.label = label;
@@ -136,14 +136,14 @@ export class SummarOutputManager implements ISummarOutputManager {
     // 즉시 반영 대신 동일한 경로로 디바운스 렌더(일관성)
     this.scheduleRender(key);
     
-    SummarDebug.log(1, `updateOutputText completed for key: ${key}`);
+    // SummarDebug.log(1, `updateOutputText completed for key: ${key}`);
     return key;
   }
 
   pushConversations(key: string, conversation: SummarAIParam) : number {
     let rec = this.context.outputRecords.get(key);
     if (!rec || !rec.itemEl) {
-      SummarDebug.log(1, `Output item not found for key: ${key}`);
+      // SummarDebug.log(1, `Output item not found for key: ${key}`);
       rec = this.createOutputItem(key);
     }
     
@@ -164,13 +164,29 @@ export class SummarOutputManager implements ISummarOutputManager {
     // outputRecords에서 해당 key의 itemEl 찾기
     const rec = this.context.outputRecords.get(key);
     if (!rec || !rec.itemEl) {
-      SummarDebug.log(1, `Output item not found for key: ${key}`);
+      // SummarDebug.log(1, `Output item not found for key: ${key}`);
       return;
     }
 
     // conversations에 데이터 저장
     const conversationParam = new SummarAIParam(role, text, SummarAIParamType.CONVERSATION);
     rec.conversations.push(conversationParam);
+
+    // UI 생성
+    this.addConversationUI(key, role, text);
+
+    // SummarDebug.log(1, `Conversation added for key: ${key}, role: ${role}`);
+  }
+
+  /**
+   * conversations 배열에 추가하지 않고 UI만 생성 (import 시 사용)
+   */
+  private addConversationUI(key: string, role: string, text: string): void {
+    const rec = this.context.outputRecords.get(key);
+    if (!rec || !rec.itemEl) {
+      // SummarDebug.log(1, `Output item not found for key: ${key}`);
+      return;
+    }
 
     // 대화 요소 UI 생성
     const conversationDiv = document.createElement('div');
@@ -214,7 +230,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     // itemEl에 appendChild
     rec.itemEl.appendChild(conversationDiv);
 
-    SummarDebug.log(1, `Conversation added for key: ${key}, role: ${role}`);
+    // SummarDebug.log(1, `Conversation UI added for key: ${key}, role: ${role}`);
   }
 
   getOutputText(key: string): string {
@@ -273,46 +289,46 @@ export class SummarOutputManager implements ISummarOutputManager {
             if (conversationFiles.length > 0) {
               path = `${conversationsDir}/${conversationFiles[0]}`;
               exists = true;
-              SummarDebug.log(1, `Found latest conversation file: ${conversationFiles[0]}`);
+              // SummarDebug.log(1, `Found latest conversation file: ${conversationFiles[0]}`);
             }
           }
         } catch (error) {
-          SummarDebug.log(1, `Error searching for conversation files:`, error);
+          // SummarDebug.log(1, `Error searching for conversation files:`, error);
         }
       }
       
       if (!exists) {
-        SummarDebug.log(1, `File does not exist: ${path}`);
+        // SummarDebug.log(1, `File does not exist: ${path}`);
         return importedCount;
       }
 
       const jsonText = await plugin.app.vault.adapter.read(path);
-      SummarDebug.log(1, `File content length: ${jsonText.length} characters`);
+      // SummarDebug.log(1, `File content length: ${jsonText.length} characters`);
       
       const data = JSON.parse(jsonText || '{}');
       const items = data?.outputItems || data?.resultItems; // outputItems와 resultItems 둘 다 지원
       
-      SummarDebug.log(1, `Parsed data structure:`, data);
+      // SummarDebug.log(1, `Parsed data structure:`, data);
       if (Array.isArray(items)) {
-        SummarDebug.log(1, `Found ${items.length} items in array format`);
+        // SummarDebug.log(1, `Found ${items.length} items in array format`);
       } else if (items && typeof items === 'object') {
-        SummarDebug.log(1, `Found ${Object.keys(items).length} items in object format`);
+        // SummarDebug.log(1, `Found ${Object.keys(items).length} items in object format`);
       } else {
-        SummarDebug.log(1, `No valid items structure found in file (looking for 'outputItems' or 'resultItems')`);
+        // SummarDebug.log(1, `No valid items structure found in file (looking for 'outputItems' or 'resultItems')`);
       }
 
       const ingest = (it: any) => {
         if (!it || typeof it !== 'object') {
-          SummarDebug.log(1, `Invalid item structure, skipping:`, it);
+          // SummarDebug.log(1, `Invalid item structure, skipping:`, it);
           return;
         }
         
         const key: string = it.key || plugin.generateUniqueId();
-        SummarDebug.log(1, `Processing item with key: ${key}`);
+        // SummarDebug.log(1, `Processing item with key: ${key}`);
         
         // 기존에 동일한 key가 존재하는지 확인
         if (this.context.outputRecords.has(key)) {
-          SummarDebug.log(1, `Skipping import for existing key: ${key}`);
+          // SummarDebug.log(1, `Skipping import for existing key: ${key}`);
           return;
         }
         
@@ -337,50 +353,62 @@ export class SummarOutputManager implements ISummarOutputManager {
           
           // Process conversations array for UI display
           if (conversations.length > 0) {
-            SummarDebug.log(1, `Processing ${conversations.length} conversations for key: ${key}`);
+            // SummarDebug.log(1, `Processing ${conversations.length} conversations for key: ${key}`);
             
-            // Find the last assistant OUTPUT message to display in UI
+            // Process all conversations and add UI elements for conversation type
             let lastAssistantOutput = '';
-            for (let i = conversations.length - 1; i >= 0; i--) {
+            for (let i = 0; i < conversations.length; i++) {
               const conv = conversations[i];
-              SummarDebug.log(1, `Conversation ${i}: role="${conv.role}", type="${conv.type}", textLength=${conv.text?.length || 0}`);
+              // SummarDebug.log(1, `Conversation ${i}: role="${conv.role}", type="${conv.type}", textLength=${conv.text?.length || 0}`);
               
+              // Add conversation-type items to UI using addConversationUI (데이터 중복 방지)
+              if (conv.type === 'conversation' || conv.type === SummarAIParamType.CONVERSATION) {
+                // SummarDebug.log(1, `Adding conversation item to UI: role="${conv.role}"`);
+                this.addConversationUI(key, conv.role, conv.text || '');
+              } else {
+                // SummarDebug.log(1, `Skipping conversation item (not conversation type): role="${conv.role}", type="${conv.type}"`);
+              }
+              
+              // Find the last assistant OUTPUT message to display in main output area
               if (conv.role === 'assistant' && 
                   (conv.type === 'output' || conv.type === SummarAIParamType.OUTPUT)) {
                 lastAssistantOutput = conv.text || '';
-                SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
-                break;
+                // SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
               }
             }
             
             if (lastAssistantOutput) {
-              SummarDebug.log(1, `Found assistant OUTPUT message for key: ${key}`);
-              SummarDebug.log(1, `Message length: ${lastAssistantOutput.length}, content preview: ${lastAssistantOutput.substring(0, 100)}...`);
+              // SummarDebug.log(1, `Found assistant OUTPUT message for key: ${key}`);
+              // SummarDebug.log(1, `Message length: ${lastAssistantOutput.length}, content preview: ${lastAssistantOutput.substring(0, 100)}...`);
               // isFinal=false로 설정하여 conversations에 추가하지 않고 UI만 업데이트
               this.updateOutputText(key, label, lastAssistantOutput, false);
               
               // 추가 디버깅: 업데이트 후 상태 확인
               const updatedRec = this.context.outputRecords.get(key);
-              SummarDebug.log(1, `After updateOutputText - record exists: ${!!updatedRec}, result length: ${updatedRec?.result?.length || 0}`);
+              // SummarDebug.log(1, `After updateOutputText - record exists: ${!!updatedRec}, result length: ${updatedRec?.result?.length || 0}`);
             } else {
-              SummarDebug.log(1, `No assistant OUTPUT message found for key: ${key}`);
+              // SummarDebug.log(1, `No assistant OUTPUT message found for key: ${key}`);
             }
           } else if (it.result) {
             // For backward compatibility: if no conversations but has result, 
             // create a conversation from the result
-            SummarDebug.log(1, `Converting legacy result field to conversation for key: ${key}`);
+            // SummarDebug.log(1, `Converting legacy result field to conversation for key: ${key}`);
             this.updateOutputText(key, label, it.result, true); // isFinal=true to add to conversations
           }
           
           if (noteName) this.setNewNoteName(key, noteName);
-          this.foldOutput(key, true);
           
+          // // conversation item들이 있으면 unfold 상태로 시작
+          // const hasConversationItems = conversations.some(conv => 
+          //   conv.type === 'conversation' || conv.type === SummarAIParamType.CONVERSATION);
+          // this.foldOutput(key, hasConversationItems ? false : true);
+          this.foldOutput(key, true);
           // 성공적으로 추가된 경우 카운트 증가
           importedCount++;
-          SummarDebug.log(1, `Successfully imported item with key: ${key}, total imported: ${importedCount}`);
+          // SummarDebug.log(1, `Successfully imported item with key: ${key}, total imported: ${importedCount}`);
           
         } catch (error) {
-          SummarDebug.error(1, `Failed to import item with key: ${key}`, error);
+          // SummarDebug.error(1, `Failed to import item with key: ${key}`, error);
           // 에러가 발생해도 카운트는 증가시키지 않음
         }
       };
@@ -400,16 +428,22 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   foldOutput(key: string | null, fold: boolean): void {
+    // SummarDebug.log(1, `foldOutput called - key: ${key}, fold: ${fold}`);
+    
     if (!key || key === "") {
       // 모든 outputItem에 대해 동일하게 적용
+      // SummarDebug.log(1, `foldOutput - applying to all output items, fold: ${fold}`);
       this.context.outputRecords.forEach((rec, itemKey) => {
         if (rec.itemEl) this.applyFoldToOutputItem(rec.itemEl, fold);
       });
     } else {
       // 특정 key의 outputItem에만 적용
+      // SummarDebug.log(1, `foldOutput - applying to specific key: ${key}, fold: ${fold}`);
       const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
       if (outputItem) {
         this.applyFoldToOutputItem(outputItem, fold);
+      } else {
+        // SummarDebug.log(1, `foldOutput - no outputItem found for key: ${key}`);
       }
     }
   }
@@ -454,7 +488,7 @@ export class SummarOutputManager implements ISummarOutputManager {
       if (header) {
         // 배색 반전 효과 적용
         this.applyInvertedColorScheme(header);
-        SummarDebug.log(1, `Output header highlighted with inverted colors for key: ${key}`);
+        // SummarDebug.log(1, `Output header highlighted with inverted colors for key: ${key}`);
       }
     }
   }
@@ -470,7 +504,7 @@ export class SummarOutputManager implements ISummarOutputManager {
         }
       }
     });
-    SummarDebug.log(1, 'All output header highlights cleared');
+    // SummarDebug.log(1, 'All output header highlights cleared');
   }
 
   /**
@@ -544,15 +578,15 @@ export class SummarOutputManager implements ISummarOutputManager {
       const exists = await this.context.plugin.app.vault.adapter.exists(conversationsDir);
       if (!exists) {
         await this.context.plugin.app.vault.createFolder(conversationsDir);
-        SummarDebug.log(1, "Directory created:", conversationsDir);
+        // SummarDebug.log(1, "Directory created:", conversationsDir);
       }
     } catch (error) {
       // 폴백으로 adapter.mkdir 시도
       try {
         await this.context.plugin.app.vault.adapter.mkdir(conversationsDir);
-        SummarDebug.log(1, "Directory created via adapter:", conversationsDir);
+        // SummarDebug.log(1, "Directory created via adapter:", conversationsDir);
       } catch (adapterError) {
-        SummarDebug.error(1, "Failed to create directory:", conversationsDir, adapterError);
+        // SummarDebug.error(1, "Failed to create directory:", conversationsDir, adapterError);
         throw new Error(`Failed to create directory: ${conversationsDir}`);
       }
     }
@@ -563,7 +597,7 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   private scheduleRender(key: string): void {
-    SummarDebug.log(1, `scheduleRender called for key: ${key}`);
+    // SummarDebug.log(1, `scheduleRender called for key: ${key}`);
     // 기존 타이머가 있으면 취소
     const prev = this.renderTimers.get(key);
     if (prev) {
@@ -572,24 +606,24 @@ export class SummarOutputManager implements ISummarOutputManager {
     }
     const timer = setTimeout(() => {
       try {
-        SummarDebug.log(1, `scheduleRender timer executing for key: ${key}`);
+        // SummarDebug.log(1, `scheduleRender timer executing for key: ${key}`);
         const outputItem = this.context.outputRecords.get(key)?.itemEl || null;
         if (!outputItem) {
-          SummarDebug.log(1, `scheduleRender - no outputItem found for key: ${key}`);
+          // SummarDebug.log(1, `scheduleRender - no outputItem found for key: ${key}`);
           return;
         }
         const outputTextEl = outputItem.querySelector('.output-text') as HTMLDivElement | null;
         if (!outputTextEl) {
-          SummarDebug.log(1, `scheduleRender - no outputTextEl found for key: ${key}`);
+          // SummarDebug.log(1, `scheduleRender - no outputTextEl found for key: ${key}`);
           return;
         }
         const raw = this.getOutput(key);
-        SummarDebug.log(1, `scheduleRender - raw text length: ${raw.length} for key: ${key}`);
+        // SummarDebug.log(1, `scheduleRender - raw text length: ${raw.length} for key: ${key}`);
         const rendered = this.context.markdownRenderer.render(raw);
         const cleaned = this.cleanupMarkdownOutput(rendered);
         const enhanced = this.enhanceCodeBlocks(cleaned);
         outputTextEl.innerHTML = enhanced;
-        SummarDebug.log(1, `scheduleRender - innerHTML set for key: ${key}`);
+        // SummarDebug.log(1, `scheduleRender - innerHTML set for key: ${key}`);
       } finally {
         // 타이머 해제 및 참조 제거
         const t = this.renderTimers.get(key);
@@ -795,22 +829,22 @@ export class SummarOutputManager implements ISummarOutputManager {
 
 
   private setOutput(key: string, text: string, isFinal: boolean = false): void {
-    SummarDebug.log(1, `setOutput called - key: ${key}, textLength: ${text.length}, isFinal: ${isFinal}`);
+    // SummarDebug.log(1, `setOutput called - key: ${key}, textLength: ${text.length}, isFinal: ${isFinal}`);
     const rec = this.ensureRecord(key);
     
     if (isFinal) {
       // Final result: add to conversations as 'assistant' message
       rec.addFinalResult(text);
-      SummarDebug.log(1, `setOutput() - added final result to conversations, isFinal=${isFinal}`);
+      // SummarDebug.log(1, `setOutput() - added final result to conversations, isFinal=${isFinal}`);
     } else {
       // Intermediate result: set as temporary result
       rec.setTempResult(text);
-      SummarDebug.log(1, `setOutput() - set temporary result, isFinal=${isFinal}`);
+      // SummarDebug.log(1, `setOutput() - set temporary result, isFinal=${isFinal}`);
     }
     
     // 결과 확인
     const resultAfter = rec.result;
-    SummarDebug.log(1, `setOutput completed - result length: ${resultAfter?.length || 0}`);
+    // SummarDebug.log(1, `setOutput completed - result length: ${resultAfter?.length || 0}`);
   }
 
   private getOutput(key: string): string {
@@ -1008,19 +1042,28 @@ export class SummarOutputManager implements ISummarOutputManager {
       toggleButton.setAttribute('toggled', fold ? 'true' : 'false');
       setIcon(toggleButton, fold ? 'square-chevron-down' : 'square-chevron-up');
       outputText.style.display = fold ? 'none' : 'block';
+      // SummarDebug.log(1, `applyFoldToOutputItem: Set output-text display to ${fold ? 'none' : 'block'}`);
     }
 
     // conversation-item 요소들도 함께 숨기거나 보여주기
     // outputItem 내부의 모든 conversation-item 요소를 직접 자식으로 찾기
     const conversationItems = outputItem.querySelectorAll('.conversation-item') as NodeListOf<HTMLDivElement>;
-    SummarDebug.log(1, `applyFoldToOutputItem: Found ${conversationItems.length} conversation items, fold=${fold}`);
+    // SummarDebug.log(1, `applyFoldToOutputItem: Found ${conversationItems.length} conversation items, fold=${fold}`);
     
     conversationItems.forEach((conversationItem, index) => {
       // 추가 안전장치: conversation-item이 실제로 현재 outputItem의 직접 자식인지 확인
       if (conversationItem.parentElement === outputItem) {
-        SummarDebug.log(1, `applyFoldToOutputItem: Setting conversation item ${index} display to ${fold ? 'none' : 'block'}`);
-        conversationItem.style.display = fold ? 'none' : 'block';
-        conversationItem.style.visibility = fold ? 'hidden' : 'visible';
+        // SummarDebug.log(1, `applyFoldToOutputItem: Setting conversation item ${index} display to ${fold ? 'none' : 'block'}`);
+        
+        // 강제로 스타일 적용
+        conversationItem.style.setProperty('display', fold ? 'none' : 'block', 'important');
+        conversationItem.style.setProperty('visibility', fold ? 'hidden' : 'visible', 'important');
+        
+        // 적용 후 실제 스타일 확인
+        const computedStyle = window.getComputedStyle(conversationItem);
+        // SummarDebug.log(1, `applyFoldToOutputItem: Conversation item ${index} actual display: ${computedStyle.display}, visibility: ${computedStyle.visibility}`);
+      } else {
+        // SummarDebug.log(1, `applyFoldToOutputItem: Conversation item ${index} is not a direct child of outputItem`);
       }
     });
   }

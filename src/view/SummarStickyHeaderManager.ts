@@ -608,20 +608,24 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       stickyToggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
       setIcon(stickyToggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
       
-      // 원본 버튼과 outputText 상태 동기화
-    const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
+      // 통합된 foldOutput 메서드 사용하여 conversation-item도 함께 처리
+      const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
       if (originalItem) {
         const originalToggleButton = originalItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
-        const outputText = originalItem.querySelector('.output-text') as HTMLDivElement;
         
-        if (originalToggleButton && outputText) {
+        if (originalToggleButton) {
+          // 원본 버튼 상태 동기화
           originalToggleButton.setAttribute('toggled', newToggled ? 'true' : 'false');
           setIcon(originalToggleButton, newToggled ? 'square-chevron-down' : 'square-chevron-up');
-          outputText.style.display = newToggled ? 'none' : 'block';
+          
+          // 통합된 fold/unfold 로직 사용 (conversation-item도 함께 처리됨)
+          if (this.context.outputManager) {
+            this.context.outputManager.foldOutput(key, newToggled);
+          }
         }
       }
       
-      SummarDebug.log(1, `Sticky toggle state changed to: ${newToggled ? 'folded' : 'unfolded'}`);
+      SummarDebug.log(1, `Sticky toggle state changed to: ${newToggled ? 'folded' : 'unfolded'} using unified foldOutput`);
       
       // fold/unfold 상태 변경 시 sticky header 가시성 재평가
       this.updateStickyHeaderVisibility();
