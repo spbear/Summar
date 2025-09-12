@@ -133,7 +133,8 @@ export interface ISummarOutputManager {
   updateOutputText(key: string, label: string, message: string, isFinal: boolean): string;
   setNewNoteName(key: string, newNotePath?: string): void;
   pushOutputPrompt(key: string, prompt: string): void;
-  addConversation(key: string, role: string, text: string): void;
+  addConversation(key: string, role: string, text: string): { conversations: SummarAIParam[], addedIndex: number };
+  updateConversation(key: string, index: number, newText: string): boolean;
 
   getOutputText(key: string): string;
   foldOutput(key: string | null, fold: boolean): void;

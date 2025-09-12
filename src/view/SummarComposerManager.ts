@@ -1,7 +1,9 @@
 import { setIcon } from "obsidian";
-import { ISummarComposerManager, ISummarViewContext } from "./SummarViewTypes";
+import { ISummarComposerManager, ISummarViewContext, SummarOutputRecord } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { setStandardComposerHeader, ComposerHeaderButtonsSet } from "./OutputHeaderComposer";
+import { SummarAI } from "../summarai";
+import { SummarAIParam } from "../summarai-types";
 
 /**
  * Composer 기능 관리자
@@ -143,7 +145,7 @@ export class SummarComposerManager implements ISummarComposerManager {
       flex: 1;
       width: 100%;
       margin: 0;
-      padding: 16px;
+      padding: 4px 4px;
       background: var(--background-primary);
       border: none;
       border-radius: 0;
@@ -414,8 +416,44 @@ export class SummarComposerManager implements ISummarComposerManager {
     
     // targetKey가 있으면 해당 output에 대화 추가
     if (this.targetKey && this.context.outputManager) {
-      this.context.outputManager.addConversation(this.targetKey, 'user', message);
-      this.context.outputManager.addConversation(this.targetKey, 'assistant', `#### reply\n${message}`);
+      const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
+      // const result = this.context.outputManager.addConversation(this.targetKey, 'assistant', `#### reply\n${message}`);
+      // this.context.outputManager.updateConversation(this.targetKey, result.addedIndex, `##### reply(2) \n${message}`);
+
+      // 1. setup에 conversation model 입력하는 UI 작성
+      // 2. conversations 내용 정리하는 함수 작성
+      // - type이 output인 것을 제외하고 새로운 것 이전 user/assistant 15개까지만 남겨둔다
+      // - gemini api의 경우 conversations에서 role이 assistant인 경우 model로 변경한다.
+      // 3. addConversation을 할 때 final 여부를 전달하고, final일때는 conversations에도 추가한다
+      // 4. updateConversation을 할 때 final 여부를 전달하고 final일 때는 conversations에도 추가한다.
+      // - summarai.complete()를 call하고 바로 updateConversation()을 false로 call하고 timer를 돌려서 진행중임을 표시하고 응답을 받으면 final을 true로 한다.
+      // 5. key가 존재하지 않을 경우에는 updateOutputText()를 호출하고, 그 key에 reply하도록 한다.
+
+      // const summarai = new SummarAI(this.context.plugin, `gpt-5-mini`, 'web');
+      const summarai = new SummarAI(this.context.plugin, `gemini-2.5-flash`, 'web');
+
+
+      // summarai.complete()에 전달할 conversations 복사본 생성 (role 변경용)
+      const conversationsForAI = result.conversations.map(conv => {
+        // 'assistant' role을 'model'로 변경한 복사본 생성
+        if (conv.role === 'assistant') {
+          return new SummarAIParam('model', conv.text, conv.type);
+        }
+        return conv; // 'user' 등 다른 role은 그대로 유지
+      });
+      await summarai.complete(conversationsForAI);
+
+
+
+			const status = summarai.response.status;
+			const response = summarai.response.text;
+      // this.context.outputManager.updateConversation(this.targetKey, result.addedIndex, response);
+      this.context.outputManager.addConversation(this.targetKey, 'assistant', response);
+      
+      
+      // 새로 추가된 conversation-item으로 스크롤
+      this.scrollToLatestConversation(this.targetKey);
+      
       SummarDebug.log(1, `Message sent to output key: ${this.targetKey}`);
     } else {
       SummarDebug.log(1, `No target key set for conversation`);
@@ -516,5 +554,44 @@ export class SummarComposerManager implements ISummarComposerManager {
     this.composerHeaderLabel = null;
     this.promptEditor = null;
     this.targetKey = null;
+  }
+
+  /**
+   * 특정 key의 가장 최근 conversation-item으로 스크롤합니다.
+   */
+  private scrollToLatestConversation(key: string): void {
+    // DOM 업데이트가 완료될 때까지 잠시 대기
+    const timeoutId = setTimeout(() => {
+      try {
+        const outputItem = this.context.outputRecords.get(key)?.itemEl;
+        if (!outputItem) {
+          SummarDebug.log(1, `Output item not found for scrolling: ${key}`);
+          return;
+        }
+
+        // 해당 outputItem 내의 모든 conversation-item 찾기
+        const conversationItems = outputItem.querySelectorAll('.conversation-item');
+        if (conversationItems.length === 0) {
+          SummarDebug.log(1, `No conversation items found for scrolling: ${key}`);
+          return;
+        }
+
+        // 마지막 conversation-item
+        const lastConversationItem = conversationItems[conversationItems.length - 1] as HTMLElement;
+        
+        // 스크롤 동작 실행
+        lastConversationItem.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest'
+        });
+
+        SummarDebug.log(1, `Scrolled to latest conversation item for key: ${key}`);
+      } catch (error) {
+        SummarDebug.log(1, `Error scrolling to conversation: ${error}`);
+      }
+    }, 100); // DOM 업데이트 후 스크롤 실행
+
+    this.context.timeoutRefs.add(timeoutId);
   }
 }

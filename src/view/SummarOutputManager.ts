@@ -160,22 +160,98 @@ export class SummarOutputManager implements ISummarOutputManager {
     return conversations;
   }
 
-  addConversation(key: string, role: string, text: string): void {
+  addConversation(key: string, role: string, text: string): { conversations: SummarAIParam[], addedIndex: number } {
     // outputRecords에서 해당 key의 itemEl 찾기
     const rec = this.context.outputRecords.get(key);
     if (!rec || !rec.itemEl) {
       // SummarDebug.log(1, `Output item not found for key: ${key}`);
-      return;
+      return { conversations: [], addedIndex: -1 };
     }
 
     // conversations에 데이터 저장
     const conversationParam = new SummarAIParam(role, text, SummarAIParamType.CONVERSATION);
-    rec.conversations.push(conversationParam);
+    const newLength = rec.conversations.push(conversationParam);
+    const addedIndex = newLength - 1; // 전체 conversations 배열에서의 index
 
     // UI 생성
     this.addConversationUI(key, role, text);
 
-    // SummarDebug.log(1, `Conversation added for key: ${key}, role: ${role}`);
+    // SummarDebug.log(1, `Conversation added for key: ${key}, role: ${role}, globalIndex: ${addedIndex}`);
+    return { conversations: rec.conversations, addedIndex: addedIndex };
+  }
+
+  /**
+   * 기존 conversation-item의 텍스트를 업데이트합니다.
+   * @param key 출력 아이템의 키
+   * @param index 전체 conversations 배열에서의 index (0부터 시작, -1이면 마지막)
+   * @param newText 새로운 텍스트
+   */
+  updateConversation(key: string, index: number, newText: string): boolean {
+    const rec = this.context.outputRecords.get(key);
+    if (!rec || !rec.itemEl) {
+      SummarDebug.log(1, `Output item not found for key: ${key}`);
+      return false;
+    }
+
+    if (rec.conversations.length === 0) {
+      SummarDebug.log(1, `No conversations found for key: ${key}`);
+      return false;
+    }
+
+    // index 처리 (-1이면 마지막, 범위 체크)
+    let targetIndex = index;
+    if (index === -1) {
+      targetIndex = rec.conversations.length - 1;
+    }
+
+    if (targetIndex < 0 || targetIndex >= rec.conversations.length) {
+      SummarDebug.log(1, `Invalid index ${index} for key ${key}, available: 0-${rec.conversations.length - 1}`);
+      return false;
+    }
+
+    // conversations 배열에서 해당 index의 conversation 가져오기
+    const targetConversation = rec.conversations[targetIndex];
+    
+    // CONVERSATION 타입인지 확인
+    if (targetConversation.type !== SummarAIParamType.CONVERSATION) {
+      SummarDebug.log(1, `Conversation at index ${targetIndex} is not CONVERSATION type: ${targetConversation.type}`);
+      return false;
+    }
+
+    // conversations 배열 업데이트
+    targetConversation.text = newText;
+    const targetRole = targetConversation.role;
+
+    // DOM에서 해당 conversation-item 찾아서 업데이트
+    // CONVERSATION 타입의 item들만 카운트하여 DOM index 찾기
+    const conversationItems = rec.itemEl.querySelectorAll('.conversation-item') as NodeListOf<HTMLDivElement>;
+    let conversationTypeCount = 0;
+    
+    for (let i = 0; i < rec.conversations.length; i++) {
+      const conv = rec.conversations[i];
+      if (conv.type === SummarAIParamType.CONVERSATION) {
+        if (i === targetIndex) {
+          // 찾았음: conversationTypeCount번째 conversation-item을 업데이트
+          if (conversationTypeCount < conversationItems.length) {
+            const targetItem = conversationItems[conversationTypeCount];
+            
+            // 마크다운 렌더링 및 업데이트
+            const rendered = this.context.markdownRenderer.render(newText);
+            const cleaned = this.cleanupMarkdownOutput(rendered);
+            const enhanced = this.enhanceCodeBlocks(cleaned);
+            targetItem.innerHTML = enhanced;
+            
+            SummarDebug.log(1, `Conversation updated for key: ${key}, globalIndex: ${targetIndex}, role: ${targetRole}, domIndex: ${conversationTypeCount}`);
+            return true;
+          }
+          break;
+        }
+        conversationTypeCount++;
+      }
+    }
+
+    SummarDebug.log(1, `Conversation UI element not found for key: ${key}, globalIndex: ${targetIndex}`);
+    return false;
   }
 
   /**
