@@ -1,4 +1,5 @@
 import { setIcon } from 'obsidian';
+import { ISummarViewContext } from './SummarViewTypes';
 
 export type HeaderButtonsSet = {
   uploadWiki: HTMLElement;
@@ -247,7 +248,7 @@ export function composeStandardOutputHeader(label: string, buttons: HeaderButton
 }
 
 // Build a standardized composer header: label + buttons in fixed order.
-export function setStandardComposerHeader(label: string, buttons: ComposerHeaderButtonsSet, options?: LabelOptions): HTMLDivElement {
+export function setStandardComposerHeader(label: string, buttons: ComposerHeaderButtonsSet, context: ISummarViewContext, options?: LabelOptions): HTMLDivElement {
   const composerHeader = document.createElement('div');
   composerHeader.className = 'composer-header';
   composerHeader.style.width = '100%';
@@ -380,7 +381,9 @@ export function setStandardComposerHeader(label: string, buttons: ComposerHeader
   // Click event for dropdown
   modelChip.addEventListener('click', (e) => {
     e.stopPropagation();
-    showModelDropdown(modelChip, undefined, (selectedModel: string) => {
+    showModelDropdown(modelChip, context.plugin, (selectedModel: string) => {
+      context.plugin.settingsv2.conversation.conversationModel = selectedModel;
+      context.plugin.settingsv2.saveSettings();
       modelChip.setAttribute('data-model', selectedModel);
       modelText.textContent = getModelDisplayText(selectedModel);
     });

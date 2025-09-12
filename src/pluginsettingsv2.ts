@@ -123,6 +123,12 @@ export class PluginSettingsV2 {
     autoLaunchZoomOnlyAccepted: true,
     calendarName: []
   };
+
+  conversation: {
+    conversationModel : string;
+  } = {
+    conversationModel : ""
+  }
   
   system: {
     debugLevel: number;
@@ -289,6 +295,10 @@ export class PluginSettingsV2 {
       }
     }
     
+    if (loaded.conversation) {
+      Object.assign(this.conversation, loaded.conversation);
+    }
+    
     if (loaded.system) {
       Object.assign(this.system, loaded.system);
     }
@@ -311,6 +321,7 @@ export class PluginSettingsV2 {
         recording: this.recording,
         custom: this.custom,
         schedule: this.schedule,
+        conversation: this.conversation,
         system: this.system
       };
       

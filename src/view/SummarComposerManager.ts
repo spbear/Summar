@@ -123,8 +123,9 @@ export class SummarComposerManager implements ISummarComposerManager {
     };
 
     // setStandardComposerHeader 사용
-    const header = setStandardComposerHeader('compose prompt', buttons, { 
-      icon: 'message-square'
+    const header = setStandardComposerHeader('compose prompt', buttons, this.context, { 
+      icon: 'message-square',
+      selectedModel: this.context.plugin.settingsv2.conversation.conversationModel ? this.context.plugin.settingsv2.conversation.conversationModel : 'gpt-4.1-mini'
     });
 
     // label element 참조 저장
@@ -141,7 +142,7 @@ export class SummarComposerManager implements ISummarComposerManager {
       flex: 1;
       width: 100%;
       margin: 0;
-      padding: 4px 4px;
+      padding: 6px 6px 6px 12px;
       background: var(--background-primary);
       border: none;
       border-radius: 0;
@@ -403,13 +404,25 @@ export class SummarComposerManager implements ISummarComposerManager {
   async sendMessage(message: string): Promise<void> {
     if (!message.trim()) return;
 
-    SummarDebug.Notice(1, `Composer message: ${message}`);
+    // SummarDebug.Notice(1, `Composer message: ${message}`);
     
     // 입력 필드 초기화
     if (this.promptEditor) {
       this.promptEditor.value = '';
     }
-    
+
+    if (!this.targetKey && this.context.outputManager) {
+      this.targetKey = this.context.plugin.generateUniqueId();
+      this.context.plugin.updateOutputText(this.targetKey,
+                                          'conversation', 
+                                          '',
+                                          true);
+      let outputItem = this.context.outputRecords.get(this.targetKey)?.itemEl || null;
+      if (outputItem) {
+        this.context.outputManager.enableOutputItemButtons(outputItem,['reply-output-button']);
+      }
+      this.setOutput(this.targetKey);
+    }
     // targetKey가 있으면 해당 output에 대화 추가
     if (this.targetKey && this.context.outputManager) {
       const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
@@ -627,8 +640,8 @@ export class SummarComposerManager implements ISummarComposerManager {
     const outputConversations = conversations.filter(conv => conv.type === 'output');
     const conversationItems = conversations.filter(conv => conv.type === 'conversation');
     
-    // 2. conversation 타입은 최근 3개만 선택
-    const recentConversations = conversationItems.slice(-3);
+    // 2. conversation 타입은 최근 15개만 선택
+    const recentConversations = conversationItems.slice(-15);
     
     // 3. 순서를 유지하면서 합치기 (output + 최근 conversation)
     const filteredConversations = [...outputConversations, ...recentConversations];

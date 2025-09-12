@@ -129,6 +129,7 @@ export interface ISummarUIRenderer {
 
 export interface ISummarOutputManager {
   createOutputItem(key: string, label: string): SummarOutputRecord;
+  enableOutputItemButtons(outputItem: HTMLDivElement, buttons: string[]): void;
   appendOutputText(key: string, label: string, message: string): string;
   updateOutputText(key: string, label: string, message: string, isFinal: boolean): string;
   setNewNoteName(key: string, newNotePath?: string): void;

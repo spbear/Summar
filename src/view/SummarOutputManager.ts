@@ -1092,15 +1092,13 @@ export class SummarOutputManager implements ISummarOutputManager {
     return button;
   }
 
-  private enableOutputItemButtons(outputItem: HTMLDivElement): void {
-    const buttons = [
-      'new-note-button',
-      'upload-output-to-wiki-button', 
-      'upload-output-to-slack-button',
-      'copy-output-button',
-      'reply-output-button'
-    ];
-    
+  enableOutputItemButtons(outputItem: HTMLDivElement, buttons: string[] = [
+    'new-note-button',
+    'upload-output-to-wiki-button', 
+    'upload-output-to-slack-button',
+    'copy-output-button',
+    'reply-output-button'
+  ]): void {
     buttons.forEach(buttonId => {
       const button = outputItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
       if (button) {
