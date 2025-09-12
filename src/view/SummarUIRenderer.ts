@@ -1,6 +1,37 @@
-import { Platform, setIcon } from "obsidian";
+import { Platform, setIcon, addIcon } from "obsidian";
 import { ISummarUIRenderer, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
+
+const PDF_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="1.5"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+  <!-- File outline with folded corner -->
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <polyline points="14 2 14 8 20 8"/>
+  
+  <!-- Bottom bar (black by default; themeable via 'color') -->
+  <rect x="1" y="13" width="22" height="10" rx="1.2" fill="red" stroke="currentColor"/>
+
+  <!-- 'PDF' letters in white strokes on the bar -->
+  <!-- P -->
+  <path d="M6 16v4" stroke="white" stroke-width="1.5"/>
+  <path d="M6 16h2" stroke="white" stroke-width="1.5"/>
+  <path d="M8 16c1 0 1 2 0 2H6" stroke="white" stroke-width="1.5"/>
+  <!-- D -->
+  <path d="M11 16v4" stroke="white" stroke-width="1.5"/>
+  <path d="M11 16h2" stroke="white" stroke-width="1.5"/>
+  <path d="M13 16c1.6 0 1.6 4 0 4H11" stroke="white" stroke-width="1.5"/>
+  <!-- F -->
+  <path d="M17 16v4" stroke="white" stroke-width="1.5"/>
+  <path d="M17 16h3" stroke="white" stroke-width="1.5"/>
+  <path d="M17 18h2" stroke="white" stroke-width="1.5"/>
+</svg>
+`;
 
 export class SummarUIRenderer implements ISummarUIRenderer {
   constructor(private context: ISummarViewContext) {}
@@ -40,6 +71,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     this.createSeparator(buttonContainer);
     
     const pdfButton = this.createPdfButton(buttonContainer);
+    const webButton = this.createWebButton(buttonContainer);
     const recordButton = this.createRecordButton(buttonContainer);
     
     // 플랫폼별 버튼 가시성 설정
@@ -48,6 +80,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       uploadSlackButton,
       testButton,
       pdfButton,
+      webButton,
       recordButton
     });
     
@@ -57,6 +90,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       uploadSlackButton,
       testButton,
       pdfButton,
+      webButton,
       recordButton
     });
     
@@ -223,18 +257,25 @@ export class SummarUIRenderer implements ISummarUIRenderer {
 
   private createPdfButton(container: HTMLDivElement): HTMLButtonElement {
     const button: HTMLButtonElement = container.createEl("button", {
-      text: "PDF",
+      // text: "PDF",
       cls: "summarview-button",
     });
     
+    addIcon('pdf-file', PDF_SVG);
+    setIcon(button, 'pdf-file');
     button.setAttribute("aria-label", "Convert PDF to Markdown");
-    button.style.width = "30%";
-    button.style.marginBottom = "1px";
-    button.style.padding = "8px 12px";
-    button.style.border = "1px solid var(--background-modifier-border)";
-    button.style.borderRadius = "5px";
-    button.style.cursor = "pointer";
-    button.style.marginTop = "1px";
+    
+    return button;
+  }
+
+  private createWebButton(container: HTMLDivElement): HTMLButtonElement {
+    const button: HTMLButtonElement = container.createEl("button", {
+      // text: "PDF",
+      cls: "summarview-button",
+    });
+    
+    setIcon(button, 'globe');
+    button.setAttribute("aria-label", "Fetch and summarize the web page");
     
     return button;
   }
@@ -247,6 +288,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     
     button.setAttribute("aria-label", "Record audio and summarize");
     button.style.width = "70%";
+    button.style.marginTop = "1px";
     button.style.marginBottom = "1px";
     button.style.padding = "8px 12px";
     button.style.border = "1px solid var(--background-modifier-border)";
@@ -284,6 +326,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     uploadSlackButton: HTMLButtonElement;
     testButton: HTMLButtonElement;
     pdfButton: HTMLButtonElement;
+    webButton: HTMLButtonElement;
     recordButton: HTMLButtonElement;
   }): void {
     // 테스트 버튼 가시성 설정 (debugLevel < 3일 때만 표시)
@@ -329,10 +372,12 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     uploadSlackButton: HTMLButtonElement;
     testButton: HTMLButtonElement;
     pdfButton: HTMLButtonElement;
+    webButton: HTMLButtonElement;
     recordButton: HTMLButtonElement;
   }): void {
     // PDF 버튼 이벤트는 SummarEventHandler에서 위임 처리
     buttons.pdfButton.setAttribute('button-id', 'pdf-button');
+    buttons.webButton.setAttribute('button-id', 'web-button');
 
     // Record 버튼 이벤트는 SummarEventHandler에서 위임 처리
     buttons.recordButton.setAttribute('button-id', 'record-button');

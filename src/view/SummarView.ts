@@ -170,7 +170,7 @@ export class SummarView extends View {
     this.context.abortController = this.abortController;
   }
 
-  private setupStyleProtection(urlInputContainer: HTMLDivElement, buttonContainer: HTMLDivElement): void {
+  private setupStyleProtection(urlInputContainer: HTMLDivElement | null, buttonContainer: HTMLDivElement): void {
     // 다른 플러그인의 스타일 변경을 감지하고 복원하는 MutationObserver
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -191,10 +191,12 @@ export class SummarView extends View {
     });
 
     // urlInputContainer buttonContainer 감시
-    observer.observe(urlInputContainer, { 
-      attributes: true, 
-      attributeFilter: ['style'] 
-    });
+    if (urlInputContainer) {
+      observer.observe(urlInputContainer, { 
+        attributes: true, 
+        attributeFilter: ['style'] 
+      });
+    }
     observer.observe(buttonContainer, { 
       attributes: true, 
       attributeFilter: ['style'] 
@@ -221,7 +223,7 @@ export class SummarView extends View {
     this.uiRenderer.setupContainerStyles(container);
 
     // Render UI components
-    const urlInputContainer = this.uiRenderer.renderUrlInputContainer(container);
+    // const urlInputContainer = this.uiRenderer.renderUrlInputContainer(container);
     const buttonContainer = this.uiRenderer.renderButtonContainer(container);
     const outputContainer = this.uiRenderer.renderOutputContainer(container);
     const composerContainer = this.uiRenderer.renderComposerContainer(container);
@@ -233,7 +235,7 @@ export class SummarView extends View {
     this.context.composerContainer = composerContainer;
 
     // Copilot 등 다른 플러그인의 스타일 간섭 방지를 위한 MutationObserver 설정
-    this.setupStyleProtection(urlInputContainer, buttonContainer);
+    this.setupStyleProtection(null, buttonContainer);
 
     // Setup composer container
     this.composerManager.setupComposerContainer();

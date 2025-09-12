@@ -243,8 +243,8 @@
 .summar-view-container .summar-button-container {
     margin-left: 5px !important;
     margin-right: 5px !important;
-    margin-top: 0px !important;
-    margin-bottom: 1px !important;
+    margin-top: 3px !important;
+    margin-bottom: 0px !important;
 }
 
 /* Custom Command 옵션 토글 행 스타일 */

@@ -90,6 +90,9 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
         case 'pdf-button':
           await this.handlePdfClick();
           break;
+        case 'web-button':
+          await this.handleWebClick();
+          break;
         case 'record-button':
           await this.handleRecordClick();
           break;
@@ -115,6 +118,17 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
   private async handlePdfClick(): Promise<void> {
     this.context.plugin.pdfHandler.convertPdfToMarkdown();
+  }
+
+  private async handleWebClick(): Promise<void> {
+    this.context.plugin.openUrlInputDialog((url) => {
+      if (url) {
+        this.context.plugin.activateView();
+        this.context.plugin.confluenceHandler.fetchAndSummarize(url);
+      } else {
+        SummarDebug.Notice(0, "No URL provided.");
+      }
+    });
   }
 
   private async handleRecordClick(): Promise<void> {
