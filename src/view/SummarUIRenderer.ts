@@ -176,12 +176,15 @@ export class SummarUIRenderer implements ISummarUIRenderer {
 
   private setupButtonContainerStyles(buttonContainer: HTMLDivElement): void {
     buttonContainer.style.display = "flex";
+    buttonContainer.style.flexWrap = "wrap";
     buttonContainer.style.alignItems = "center";
+    buttonContainer.style.alignContent = "flex-start";
     buttonContainer.style.gap = "5px";
     buttonContainer.style.marginBottom = "1px";
     buttonContainer.style.marginLeft = "5px";
     buttonContainer.style.marginRight = "5px";
     buttonContainer.style.marginTop = "0px";
+    buttonContainer.style.minHeight = "auto";
     
     // Copilot 등 다른 플러그인의 CSS 간섭 방지
     buttonContainer.style.setProperty('margin-left', '5px', 'important');
@@ -258,7 +261,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
   private createPdfButton(container: HTMLDivElement): HTMLButtonElement {
     const button: HTMLButtonElement = container.createEl("button", {
       // text: "PDF",
-      cls: "summarview-button",
+      cls: "lucide-icon-button",
     });
     
     addIcon('pdf-file', PDF_SVG);
@@ -271,7 +274,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
   private createWebButton(container: HTMLDivElement): HTMLButtonElement {
     const button: HTMLButtonElement = container.createEl("button", {
       // text: "PDF",
-      cls: "summarview-button",
+      cls: "lucide-icon-button",
     });
     
     setIcon(button, 'globe');
@@ -287,7 +290,10 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     });
     
     button.setAttribute("aria-label", "Record audio and summarize");
-    button.style.width = "70%";
+    button.style.width = "auto";
+    button.style.minWidth = "70px";
+    button.style.flexGrow = "1";
+    button.style.flexBasis = "100px";
     button.style.marginTop = "1px";
     button.style.marginBottom = "1px";
     button.style.padding = "8px 12px";
@@ -330,13 +336,12 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     recordButton: HTMLButtonElement;
   }): void {
     // 테스트 버튼 가시성 설정 (debugLevel < 3일 때만 표시)
-    const shouldShowTestButton = this.context.plugin.settingsv2.system.debugLevel >= 3;
+    // const shouldShowTestButton = this.context.plugin.settingsv2.system.debugLevel >= 3;
     
     if (!(Platform.isMacOS && Platform.isDesktopApp)) {
       // macOS 데스크톱이 아닌 경우 일부 버튼 숨김
       buttons.uploadWikiButton.style.display = "none";
       buttons.uploadWikiButton.disabled = true;
-      buttons.uploadWikiButton.style.width = "100%";
       
       buttons.uploadSlackButton.style.display = "none";
       buttons.uploadSlackButton.disabled = true;
@@ -344,7 +349,11 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       buttons.pdfButton.style.display = "none";
       buttons.pdfButton.disabled = true;
       
+      // record 버튼이 전체 너비를 차지하도록 조정
+      buttons.recordButton.style.flexGrow = "1";
+      buttons.recordButton.style.flexBasis = "100%";
       buttons.recordButton.style.width = "100%";
+      
       // macOS가 아니면 테스트 버튼 숨김
       buttons.testButton.style.display = 'none';
       buttons.testButton.disabled = true;
@@ -352,13 +361,13 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       // macOS 데스크톱인 경우 초기 버튼 상태 설정
       this.context.plugin.updateSlackButtonState();
       // 테스트 버튼 표시 여부 결정 (macOS에서만 debugLevel 조건 확인)
-      if (shouldShowTestButton) {
-        buttons.testButton.style.display = '';
-        buttons.testButton.disabled = false;
-      } else {
-        buttons.testButton.style.display = 'none';
-        buttons.testButton.disabled = true;
-      }
+      // if (shouldShowTestButton) {
+      //   buttons.testButton.style.display = '';
+      //   buttons.testButton.disabled = false;
+      // } else {
+      //   buttons.testButton.style.display = 'none';
+      //   buttons.testButton.disabled = true;
+      // }
     }
   }
 

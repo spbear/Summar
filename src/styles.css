@@ -232,10 +232,13 @@
 /* 🔹 Summar 버튼 컨테이너 (Copilot 등 다른 플러그인과의 충돌 방지) */
 .summar-button-container {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    align-content: flex-start;
     gap: 5px;
     margin: 0 5px;
     margin-bottom: 1px;
+    min-height: auto;
 }
 
 /* Copilot 플러그인 충돌 방지 - 강화된 선택자 */
@@ -245,6 +248,34 @@
     margin-right: 5px !important;
     margin-top: 3px !important;
     margin-bottom: 0px !important;
+    flex-wrap: wrap !important;
+    align-content: flex-start !important;
+}
+
+/* 버튼 컨테이너 내 버튼들 반응형 스타일 */
+.summar-button-container .summarview-button {
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.summar-button-container .lucide-icon-button {
+    flex-shrink: 0;
+    min-width: 24px;
+}
+
+/* 구분선 스타일 */
+.summar-button-container .button-separator {
+    flex-shrink: 0;
+    margin: 0 0px;
+    color: var(--text-muted);
+}
+
+/* 좁은 화면에서 record 버튼 전체 너비 사용 */
+@media (max-width: 600px) {
+    .summar-button-container .summarview-button[aria-label*="Record"] {
+        flex-basis: 100%;
+        width: 100%;
+    }
 }
 
 /* Custom Command 옵션 토글 행 스타일 */
