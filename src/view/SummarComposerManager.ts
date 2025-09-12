@@ -130,10 +130,6 @@ export class SummarComposerManager implements ISummarComposerManager {
     // label element 참조 저장
     this.composerHeaderLabel = header.querySelector('.composer-label-text') as HTMLElement;
 
-    // 높이 설정 (OutputHeaderComposer에서 주석처리된 부분 적용)
-    header.style.height = '28px';
-    header.style.padding = '4px 6px';
-
     return header;
   }
 
@@ -417,40 +413,65 @@ export class SummarComposerManager implements ISummarComposerManager {
     // targetKey가 있으면 해당 output에 대화 추가
     if (this.targetKey && this.context.outputManager) {
       const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
+
       // const result = this.context.outputManager.addConversation(this.targetKey, 'assistant', `#### reply\n${message}`);
       // this.context.outputManager.updateConversation(this.targetKey, result.addedIndex, `##### reply(2) \n${message}`);
 
-      // 1. setup에 conversation model 입력하는 UI 작성
-      // 2. conversations 내용 정리하는 함수 작성
-      // - type이 output인 것을 제외하고 새로운 것 이전 user/assistant 15개까지만 남겨둔다
-      // - gemini api의 경우 conversations에서 role이 assistant인 경우 model로 변경한다.
-      // 3. addConversation을 할 때 final 여부를 전달하고, final일때는 conversations에도 추가한다
-      // 4. updateConversation을 할 때 final 여부를 전달하고 final일 때는 conversations에도 추가한다.
-      // - summarai.complete()를 call하고 바로 updateConversation()을 false로 call하고 timer를 돌려서 진행중임을 표시하고 응답을 받으면 final을 true로 한다.
+      // ~~1. setup에 conversation model 입력하는 UI 작성~~
+      // ~~2. conversations 내용 정리하는 함수 작성~~
+      // ~~- type이 output인 것을 제외하고 새로운 것 이전 user/assistant 15개까지만 남겨둔다~~
+      // ~~- gemini api의 경우 conversations에서 role이 assistant인 경우 model로 변경한다.~~
+      
+      // ~~3. addConversation을 할 때 final 여부를 전달하고, final일때는 conversations에도 추가한다~~
+      // ~~4. updateConversation을 할 때 final 여부를 전달하고 final일 때는 conversations에도 추가한다.~~
+      // ~~- summarai.complete()를 call하고 바로 updateConversation()을 false로 call하고 timer를 돌려서 진행중임을 표시하고 응답을 받으면 final을 true로 한다.~~
+
       // 5. key가 존재하지 않을 경우에는 updateOutputText()를 호출하고, 그 key에 reply하도록 한다.
 
       // const summarai = new SummarAI(this.context.plugin, `gpt-5-mini`, 'web');
-      const summarai = new SummarAI(this.context.plugin, `gemini-2.5-flash`, 'web');
+      // Get selected model from modelchip
+      const selectedModel = this.getSelectedModel();
+      const summarai = new SummarAI(this.context.plugin, selectedModel, 'conversation');
 
-
-      // summarai.complete()에 전달할 conversations 복사본 생성 (role 변경용)
-      const conversationsForAI = result.conversations.map(conv => {
-        // 'assistant' role을 'model'로 변경한 복사본 생성
-        if (conv.role === 'assistant') {
-          return new SummarAIParam('model', conv.text, conv.type);
+      // summarai.complete()에 전달할 conversations 준비
+      const conversationsForAI = this.prepareConversations(result.conversations, selectedModel);
+      
+      // 임시 응답 생성 - AI 응답 대기 중 표시
+      const resultResponse = this.context.outputManager.addConversation(this.targetKey, 'assistant', '.');
+      this.scrollToLatestConversation(this.targetKey);
+      
+      // 진행 상황 애니메이션 타이머 시작
+      let dotCount = 1;
+      const thinkingTimer = setInterval(() => {
+        if (this.targetKey && resultResponse.addedIndex >= 0 && this.context.outputManager) {
+          dotCount++;
+          const dots = '.'.repeat(dotCount);
+          this.context.outputManager.updateConversation(this.targetKey, resultResponse.addedIndex, dots);
         }
-        return conv; // 'user' 등 다른 role은 그대로 유지
-      });
-      await summarai.complete(conversationsForAI);
-
-
-
-			const status = summarai.response.status;
-			const response = summarai.response.text;
-      // this.context.outputManager.updateConversation(this.targetKey, result.addedIndex, response);
-      this.context.outputManager.addConversation(this.targetKey, 'assistant', response);
+      }, 500); // 500ms마다 점 추가
       
+      this.context.timeoutRefs.add(thinkingTimer);
       
+      try {
+        await summarai.complete(conversationsForAI);
+        
+        // AI 응답 완료 후 실제 응답으로 교체
+        const status = summarai.response.status;
+        const response = summarai.response.text;
+        if (this.targetKey && resultResponse.addedIndex >= 0 && this.context.outputManager) {
+          this.context.outputManager.updateConversation(this.targetKey, resultResponse.addedIndex, response);
+        }
+      } catch (error) {
+        // AI 호출 실패 시 에러 메시지 표시
+        if (this.targetKey && resultResponse.addedIndex >= 0 && this.context.outputManager) {
+          this.context.outputManager.updateConversation(this.targetKey, resultResponse.addedIndex, 'Error: Failed to get AI response');
+        }
+        SummarDebug.log(1, `AI completion error: ${error}`);
+      } finally {
+        // 타이머 정리
+        clearInterval(thinkingTimer);
+        this.context.timeoutRefs.delete(thinkingTimer);
+      }      
       // 새로 추가된 conversation-item으로 스크롤
       this.scrollToLatestConversation(this.targetKey);
       
@@ -593,5 +614,57 @@ export class SummarComposerManager implements ISummarComposerManager {
     }, 100); // DOM 업데이트 후 스크롤 실행
 
     this.context.timeoutRefs.add(timeoutId);
+  }
+
+  /**
+   * AI에 전달할 대화 내역을 준비합니다.
+   * - type이 'output'인 항목들은 모두 유지
+   * - type이 'conversation'인 항목들은 최근 3개만 선택
+   * - Gemini 모델의 경우 'assistant' role을 'model'로 변환
+   */
+  private prepareConversations(conversations: SummarAIParam[], selectedModel: string): SummarAIParam[] {
+    // 1. type별로 분리
+    const outputConversations = conversations.filter(conv => conv.type === 'output');
+    const conversationItems = conversations.filter(conv => conv.type === 'conversation');
+    
+    // 2. conversation 타입은 최근 3개만 선택
+    const recentConversations = conversationItems.slice(-3);
+    
+    // 3. 순서를 유지하면서 합치기 (output + 최근 conversation)
+    const filteredConversations = [...outputConversations, ...recentConversations];
+    
+    // 4. Gemini 모델인 경우 assistant -> model 변환
+    if (selectedModel.includes('gemini')) {
+      return filteredConversations.map(conv => {
+        if (conv.role === 'assistant') {
+          return new SummarAIParam('model', conv.text, conv.type);
+        }
+        return conv; // 'user' 등 다른 role은 그대로 유지
+      });
+    } else {
+      // Gemini가 아닌 모델일 경우 원본 그대로 반환
+      return filteredConversations;
+    }
+  }
+
+  // Get selected model from modelchip in composer header
+  private getSelectedModel(): string {
+    try {
+      const composerElement = this.context.containerEl.querySelector('.composer-header');
+      if (!composerElement) {
+        return 'gpt-4.1-mini'; // fallback
+      }
+
+      const modelChip = composerElement.querySelector('.composer-model-chip') as HTMLElement;
+      if (!modelChip) {
+        return 'gpt-4.1-mini'; // fallback
+      }
+
+      const selectedModel = modelChip.getAttribute('data-model');
+      return selectedModel || 'gpt-4.1-mini'; // fallback
+    } catch (error) {
+      SummarDebug.log(1, `Error getting selected model: ${error}`);
+      return 'gpt-4.1-mini'; // fallback
+    }
   }
 }

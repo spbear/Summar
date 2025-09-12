@@ -872,7 +872,7 @@ SummarDebug.log(3, `model: ${m}, matched: ${matchedKey}, inputPerK: ${inputPerK}
             pdfModel: ['pdf'],
             sttModel: ['stt'],
             transcriptSummaryModel: ['stt-summary', 'stt-refine'],
-            customModel: ['custom']
+            customModel: ['custom', 'conversation']
         };
         const modelList = this.plugin.modelsJson?.model_list || {};
 
