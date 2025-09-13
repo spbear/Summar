@@ -129,7 +129,7 @@ export interface ISummarStyleManager {
 }
 
 export interface ISummarUIRenderer {
-  renderUrlInputContainer(container: HTMLElement): HTMLDivElement;
+  // renderUrlInputContainer(container: HTMLElement): HTMLDivElement;
   renderButtonContainer(container: HTMLElement): HTMLDivElement;
   renderOutputContainer(container: HTMLElement): HTMLDivElement;
   renderComposerContainer(container: HTMLElement): HTMLDivElement;

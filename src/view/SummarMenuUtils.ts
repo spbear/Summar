@@ -210,10 +210,10 @@ export class SummarMenuUtils {
     isFromStickyHeader: boolean = false
   ): MenuItemConfig[] {
     return [
-      { 
-        label: 'Reply', 
-        action: () => this.handleReply(key, context, isFromStickyHeader) 
-      },
+      // { 
+      //   label: 'Reply', 
+      //   action: () => this.handleReply(key, context, isFromStickyHeader) 
+      // },
       { 
         label: 'Delete Output', 
         action: () => this.handleDeleteOutput(key, context) 

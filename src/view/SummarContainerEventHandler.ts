@@ -22,7 +22,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   setupEventListeners(): void {
     this.setupUIButtonEvents();        // fetch, PDF, record 버튼
     this.setupUploadEvents();          // Wiki, Slack 업로드 버튼
-    this.setupTestButtonEvent();       // 테스트 메뉴 버튼
+    this.setupSummarViewPopupMenuEvent();       // 테스트 메뉴 버튼
   }
 
   cleanup(): void {
@@ -74,7 +74,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     }
   }
 
-  private setupTestButtonEvent(): void {
+  private setupSummarViewPopupMenuEvent(): void {
     const testButton = this.context.containerEl.querySelector('button[button-id="test-button"]') as HTMLButtonElement;
     if (testButton) {
       testButton.addEventListener("click", (event) => {

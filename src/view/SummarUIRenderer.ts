@@ -51,24 +51,24 @@ export class SummarUIRenderer implements ISummarUIRenderer {
 
   constructor(private context: ISummarViewContext) {}
 
-  renderUrlInputContainer(container: HTMLElement): HTMLDivElement {
-    const urlInputContainer: HTMLDivElement = container.createEl("div", {
-      cls: "url-input-container",
-    });
+  // renderUrlInputContainer(container: HTMLElement): HTMLDivElement {
+  //   const urlInputContainer: HTMLDivElement = container.createEl("div", {
+  //     cls: "url-input-container",
+  //   });
     
-    this.setupUrlInputContainerStyles(urlInputContainer);
+  //   this.setupUrlInputContainerStyles(urlInputContainer);
     
-    // Input field 생성
-    const urlInputField = this.createUrlInputField(urlInputContainer);
+  //   // Input field 생성
+  //   const urlInputField = this.createUrlInputField(urlInputContainer);
     
-    // Fetch button 생성
-    const fetchButton = this.createFetchButton(urlInputContainer);
+  //   // Fetch button 생성
+  //   const fetchButton = this.createFetchButton(urlInputContainer);
     
-    // 이벤트 리스너 설정
-    this.setupInputEvents(urlInputField, fetchButton);
+  //   // 이벤트 리스너 설정
+  //   this.setupInputEvents(urlInputField, fetchButton);
     
-    return urlInputContainer;
-  }
+  //   return urlInputContainer;
+  // }
 
   renderButtonContainer(container: HTMLElement): HTMLDivElement {
     const buttonContainer: HTMLDivElement = container.createEl("div", {
@@ -145,55 +145,55 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     container.style.overflow = "hidden";
   }
 
-  private setupUrlInputContainerStyles(urlInputContainer: HTMLDivElement): void {
-    urlInputContainer.style.display = "flex";
-    urlInputContainer.style.alignItems = "center";
-    urlInputContainer.style.gap = "5px";
-    urlInputContainer.style.marginBottom = "1px";
+  // private setupUrlInputContainerStyles(urlInputContainer: HTMLDivElement): void {
+  //   urlInputContainer.style.display = "flex";
+  //   urlInputContainer.style.alignItems = "center";
+  //   urlInputContainer.style.gap = "5px";
+  //   urlInputContainer.style.marginBottom = "1px";
     
-    // Copilot 등 다른 플러그인의 CSS 간섭 방지
-    urlInputContainer.style.setProperty('margin-left', '5px', 'important');
-    urlInputContainer.style.setProperty('margin-right', '5px', 'important');
-    urlInputContainer.classList.add('summar-url-input-container');
-  }
+  //   // Copilot 등 다른 플러그인의 CSS 간섭 방지
+  //   urlInputContainer.style.setProperty('margin-left', '5px', 'important');
+  //   urlInputContainer.style.setProperty('margin-right', '5px', 'important');
+  //   urlInputContainer.classList.add('summar-url-input-container');
+  // }
 
-  private createUrlInputField(container: HTMLDivElement): HTMLInputElement {
-    const urlInputField: HTMLInputElement = container.createEl("input", {
-      type: "text",
-      placeholder: "Enter Web page URL",
-      cls: "summarview-url-input",
-    });
+  // private createUrlInputField(container: HTMLDivElement): HTMLInputElement {
+  //   const urlInputField: HTMLInputElement = container.createEl("input", {
+  //     type: "text",
+  //     placeholder: "Enter Web page URL",
+  //     cls: "summarview-url-input",
+  //   });
     
-    urlInputField.style.flexGrow = "1";
-    urlInputField.style.padding = "8px";
-    urlInputField.style.border = "1px solid var(--background-modifier-border)";
-    urlInputField.style.borderRadius = "5px";
-    urlInputField.style.boxSizing = "border-box";
-    urlInputField.style.margin = "5px";
-    urlInputField.value = this.context.plugin.settingsv2.system.testUrl || "";
+  //   urlInputField.style.flexGrow = "1";
+  //   urlInputField.style.padding = "8px";
+  //   urlInputField.style.border = "1px solid var(--background-modifier-border)";
+  //   urlInputField.style.borderRadius = "5px";
+  //   urlInputField.style.boxSizing = "border-box";
+  //   urlInputField.style.margin = "5px";
+  //   urlInputField.value = this.context.plugin.settingsv2.system.testUrl || "";
     
-    // Store input field for later use
-    this.context.plugin.urlInputField = urlInputField;
+  //   // Store input field for later use
+  //   this.context.plugin.urlInputField = urlInputField;
     
-    return urlInputField;
-  }
+  //   return urlInputField;
+  // }
 
-  private createFetchButton(container: HTMLDivElement): HTMLButtonElement {
-    const fetchButton: HTMLButtonElement = container.createEl("button", {
-      text: "GO",
-      cls: "summarview-button",
-    });
+  // private createFetchButton(container: HTMLDivElement): HTMLButtonElement {
+  //   const fetchButton: HTMLButtonElement = container.createEl("button", {
+  //     text: "GO",
+  //     cls: "summarview-button",
+  //   });
     
-    fetchButton.setAttribute("aria-label", "Fetch and summarize the web page");
-    fetchButton.style.padding = "8px 12px";
-    fetchButton.style.border = "1px solid var(--background-modifier-border)";
-    fetchButton.style.borderRadius = "5px";
-    fetchButton.style.cursor = "pointer";
-    fetchButton.style.flexShrink = "0";
-    fetchButton.style.margin = "5px";
+  //   fetchButton.setAttribute("aria-label", "Fetch and summarize the web page");
+  //   fetchButton.style.padding = "8px 12px";
+  //   fetchButton.style.border = "1px solid var(--background-modifier-border)";
+  //   fetchButton.style.borderRadius = "5px";
+  //   fetchButton.style.cursor = "pointer";
+  //   fetchButton.style.flexShrink = "0";
+  //   fetchButton.style.margin = "5px";
     
-    return fetchButton;
-  }
+  //   return fetchButton;
+  // }
 
   private setupButtonContainerStyles(buttonContainer: HTMLDivElement): void {
     buttonContainer.style.display = "flex";
@@ -392,10 +392,10 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     }
   }
 
-  private setupInputEvents(urlInputField: HTMLInputElement, fetchButton: HTMLButtonElement): void {
-    // Fetch 버튼 이벤트는 SummarEventHandler에서 위임 처리
-    fetchButton.setAttribute('button-id', 'fetch-button');
-  }
+  // private setupInputEvents(urlInputField: HTMLInputElement, fetchButton: HTMLButtonElement): void {
+  //   // Fetch 버튼 이벤트는 SummarEventHandler에서 위임 처리
+  //   fetchButton.setAttribute('button-id', 'fetch-button');
+  // }
 
   private setupButtonEvents(buttons: {
     uploadWikiButton: HTMLButtonElement;
