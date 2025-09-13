@@ -4,6 +4,7 @@ import { SummarDebug } from "../globals";
 export interface MenuItemConfig {
   label: string;
   action: () => void;
+  icon?: string; // lucide icon name
 }
 
 export interface MenuOptions {
@@ -216,7 +217,8 @@ export class SummarMenuUtils {
       // },
       { 
         label: 'Delete Output', 
-        action: () => this.handleDeleteOutput(key, context) 
+        action: () => this.handleDeleteOutput(key, context),
+        icon: 'trash-2'
       }
     ];
   }

@@ -19,17 +19,17 @@ const PDF_SVG = `
 
   <!-- 'PDF' letters in white strokes on the bar -->
   <!-- P -->
-  <path d="M6 16v4" stroke="white" stroke-width="1.5"/>
-  <path d="M6 16h2" stroke="white" stroke-width="1.5"/>
-  <path d="M8 16c1 0 1 2 0 2H6" stroke="white" stroke-width="1.5"/>
+  <path d="M5.5 16v4" stroke="white" stroke-width="1.5"/>
+  <path d="M5.5 16h2" stroke="white" stroke-width="1.5"/>
+  <path d="M7.5 16c1 0 1 2 0 2H5.5" stroke="white" stroke-width="1.5"/>
   <!-- D -->
-  <path d="M11 16v4" stroke="white" stroke-width="1.5"/>
-  <path d="M11 16h2" stroke="white" stroke-width="1.5"/>
-  <path d="M13 16c1.6 0 1.6 4 0 4H11" stroke="white" stroke-width="1.5"/>
+  <path d="M10.5 16v4" stroke="white" stroke-width="1.5"/>
+  <path d="M10.5 16h2" stroke="white" stroke-width="1.5"/>
+  <path d="M12.5 16c1.6 0 1.6 4 0 4H10.5" stroke="white" stroke-width="1.5"/>
   <!-- F -->
-  <path d="M17 16v4" stroke="white" stroke-width="1.5"/>
-  <path d="M17 16h3" stroke="white" stroke-width="1.5"/>
-  <path d="M17 18h2" stroke="white" stroke-width="1.5"/>
+  <path d="M16.5 16v4" stroke="white" stroke-width="1.5"/>
+  <path d="M16.5 16h3" stroke="white" stroke-width="1.5"/>
+  <path d="M16.5 18h2" stroke="white" stroke-width="1.5"/>
 </svg>
 `;
 
@@ -80,7 +80,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     // 버튼들 생성
     const uploadWikiButton = this.createUploadWikiButton(buttonContainer);
     const uploadSlackButton = this.createUploadSlackButton(buttonContainer);
-    const testButton = this.createTestButton(buttonContainer);
+    const menuButton = this.createSummarViewMenuButton(buttonContainer);
     
     // 구분선 추가
     this.createSeparator(buttonContainer);
@@ -93,7 +93,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     this.setupPlatformSpecificVisibility({
       uploadWikiButton,
       uploadSlackButton,
-      testButton,
+      menuButton,
       pdfButton,
       webButton,
       recordButton
@@ -103,7 +103,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     this.setupButtonEvents({
       uploadWikiButton,
       uploadSlackButton,
-      testButton,
+      menuButton,
       pdfButton,
       webButton,
       recordButton
@@ -259,12 +259,12 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     }
   }
 
-  private createTestButton(container: HTMLDivElement): HTMLButtonElement {
+  private createSummarViewMenuButton(container: HTMLDivElement): HTMLButtonElement {
     const button = container.createEl("button", {
       cls: "lucide-icon-button",
     });
-    button.setAttribute("aria-label", "Test menu");
-    button.setAttribute("button-id", "test-button");
+    button.setAttribute("aria-label", "Show menu");
+    button.setAttribute("button-id", "summarview-menu-button");
     setIcon(button, "menu");
     button.disabled = false;
     button.style.display = '';
@@ -351,7 +351,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
   private setupPlatformSpecificVisibility(buttons: {
     uploadWikiButton: HTMLButtonElement;
     uploadSlackButton: HTMLButtonElement;
-    testButton: HTMLButtonElement;
+    menuButton: HTMLButtonElement;
     pdfButton: HTMLButtonElement;
     webButton: HTMLButtonElement;
     recordButton: HTMLButtonElement;
@@ -376,8 +376,8 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       buttons.recordButton.style.width = "100%";
       
       // macOS가 아니면 테스트 버튼 숨김
-      buttons.testButton.style.display = 'none';
-      buttons.testButton.disabled = true;
+      buttons.menuButton.style.display = 'none';
+      buttons.menuButton.disabled = true;
     } else {
       // macOS 데스크톱인 경우 초기 버튼 상태 설정
       this.context.plugin.updateSlackButtonState();
@@ -400,7 +400,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
   private setupButtonEvents(buttons: {
     uploadWikiButton: HTMLButtonElement;
     uploadSlackButton: HTMLButtonElement;
-    testButton: HTMLButtonElement;
+    menuButton: HTMLButtonElement;
     pdfButton: HTMLButtonElement;
     webButton: HTMLButtonElement;
     recordButton: HTMLButtonElement;

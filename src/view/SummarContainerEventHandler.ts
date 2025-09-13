@@ -1,4 +1,4 @@
-import { MarkdownView, normalizePath } from "obsidian";
+import { MarkdownView, normalizePath, setIcon } from "obsidian";
 import { ISummarEventHandler, ISummarViewContext, HiddenButtonsState, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
@@ -88,9 +88,9 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   }
 
   private setupSummarViewPopupMenuEvent(): void {
-    const testButton = this.context.containerEl.querySelector('button[button-id="test-button"]') as HTMLButtonElement;
-    if (testButton) {
-      testButton.addEventListener("click", (event) => {
+    const menuButton = this.context.containerEl.querySelector('button[button-id="summarview-menu-button"]') as HTMLButtonElement;
+    if (menuButton) {
+      menuButton.addEventListener("click", (event) => {
         event.stopPropagation();
         this.showSummarViewPopupMenu(event);
       }, { signal: this.context.abortController.signal });
@@ -187,12 +187,12 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     // 숨겨진 버튼들의 메뉴 아이템 생성
     const hiddenButtonItems = this.getHiddenButtonMenuItems();
     
-    // 기존 메뉴 아이템들
+    // 기존 메뉴 아이템들 (아이콘 포함)
     const defaultMenuItems = [
-      { label: 'New prompt', action: () => this.handleComposer() },
-      { label: 'Load conversation', action: () => this.handleLoadAllOutputs() },
-      { label: 'Save all conversations', action: () => this.handleSaveAllOutputs() },
-      { label: 'Clear all conversations', action: () => this.handleDeleteAllOutputs() }
+      { label: 'New prompt', action: () => this.handleComposer(), icon: 'message-square-more' },
+      { label: 'Load conversation', action: () => this.handleLoadAllOutputs(), icon: 'folder-open' },
+      { label: 'Save all conversations', action: () => this.handleSaveAllOutputs(), icon: 'save' },
+      { label: 'Clear all conversations', action: () => this.handleDeleteAllOutputs(), icon: 'trash-2' }
     ];
 
     // 숨겨진 버튼 메뉴들을 맨 앞에 추가
@@ -201,14 +201,41 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     allMenuItems.forEach((item, index) => {
       const menuItem = document.createElement('div');
       menuItem.className = 'summarview-menu-item';
-      menuItem.textContent = item.label;
       menuItem.style.cssText = `
         padding: 8px 12px;
         cursor: pointer;
         border-radius: 3px;
         color: var(--text-normal);
         font-size: var(--font-ui-small);
+        display: flex;
+        align-items: center;
+        gap: 6px;
       `;
+      
+      // 아이콘 추가
+      if (item.icon) {
+        const iconHolder = document.createElement('span');
+        iconHolder.style.display = 'inline-flex';
+        iconHolder.style.width = '14px';
+        iconHolder.style.height = '14px';
+        iconHolder.style.flexShrink = '0';
+        setIcon(iconHolder, item.icon);
+        
+        // SVG 크기 조정
+        const svg = iconHolder.querySelector('svg') as SVGElement | null;
+        if (svg) {
+          svg.style.width = '14px';
+          svg.style.height = '14px';
+          svg.style.strokeWidth = '2px';
+        }
+        
+        menuItem.appendChild(iconHolder);
+      }
+      
+      // 텍스트 라벨 추가
+      const textSpan = document.createElement('span');
+      textSpan.textContent = item.label;
+      menuItem.appendChild(textSpan);
       
       // 숨겨진 버튼 메뉴들은 다른 스타일 적용
       if (index < hiddenButtonItems.length) {
@@ -500,14 +527,15 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   /**
    * 숨겨진 버튼들을 위한 메뉴 아이템 생성
    */
-  private getHiddenButtonMenuItems(): Array<{ label: string; action: () => void }> {
-    const items: Array<{ label: string; action: () => void }> = [];
+  private getHiddenButtonMenuItems(): Array<{ label: string; action: () => void; icon: string }> {
+    const items: Array<{ label: string; action: () => void; icon: string }> = [];
 
     // uploadWiki 버튼이 숨겨져 있으면 메뉴에 추가 (우선순위 높음)
     if (this.currentHiddenButtons.uploadWiki) {
       items.push({
         label: 'Upload Note to Confluence',
-        action: () => this.executeUploadWikiAction()
+        action: () => this.executeUploadWikiAction(),
+        icon: 'file-up'
       });
     }
 
@@ -515,7 +543,8 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     if (this.currentHiddenButtons.uploadSlack) {
       items.push({
         label: this.getSlackButtonTooltip(),
-        action: () => this.executeUploadSlackAction()
+        action: () => this.executeUploadSlackAction(),
+        icon: 'hash'
       });
     }
 

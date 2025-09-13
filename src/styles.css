@@ -602,7 +602,7 @@
 .summar-code-block-container {
     margin: 8px 0;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
+    border-radius: 0;
     background-color: var(--background-primary-alt);
     overflow: hidden;
     width: 100%;
@@ -640,6 +640,6 @@
 
 /* Ensure code blocks fit within outputText area */
 .output-text .summar-code-block-container {
-    margin: 6px -8px;
-    width: calc(100% + 16px);
+    margin: 6px -5px;
+    width: calc(100% + 10px);
 }

@@ -544,12 +544,14 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
     ...hiddenButtonMenuItems.map(item => ({
       label: item.tooltip,
       action: item.action,
-      isHiddenButton: true
+      isHiddenButton: true,
+      icon: item.icon
     })),
     ...standardMenuItems.map(item => ({
       label: item.label,
       action: item.action,
-      isHiddenButton: false
+      isHiddenButton: false,
+      icon: item.icon
     }))
   ];
   
@@ -607,7 +609,31 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
     menuItem.style.display = 'flex';
     menuItem.style.alignItems = 'center';
     menuItem.style.gap = '6px';
-    menuItem.textContent = item.label;
+    
+    // 아이콘 추가 (숨겨진 버튼들에만)
+    if (item.icon) {
+      const iconHolder = document.createElement('span');
+      iconHolder.style.display = 'inline-flex';
+      iconHolder.style.width = '14px';
+      iconHolder.style.height = '14px';
+      iconHolder.style.flexShrink = '0';
+      setIcon(iconHolder, item.icon);
+      
+      // SVG 크기 조정
+      const svg = iconHolder.querySelector('svg') as SVGElement | null;
+      if (svg) {
+        svg.style.width = '14px';
+        svg.style.height = '14px';
+        svg.style.strokeWidth = '2px';
+      }
+      
+      menuItem.appendChild(iconHolder);
+    }
+    
+    // 텍스트 라벨 추가
+    const textSpan = document.createElement('span');
+    textSpan.textContent = item.label;
+    menuItem.appendChild(textSpan);
     
     menuItem.addEventListener('mouseenter', () => {
       menuItem.style.backgroundColor = 'var(--background-modifier-hover)';
@@ -653,42 +679,56 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
 }
 
 // 숨겨진 버튼들의 메뉴 아이템 생성
-function getOutputHeaderHiddenButtonMenuItems(buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState): Array<{tooltip: string, action: () => void}> {
-  const menuItems: Array<{tooltip: string, action: () => void}> = [];
+function getOutputHeaderHiddenButtonMenuItems(buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState): Array<{tooltip: string, action: () => void, icon: string}> {
+  // 버튼 타입별 아이콘 매핑
+  const buttonIconMap = {
+    uploadWiki: 'file-up',
+    uploadSlack: 'hash',
+    newNote: 'file-output',
+    reply: 'message-square-reply',
+    copy: 'copy'
+  };
+
+  const menuItems: Array<{tooltip: string, action: () => void, icon: string}> = [];
 
   // 숨겨진 버튼들만 메뉴에 추가 (표시 순서: uploadWiki → uploadSlack → newNote → reply → copy)
   if (hiddenButtons.uploadWiki) {
     menuItems.push({
       tooltip: buttons.uploadWiki.getAttribute('aria-label') || 'Upload to Wiki',
-      action: () => buttons.uploadWiki.click()
+      action: () => buttons.uploadWiki.click(),
+      icon: buttonIconMap.uploadWiki
     });
   }
 
   if (hiddenButtons.uploadSlack) {
     menuItems.push({
       tooltip: buttons.uploadSlack.getAttribute('aria-label') || 'Upload to Slack',
-      action: () => buttons.uploadSlack.click()
+      action: () => buttons.uploadSlack.click(),
+      icon: buttonIconMap.uploadSlack
     });
   }
 
   if (hiddenButtons.newNote) {
     menuItems.push({
       tooltip: buttons.newNote.getAttribute('aria-label') || 'Create New Note',
-      action: () => buttons.newNote.click()
+      action: () => buttons.newNote.click(),
+      icon: buttonIconMap.newNote
     });
   }
 
   if (hiddenButtons.reply) {
     menuItems.push({
       tooltip: buttons.reply.getAttribute('aria-label') || 'Reply',
-      action: () => buttons.reply.click()
+      action: () => buttons.reply.click(),
+      icon: buttonIconMap.reply
     });
   }
 
   if (hiddenButtons.copy) {
     menuItems.push({
       tooltip: buttons.copy.getAttribute('aria-label') || 'Copy',
-      action: () => buttons.copy.click()
+      action: () => buttons.copy.click(),
+      icon: buttonIconMap.copy
     });
   }
 
