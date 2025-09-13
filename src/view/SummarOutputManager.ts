@@ -1019,7 +1019,14 @@ export class SummarOutputManager implements ISummarOutputManager {
     button.style.transformOrigin = 'center';
     button.style.margin = '0';
     button.disabled = true;
-    button.style.display = 'none';
+    
+    // Composer 사용 가능 여부 확인
+    const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
+    if (!canShowComposer) {
+      button.style.display = 'none';
+    } else {
+      button.style.display = 'none'; // 기본적으로 숨김 (enableOutputItemButtons에서 활성화)
+    }
     
     setIcon(button, 'message-square-reply');
     

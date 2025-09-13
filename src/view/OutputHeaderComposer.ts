@@ -459,9 +459,15 @@ function setupOutputHeaderResponsiveButtons(outputHeader: HTMLElement, buttons: 
       changed = true;
     }
 
-    if (hiddenButtons.reply !== newReplyHidden) {
+    // Reply 버튼은 항상 composer 가용성 체크 (조건 없이 매번 실행)
+    const canShowComposer = context.composerManager?.canShowComposer(200)?.canShow ?? false;
+    const shouldShowReply = !newReplyHidden && canShowComposer;
+    const currentReplyDisplay = buttons.reply.style.display;
+    const newReplyDisplay = shouldShowReply ? 'block' : 'none';
+    
+    if (hiddenButtons.reply !== newReplyHidden || currentReplyDisplay !== newReplyDisplay) {
       hiddenButtons.reply = newReplyHidden;
-      buttons.reply.style.display = newReplyHidden ? 'none' : 'block';
+      buttons.reply.style.display = newReplyDisplay;
       changed = true;
     }
 

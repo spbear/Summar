@@ -174,6 +174,17 @@ export class SummarMenuUtils {
     // ComposerManager를 통해 composer 표시 및 타겟 설정
     const composerManager = context.composerManager;
     if (composerManager && composerManager.showComposerContainer) {
+      // Composer 표시 가능 여부 확인
+      const proposedHeight = 200; // 기본 composer 높이
+      const { canShow, containerHeight, maxAllowedHeight } = composerManager.canShowComposer(proposedHeight);
+      
+      if (!canShow) {
+        // 표시할 수 없는 경우 사용자에게 알림
+        SummarDebug.Notice(0, `Reply not available: required height (${proposedHeight}px) exceeds half of view height (${Math.floor(maxAllowedHeight)}px)`);
+        SummarDebug.log(1, `Reply blocked: containerHeight=${containerHeight}px, maxAllowed=${maxAllowedHeight}px`);
+        return;
+      }
+      
       // Composer 표시
       composerManager.showComposerContainer();
       // 타겟 아이템 설정

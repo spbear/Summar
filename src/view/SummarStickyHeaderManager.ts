@@ -106,6 +106,9 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
           this.stickyHeaderContainer.style.display !== 'none') {
         SummarDebug.log(1, `Container resized, updating sticky header size for key: ${this.currentStickyKey}`);
         this.updateStickyHeaderSize();
+        
+        // Resize 시 composer 가용성 다시 체크하고 버튼 업데이트
+        this.updateStickyHeaderButtonsOnResize();
       }
     });
     
@@ -524,16 +527,38 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     button.style.transformOrigin = 'center';
     button.style.margin = '0';
     
-    // 원본 버튼 상태 동기화
-    const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
-    if (originalItem) {
-      const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
-      if (originalButton) {
-        button.disabled = originalButton.disabled;
-        button.style.display = originalButton.style.display;
-      } else {
-        button.disabled = true;
+    // Reply 버튼의 경우 composer 가용성 확인
+    if (buttonId === 'reply-output-button') {
+      const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
+      if (!canShowComposer) {
         button.style.display = 'none';
+        button.disabled = true;
+      } else {
+        // 원본 버튼 상태 동기화
+        const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
+        if (originalItem) {
+          const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+          if (originalButton) {
+            button.disabled = originalButton.disabled;
+            button.style.display = originalButton.style.display;
+          } else {
+            button.disabled = true;
+            button.style.display = 'none';
+          }
+        }
+      }
+    } else {
+      // 다른 버튼들은 기존 로직 사용
+      const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
+      if (originalItem) {
+        const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+        if (originalButton) {
+          button.disabled = originalButton.disabled;
+          button.style.display = originalButton.style.display;
+        } else {
+          button.disabled = true;
+          button.style.display = 'none';
+        }
       }
     }
     
@@ -549,6 +574,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       // 다른 버튼들은 원본 버튼 클릭으로 위임
       button.addEventListener('click', (event) => {
         event.stopPropagation();
+        const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
         if (originalItem) {
           const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
           originalButton?.click();
@@ -937,5 +963,46 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     }
     
     return items;
+  }
+
+  // Resize 시 sticky header 버튼들의 가시성을 다시 평가
+  private updateStickyHeaderButtonsOnResize(): void {
+    if (!this.stickyHeaderContainer || !this.currentStickyKey) {
+      return;
+    }
+
+    const stickyHeaderEl = this.stickyHeaderContainer.querySelector('.output-header') as HTMLElement;
+    if (!stickyHeaderEl) {
+      return;
+    }
+
+    // Composer 가용성 재확인 (최우선 체크)
+    const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
+    
+    // Reply 버튼 업데이트
+    const replyButton = stickyHeaderEl.querySelector('[button-id="reply-output-button"]') as HTMLButtonElement;
+    if (replyButton) {
+      if (!canShowComposer) {
+        // Composer 사용 불가능하면 무조건 숨김
+        replyButton.style.display = 'none';
+        replyButton.disabled = true;
+      } else {
+        // Composer 사용 가능한 경우에만 원본 버튼 상태와 동기화
+        const originalItem = this.context.outputRecords.get(this.currentStickyKey)?.itemEl || null;
+        if (originalItem) {
+          const originalButton = originalItem.querySelector('[button-id="reply-output-button"]') as HTMLButtonElement;
+          if (originalButton) {
+            replyButton.disabled = originalButton.disabled;
+            replyButton.style.display = originalButton.style.display;
+          } else {
+            replyButton.style.display = 'none';
+            replyButton.disabled = true;
+          }
+        } else {
+          replyButton.style.display = 'none';
+          replyButton.disabled = true;
+        }
+      }
+    }
   }
 }

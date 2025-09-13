@@ -188,12 +188,20 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     const hiddenButtonItems = this.getHiddenButtonMenuItems();
     
     // 기존 메뉴 아이템들 (아이콘 포함)
-    const defaultMenuItems = [
-      { label: 'New prompt', action: () => this.handleComposer(), icon: 'message-square-more' },
+    const defaultMenuItems = [];
+    
+    // New prompt 항목은 composer 가용성 확인
+    const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
+    if (canShowComposer) {
+      defaultMenuItems.push({ label: 'New prompt', action: () => this.handleComposer(), icon: 'message-square-more' });
+    }
+    
+    // 나머지 항목들 추가
+    defaultMenuItems.push(
       { label: 'Load conversation', action: () => this.handleLoadAllOutputs(), icon: 'folder-open' },
       { label: 'Save all conversations', action: () => this.handleSaveAllOutputs(), icon: 'save' },
       { label: 'Clear all conversations', action: () => this.handleDeleteAllOutputs(), icon: 'trash-2' }
-    ];
+    );
 
     // 숨겨진 버튼 메뉴들을 맨 앞에 추가
     const allMenuItems = [...hiddenButtonItems, ...defaultMenuItems];
@@ -258,6 +266,15 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
       });
       
       menu.appendChild(menuItem);
+      
+      // 숨겨진 버튼과 기본 메뉴 사이에 구분선 추가
+      if (index === hiddenButtonItems.length - 1 && defaultMenuItems.length > 0) {
+        const separator = document.createElement('div');
+        separator.style.height = '1px';
+        separator.style.backgroundColor = 'var(--background-modifier-border)';
+        separator.style.margin = '4px 0';
+        menu.appendChild(separator);
+      }
     });
 
     document.body.appendChild(menu);

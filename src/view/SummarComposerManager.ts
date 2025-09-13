@@ -314,13 +314,26 @@ export class SummarComposerManager implements ISummarComposerManager {
     const composerVisible = this.context.composerContainer.style.display !== 'none';
     
     if (composerVisible) {
-      // composerContainer가 표시된 경우 현재 높이를 유지하면서 리사이징
+      // composerContainer가 표시된 경우
       const currentComposerHeight = parseInt(this.context.composerContainer.style.height) || 200;
-      this.resizeComposerContainer(currentComposerHeight);
       
+      // 현재 composer 높이로 가용성 체크
+      const { canShow } = this.canShowComposer(currentComposerHeight);
+      
+      if (!canShow) {
+        // canShow가 false가 되면 composer를 자동으로 숨김
+        SummarDebug.log(1, `View resized: composer cannot be shown anymore (height=${currentComposerHeight}px), hiding automatically`);
+        this.isComposerVisible = false;
+        this.hideComposerContainer();
+        return;
+      }
+      
+      // canShow가 true면 기존 높이 유지하면서 리사이징
+      this.resizeComposerContainer(currentComposerHeight);
       SummarDebug.log(1, `View resized: composer visible, maintained height ${currentComposerHeight}px`);
     } else {
       // composerContainer가 숨겨진 경우 outputContainer를 전체 크기로 복원
+      // canShow가 true가 되어도 자동으로 보여주지는 않음 (사용자 의도 존중)
       const containerRect = this.context.containerEl.getBoundingClientRect();
       const inputHeight = 60; // 대략적인 input + button 영역 높이
       const statusBarMargin = 6; // outputContainer의 기본 하단 간격
@@ -330,6 +343,22 @@ export class SummarComposerManager implements ISummarComposerManager {
       
       SummarDebug.log(1, `View resized: composer hidden, output height restored to ${fullOutputHeight}px`);
     }
+  }
+
+  /**
+   * Composer를 표시할 수 있는지 확인합니다
+   * @param proposedHeight 제안된 composer 높이
+   * @returns 표시 가능 여부와 관련 정보
+   */
+  canShowComposer(proposedHeight: number): { canShow: boolean; containerHeight: number; maxAllowedHeight: number } {
+    const containerHeight = this.context.containerEl.getBoundingClientRect().height;
+    const maxAllowedHeight = containerHeight / 2;
+    
+    return {
+      canShow: proposedHeight <= maxAllowedHeight,
+      containerHeight,
+      maxAllowedHeight
+    };
   }
 
   toggleComposerContainer(): void {
@@ -343,7 +372,22 @@ export class SummarComposerManager implements ISummarComposerManager {
   }
 
   showComposerContainer(): void {
-    const composerHeight = 200;
+    const proposedHeight = 200;
+    const { canShow, containerHeight, maxAllowedHeight } = this.canShowComposer(proposedHeight);
+    
+    // 높이 제한 검사 - composer가 전체 높이의 절반보다 클 경우 표시하지 않음
+    if (!canShow) {
+      // 상태 복원
+      this.isComposerVisible = false;
+      
+      // 사용자에게 알림
+      SummarDebug.Notice(0, `Composer cannot be shown: required height (${proposedHeight}px) exceeds half of view height (${Math.floor(maxAllowedHeight)}px)`);
+      
+      SummarDebug.log(1, `Composer display blocked: containerHeight=${containerHeight}px, maxAllowed=${maxAllowedHeight}px, proposed=${proposedHeight}px`);
+      return;
+    }
+    
+    const composerHeight = proposedHeight;
     
     // Composer container 표시
     this.context.composerContainer.style.display = 'flex';

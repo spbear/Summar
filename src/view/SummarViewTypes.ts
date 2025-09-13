@@ -216,6 +216,7 @@ export interface ISummarComposerManager {
   setOutput(key: string): void;
   handleViewResize(): void;
   cleanup(): void;
+  canShowComposer(proposedHeight: number): { canShow: boolean; containerHeight: number; maxAllowedHeight: number };
   
   // 현재 타겟 키 조회
   get currentTargetKey(): string | null;
