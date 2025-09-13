@@ -3,10 +3,25 @@ import SummarPlugin from "../main";
 import MarkdownIt from "markdown-it";
 import { SummarAIParam, SummarAIParamType } from "../summarai-types";
 
-// 버튼 가시성 상태 타입
+// ButtonContainer용 버튼 가시성 상태
 export interface HiddenButtonsState {
   uploadSlack: boolean;
   uploadWiki: boolean;
+}
+
+// OutputHeader용 버튼 가시성 상태
+export interface OutputHeaderHiddenButtonsState {
+  copy: boolean;
+  reply: boolean;
+  newNote: boolean;
+  uploadSlack: boolean;
+  uploadWiki: boolean;
+}
+
+// 전체 버튼 가시성 상태 통합
+export interface AllHiddenButtonsState {
+  buttonContainer: HiddenButtonsState;
+  outputHeader: OutputHeaderHiddenButtonsState;
 }
 
 // 공통 인터페이스
@@ -25,6 +40,7 @@ export interface ISummarViewContext {
   
   // 버튼 가시성 변경 이벤트
   onButtonVisibilityChanged?: (hiddenButtons: HiddenButtonsState) => void;
+  onOutputHeaderButtonVisibilityChanged?: (hiddenButtons: OutputHeaderHiddenButtonsState) => void;
   
   // 매니저 참조들 (타입 안전성 향상)
   outputManager?: ISummarOutputManager;

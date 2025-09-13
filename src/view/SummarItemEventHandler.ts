@@ -53,9 +53,9 @@ export class SummarItemEventHandler implements ISummarEventHandler {
         case 'copy-output-button':
           this.handleCopyOutput(key);
           break;
-        case 'show-menu-button':
-          this.handleShowMenuClick(key, event);
-          break;
+        // case 'show-menu-button':
+        //   this.handleShowMenuClick(key, event);
+        //   break;
         case 'toggle-fold-button':
           this.handleToggleClick(key, button);
           break;
@@ -211,16 +211,16 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     }
   }
 
-  private handleShowMenuClick(key: string, event: MouseEvent): void {
-    const button = event.target as HTMLButtonElement;
+  // private handleShowMenuClick(key: string, event: MouseEvent): void {
+  //   const button = event.target as HTMLButtonElement;
     
-    const menuItems = SummarMenuUtils.createStandardMenuItems(key, this.context, false);
+  //   const menuItems = SummarMenuUtils.createStandardMenuItems(key, this.context, false);
 
-    SummarMenuUtils.showPopupMenu(button, menuItems, {
-      zIndex: 1000,
-      context: this.context
-    });
-  }
+  //   SummarMenuUtils.showPopupMenu(button, menuItems, {
+  //     zIndex: 1000,
+  //     context: this.context
+  //   });
+  // }
 
   private handleToggleClick(key: string, toggleButton: HTMLButtonElement): void {
     // 중복 실행 방지

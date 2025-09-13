@@ -1,5 +1,5 @@
 import { MarkdownView, normalizePath } from "obsidian";
-import { ISummarEventHandler, ISummarViewContext, HiddenButtonsState } from "./SummarViewTypes";
+import { ISummarEventHandler, ISummarViewContext, HiddenButtonsState, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
 /**
@@ -12,10 +12,23 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     uploadWiki: false
   };
 
+  private currentOutputHeaderHiddenButtons: OutputHeaderHiddenButtonsState = {
+    copy: false,
+    reply: false,
+    newNote: false,
+    uploadSlack: false,
+    uploadWiki: false
+  };
+
   constructor(private context: ISummarViewContext) {
     // 버튼 가시성 변경 이벤트 리스너 등록
     this.context.onButtonVisibilityChanged = (hiddenButtons) => {
       this.currentHiddenButtons = hiddenButtons;
+    };
+
+    // OutputHeader 버튼 가시성 변경 이벤트 리스너 등록
+    this.context.onOutputHeaderButtonVisibilityChanged = (hiddenButtons) => {
+      this.currentOutputHeaderHiddenButtons = hiddenButtons;
     };
   }
 

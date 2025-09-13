@@ -852,7 +852,7 @@ export class SummarOutputManager implements ISummarOutputManager {
       copy: copyButton,
       spacer: rightSpacer,
       menu: showMenuButton,
-    }, { icon });
+    }, this.context, { icon });
   }
 
   private createOutputText(key: string): HTMLDivElement {
@@ -1081,6 +1081,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     button.className = 'lucide-icon-button';
     button.setAttribute('button-id', 'show-menu-button');
     button.setAttribute('aria-label', 'Show menu');
+    button.setAttribute('data-key', key); // key 정보 저장
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
     button.style.margin = '0';

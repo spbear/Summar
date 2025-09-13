@@ -1,7 +1,7 @@
-import { ISummarStickyHeaderManager, ISummarViewContext } from "./SummarViewTypes";
+import { ISummarStickyHeaderManager, ISummarViewContext, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { setIcon } from "obsidian";
-import { composeStandardOutputHeader, getDefaultLabelIcon } from "./OutputHeaderComposer";
+import { composeStandardOutputHeader, getDefaultLabelIcon, HeaderButtonsSet } from "./OutputHeaderComposer";
 import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 
 export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
@@ -507,7 +507,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       copy: copyButton,
       spacer: rightSpacer,
       menu: showMenuButton,
-    }, { icon });
+    }, this.context, { icon });
 
     return header;
   }
@@ -519,6 +519,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     button.className = 'lucide-icon-button';
     button.setAttribute('button-id', buttonId);
     button.setAttribute('aria-label', ariaLabel);
+    button.setAttribute('data-key', key); // key 정보 저장
     button.style.transform = 'scale(0.7)';
     button.style.transformOrigin = 'center';
     button.style.margin = '0';
@@ -645,14 +646,38 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private handleStickyMenuClick(key: string, event: MouseEvent): void {
     const button = event.target as HTMLButtonElement;
     
-    const menuItems = SummarMenuUtils.createStandardMenuItems(key, this.context, true);
+    // 새로운 responsive 메뉴 시스템 사용
+    // sticky header의 hidden buttons 상태 가져오기
+    const hiddenButtons = (this.context as any).hiddenButtonsState?.stickyHeader || {
+      copy: false,
+      reply: false, 
+      newNote: false,
+      uploadSlack: false,
+      uploadWiki: false
+    };
+    
+    // sticky header의 버튼들 가져오기
+    const stickyHeaderEl = this.getStickyHeaderElement(key);
+    if (!stickyHeaderEl) {
+      SummarDebug.log(1, `No sticky header found for key: ${key}`);
+      return;
+    }
+    
+    const buttons = {
+      copy: stickyHeaderEl.querySelector('[button-id="copy-output-button"]') as HTMLButtonElement,
+      reply: stickyHeaderEl.querySelector('[button-id="reply-output-button"]') as HTMLButtonElement,
+      newNote: stickyHeaderEl.querySelector('[button-id="new-note-button"]') as HTMLButtonElement,
+      uploadSlack: stickyHeaderEl.querySelector('[button-id="upload-output-to-slack-button"]') as HTMLButtonElement,
+      uploadWiki: stickyHeaderEl.querySelector('[button-id="upload-output-to-wiki-button"]') as HTMLButtonElement,
+      toggle: stickyHeaderEl.querySelector('[button-id="toggle-fold-button"]') as HTMLButtonElement,
+      spacer: stickyHeaderEl.querySelector('.spacer') as HTMLDivElement,
+      menu: button
+    };
+    
+    // OutputHeaderComposer의 메뉴 함수 사용
+    this.showStickyHeaderHiddenButtonsMenu(button, buttons, hiddenButtons, this.context, key);
 
-    SummarMenuUtils.showPopupMenu(button, menuItems, {
-      zIndex: 10001, // sticky header보다 위에 표시
-      context: this.context
-    });
-
-    SummarDebug.log(1, `Sticky menu opened for key: ${key}`);
+    SummarDebug.log(1, `Sticky responsive menu opened for key: ${key}`);
   }
 
   private handleStickyReply(key: string): void {
@@ -749,5 +774,168 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
         SummarDebug.log(1, `Found ${allStickyHeaders.length} sticky headers in total`);
       }
     }
+  }
+
+  private getStickyHeaderElement(key: string): HTMLElement | null {
+    if (!this.stickyHeaderContainer) {
+      return null;
+    }
+    
+    const stickyHeaderEl = this.stickyHeaderContainer.querySelector(`.sticky-header[data-key="${key}"]`) as HTMLElement;
+    return stickyHeaderEl;
+  }
+
+  private showStickyHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState, context: ISummarViewContext, key: string): void {
+    // 기존 드롭다운 제거
+    const existingDropdown = document.querySelector('.output-header-hidden-menu');
+    if (existingDropdown) {
+      existingDropdown.remove();
+    }
+
+    // 숨겨진 버튼들의 메뉴 아이템 생성
+    const hiddenButtonMenuItems = this.getHiddenButtonMenuItems(buttons, hiddenButtons);
+    
+    // 표준 메뉴 아이템들 가져오기 (Delete Output 등)
+    const standardMenuItems = SummarMenuUtils.createStandardMenuItems(key, context, true);
+    
+    // 모든 메뉴 아이템 합치기 (숨겨진 버튼들 + 표준 메뉴들)
+    const allMenuItems = [
+      ...hiddenButtonMenuItems.map(item => ({ 
+        label: item.tooltip, 
+        action: item.action 
+      })),
+      ...standardMenuItems
+    ];
+
+    if (allMenuItems.length === 0) {
+      return;
+    }
+
+    // 드롭다운 메뉴 생성
+    const dropdown = document.createElement('div');
+    dropdown.className = 'output-header-hidden-menu';
+    dropdown.style.cssText = `
+      position: fixed;
+      background: var(--background-primary);
+      border: 1px solid var(--background-modifier-border);
+      border-radius: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10001;
+      min-width: 160px;
+      max-width: 250px;
+      padding: 4px;
+    `;
+
+    // 메뉴 아이템들 추가
+    allMenuItems.forEach((item, index) => {
+      const menuItem = document.createElement('div');
+      menuItem.className = 'menu-item';
+      menuItem.textContent = item.label;
+      menuItem.style.cssText = `
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 3px;
+        color: var(--text-normal);
+        font-size: var(--font-ui-small);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      `;
+      
+      menuItem.addEventListener('mouseenter', () => {
+        menuItem.style.backgroundColor = 'var(--background-modifier-hover)';
+      });
+      
+      menuItem.addEventListener('mouseleave', () => {
+        menuItem.style.backgroundColor = '';
+      });
+      
+      menuItem.addEventListener('click', () => {
+        item.action();
+        dropdown.remove();
+      });
+      
+      dropdown.appendChild(menuItem);
+    });
+
+    // 메뉴 위치 계산 및 설정
+    const rect = menuButton.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    let left = rect.left;
+    let top = rect.bottom + 5;
+    
+    // 우측 경계 체크
+    const menuWidth = 200; // 예상 메뉴 너비
+    if (left + menuWidth > viewportWidth) {
+      left = rect.right - menuWidth;
+    }
+    
+    // 하단 경계 체크
+    const menuHeight = allMenuItems.length * 40; // 예상 메뉴 높이
+    if (top + menuHeight > viewportHeight) {
+      top = rect.top - menuHeight - 5;
+    }
+    
+    dropdown.style.left = `${Math.max(5, left)}px`;
+    dropdown.style.top = `${Math.max(5, top)}px`;
+
+    // document.body에 추가하여 z-index 문제 해결
+    document.body.appendChild(dropdown);
+
+    // 외부 클릭 시 메뉴 닫기
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!dropdown.contains(e.target as Node) && !menuButton.contains(e.target as Node)) {
+        dropdown.remove();
+        document.removeEventListener('click', handleOutsideClick);
+      }
+    };
+    
+    // 다음 틱에 이벤트 리스너 추가 (현재 클릭 이벤트와 충돌 방지)
+    setTimeout(() => {
+      document.addEventListener('click', handleOutsideClick);
+    }, 0);
+  }
+
+  private getHiddenButtonMenuItems(buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState): Array<{tooltip: string, action: () => void}> {
+    const items: Array<{tooltip: string, action: () => void}> = [];
+    
+    if (hiddenButtons.copy && buttons.copy) {
+      items.push({
+        tooltip: 'Copy',
+        action: () => buttons.copy?.click()
+      });
+    }
+    
+    if (hiddenButtons.reply && buttons.reply) {
+      items.push({
+        tooltip: 'Reply',
+        action: () => buttons.reply?.click()
+      });
+    }
+    
+    if (hiddenButtons.newNote && buttons.newNote) {
+      items.push({
+        tooltip: 'New Note',
+        action: () => buttons.newNote?.click()
+      });
+    }
+    
+    if (hiddenButtons.uploadSlack && buttons.uploadSlack) {
+      items.push({
+        tooltip: 'Upload to Slack',
+        action: () => buttons.uploadSlack?.click()
+      });
+    }
+    
+    if (hiddenButtons.uploadWiki && buttons.uploadWiki) {
+      items.push({
+        tooltip: 'Upload to Wiki',
+        action: () => buttons.uploadWiki?.click()
+      });
+    }
+    
+    return items;
   }
 }

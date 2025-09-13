@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
-import { ISummarViewContext } from './SummarViewTypes';
+import { ISummarViewContext, OutputHeaderHiddenButtonsState } from './SummarViewTypes';
+import { SummarMenuUtils } from './SummarMenuUtils';
 
 export type HeaderButtonsSet = {
   uploadWiki: HTMLElement;
@@ -179,7 +180,7 @@ function getAvailableModels(plugin?: any): string[] {
 }
 
 // Build a standardized output header: label + buttons in fixed order.
-export function composeStandardOutputHeader(label: string, buttons: HeaderButtonsSet, options?: LabelOptions): HTMLDivElement {
+export function composeStandardOutputHeader(label: string, buttons: HeaderButtonsSet, context?: ISummarViewContext, options?: LabelOptions): HTMLDivElement {
   const outputHeader = document.createElement('div');
   outputHeader.className = 'output-header';
   outputHeader.style.width = '100%';
@@ -243,6 +244,11 @@ export function composeStandardOutputHeader(label: string, buttons: HeaderButton
   outputHeader.appendChild(buttons.copy);
   outputHeader.appendChild(buttons.spacer);
   outputHeader.appendChild(buttons.menu);
+
+  // 반응형 버튼 숨김 로직 추가 (context가 제공된 경우에만)
+  if (context) {
+    setupOutputHeaderResponsiveButtons(outputHeader, buttons, context);
+  }
 
   return outputHeader;
 }
@@ -413,4 +419,278 @@ export function setStandardComposerHeader(label: string, buttons: ComposerHeader
   composerHeader.setAttribute('data-label', label);
 
   return composerHeader;
+}
+
+// OutputHeader 반응형 버튼 숨김 시스템 설정
+function setupOutputHeaderResponsiveButtons(outputHeader: HTMLElement, buttons: HeaderButtonsSet, context: ISummarViewContext): void {
+  // 버튼 가시성 상태 초기화
+  const hiddenButtons: OutputHeaderHiddenButtonsState = {
+    copy: false,
+    reply: false,
+    newNote: false,
+    uploadSlack: false,
+    uploadWiki: false
+  };
+
+  // 너비 임계값 설정 (실제 테스트 기반으로 조정된 값)
+  // 더 보수적으로 설정하여 버튼이 겹치지 않도록 함
+  const buttonVisibilityThresholds = {
+    copy: 320,      // 첫 번째로 숨김 (Copy 버튼)
+    reply: 280,     // 두 번째로 숨김 (Reply 버튼)
+    newNote: 240,   // 세 번째로 숨김 (New Note 버튼)
+    uploadSlack: 200, // 네 번째로 숨김 (Upload Slack 버튼)
+    uploadWiki: 160   // 마지막으로 숨김 (Upload Wiki 버튼)
+  };
+
+  // 버튼 가시성 업데이트 함수
+  const updateButtonVisibility = (width: number) => {
+    let changed = false;
+
+    // 숨김 순서: copy → reply → newNote → uploadSlack → uploadWiki
+    const newCopyHidden = width <= buttonVisibilityThresholds.copy;
+    const newReplyHidden = width <= buttonVisibilityThresholds.reply;
+    const newNewNoteHidden = width <= buttonVisibilityThresholds.newNote;
+    const newUploadSlackHidden = width <= buttonVisibilityThresholds.uploadSlack;
+    const newUploadWikiHidden = width <= buttonVisibilityThresholds.uploadWiki;
+
+    if (hiddenButtons.copy !== newCopyHidden) {
+      hiddenButtons.copy = newCopyHidden;
+      buttons.copy.style.display = newCopyHidden ? 'none' : 'block';
+      changed = true;
+    }
+
+    if (hiddenButtons.reply !== newReplyHidden) {
+      hiddenButtons.reply = newReplyHidden;
+      buttons.reply.style.display = newReplyHidden ? 'none' : 'block';
+      changed = true;
+    }
+
+    if (hiddenButtons.newNote !== newNewNoteHidden) {
+      hiddenButtons.newNote = newNewNoteHidden;
+      buttons.newNote.style.display = newNewNoteHidden ? 'none' : 'block';
+      changed = true;
+    }
+
+    if (hiddenButtons.uploadSlack !== newUploadSlackHidden) {
+      hiddenButtons.uploadSlack = newUploadSlackHidden;
+      buttons.uploadSlack.style.display = newUploadSlackHidden ? 'none' : 'block';
+      changed = true;
+    }
+
+    if (hiddenButtons.uploadWiki !== newUploadWikiHidden) {
+      hiddenButtons.uploadWiki = newUploadWikiHidden;
+      buttons.uploadWiki.style.display = newUploadWikiHidden ? 'none' : 'block';
+      changed = true;
+    }
+
+    // 변경사항이 있으면 이벤트 콜백 호출
+    if (changed && context.onOutputHeaderButtonVisibilityChanged) {
+      context.onOutputHeaderButtonVisibilityChanged(hiddenButtons);
+    }
+  };
+
+  // ResizeObserver 설정
+  const resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const width = entry.contentRect.width;
+      updateButtonVisibility(width);
+    }
+  });
+
+  // 관찰 시작
+  resizeObserver.observe(outputHeader);
+
+  // 정리 함수를 AbortController에 연결
+  context.abortController.signal.addEventListener('abort', () => {
+    resizeObserver.disconnect();
+  });
+
+  // menu 버튼에 클릭 이벤트 추가 (숨겨진 버튼 메뉴 표시)
+  setupOutputHeaderMenuButton(buttons.menu, buttons, hiddenButtons, context);
+
+  // 초기 크기 체크
+  const initialWidth = outputHeader.clientWidth;
+  if (initialWidth > 0) {
+    updateButtonVisibility(initialWidth);
+  }
+}
+
+// OutputHeader 메뉴 버튼 설정
+function setupOutputHeaderMenuButton(menuButton: HTMLElement, buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState, context: ISummarViewContext): void {
+  menuButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const key = menuButton.getAttribute('data-key') || '';
+    showOutputHeaderHiddenButtonsMenu(menuButton, buttons, hiddenButtons, context, key);
+  }, { signal: context.abortController.signal });
+}
+
+// 숨겨진 버튼들의 메뉴 표시
+function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState, context: ISummarViewContext, key: string): void {
+  // 기존 드롭다운 제거
+  const existingDropdown = document.querySelector('.output-header-hidden-menu');
+  if (existingDropdown) {
+    existingDropdown.remove();
+    return;
+  }
+
+  // 숨겨진 버튼들의 메뉴 아이템 생성
+  const hiddenButtonMenuItems = getOutputHeaderHiddenButtonMenuItems(buttons, hiddenButtons);
+  
+  // 표준 메뉴 아이템들 가져오기 (Delete Output 등)
+  const standardMenuItems = SummarMenuUtils.createStandardMenuItems(key, context);
+  
+  // 통합 메뉴 아이템 배열 생성
+  const allMenuItems = [
+    ...hiddenButtonMenuItems.map(item => ({
+      label: item.tooltip,
+      action: item.action,
+      isHiddenButton: true
+    })),
+    ...standardMenuItems.map(item => ({
+      label: item.label,
+      action: item.action,
+      isHiddenButton: false
+    }))
+  ];
+  
+  if (allMenuItems.length === 0) {
+    return; // 메뉴 아이템이 없으면 메뉴를 표시하지 않음
+  }
+
+  // 드롭다운 메뉴 생성
+  const dropdown = document.createElement('div');
+  dropdown.classList.add('output-header-hidden-menu');
+  dropdown.style.position = 'fixed'; // fixed positioning like existing menus
+  dropdown.style.backgroundColor = 'var(--background-primary)';
+  dropdown.style.border = '1px solid var(--background-modifier-border)';
+  dropdown.style.borderRadius = '6px';
+  dropdown.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
+  dropdown.style.zIndex = '10001'; // StickyHeader보다 위에 표시
+  dropdown.style.minWidth = '150px';
+  dropdown.style.maxHeight = '200px';
+  dropdown.style.overflowY = 'auto';
+  dropdown.style.padding = '4px';
+
+  // 메뉴 버튼의 위치를 기준으로 드롭다운 위치 계산
+  const rect = menuButton.getBoundingClientRect();
+  let top = rect.bottom + 5;
+  let left = rect.left;
+  
+  // 화면 경계를 벗어나지 않도록 조정
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const menuWidth = 150; // minWidth와 동일
+  const menuHeight = 200; // maxHeight와 동일
+  
+  // 오른쪽 경계 체크
+  if (left + menuWidth > viewportWidth) {
+    left = viewportWidth - menuWidth - 10;
+  }
+  
+  // 하단 경계 체크
+  if (top + menuHeight > viewportHeight) {
+    top = rect.top - menuHeight - 5; // 버튼 위쪽에 표시
+  }
+  
+  dropdown.style.top = `${top}px`;
+  dropdown.style.left = `${left}px`;
+
+  // 메뉴 아이템들 추가
+  allMenuItems.forEach((item, index) => {
+    const menuItem = document.createElement('div');
+    menuItem.style.padding = '6px 8px';
+    menuItem.style.cursor = 'pointer';
+    menuItem.style.borderRadius = '3px';
+    menuItem.style.fontSize = 'var(--font-ui-small)'; // 기존 메뉴와 동일한 CSS 변수 사용
+    menuItem.style.color = 'var(--text-normal)';
+    menuItem.style.transition = 'background-color 0.1s ease';
+    menuItem.style.display = 'flex';
+    menuItem.style.alignItems = 'center';
+    menuItem.style.gap = '6px';
+    menuItem.textContent = item.label;
+    
+    menuItem.addEventListener('mouseenter', () => {
+      menuItem.style.backgroundColor = 'var(--background-modifier-hover)';
+    });
+    
+    menuItem.addEventListener('mouseleave', () => {
+      menuItem.style.backgroundColor = 'transparent';
+    });
+    
+    menuItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      item.action();
+      dropdown.remove();
+    });
+    
+    dropdown.appendChild(menuItem);
+    
+    // 숨겨진 버튼과 표준 메뉴 사이에 구분선 추가
+    if (index === hiddenButtonMenuItems.length - 1 && standardMenuItems.length > 0) {
+      const separator = document.createElement('div');
+      separator.style.height = '1px';
+      separator.style.backgroundColor = 'var(--background-modifier-border)';
+      separator.style.margin = '4px 0';
+      dropdown.appendChild(separator);
+    }
+  });
+
+  // 메뉴를 document.body에 추가 (기존 메뉴 시스템과 동일)
+  document.body.appendChild(dropdown);
+
+  // 외부 클릭 시 드롭다운 닫기
+  const closeDropdown = (e: Event) => {
+    if (!dropdown.contains(e.target as Node) && !menuButton.contains(e.target as Node)) {
+      dropdown.remove();
+      document.removeEventListener('click', closeDropdown);
+    }
+  };
+  
+  // 지연 후 이벤트 리스너 추가 (즉시 닫힘 방지)
+  setTimeout(() => {
+    document.addEventListener('click', closeDropdown);
+  }, 0);
+}
+
+// 숨겨진 버튼들의 메뉴 아이템 생성
+function getOutputHeaderHiddenButtonMenuItems(buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState): Array<{tooltip: string, action: () => void}> {
+  const menuItems: Array<{tooltip: string, action: () => void}> = [];
+
+  // 숨겨진 버튼들만 메뉴에 추가 (표시 순서: uploadWiki → uploadSlack → newNote → reply → copy)
+  if (hiddenButtons.uploadWiki) {
+    menuItems.push({
+      tooltip: buttons.uploadWiki.getAttribute('aria-label') || 'Upload to Wiki',
+      action: () => buttons.uploadWiki.click()
+    });
+  }
+
+  if (hiddenButtons.uploadSlack) {
+    menuItems.push({
+      tooltip: buttons.uploadSlack.getAttribute('aria-label') || 'Upload to Slack',
+      action: () => buttons.uploadSlack.click()
+    });
+  }
+
+  if (hiddenButtons.newNote) {
+    menuItems.push({
+      tooltip: buttons.newNote.getAttribute('aria-label') || 'Create New Note',
+      action: () => buttons.newNote.click()
+    });
+  }
+
+  if (hiddenButtons.reply) {
+    menuItems.push({
+      tooltip: buttons.reply.getAttribute('aria-label') || 'Reply',
+      action: () => buttons.reply.click()
+    });
+  }
+
+  if (hiddenButtons.copy) {
+    menuItems.push({
+      tooltip: buttons.copy.getAttribute('aria-label') || 'Copy',
+      action: () => buttons.copy.click()
+    });
+  }
+
+  return menuItems;
 }
