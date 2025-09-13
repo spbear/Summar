@@ -425,21 +425,21 @@ export function setStandardComposerHeader(label: string, buttons: ComposerHeader
 function setupOutputHeaderResponsiveButtons(outputHeader: HTMLElement, buttons: HeaderButtonsSet, context: ISummarViewContext): void {
   // 버튼 가시성 상태 초기화
   const hiddenButtons: OutputHeaderHiddenButtonsState = {
+    uploadSlack: false,
+    uploadWiki: false,
+    newNote: false,
     copy: false,
     reply: false,
-    newNote: false,
-    uploadSlack: false,
-    uploadWiki: false
   };
 
   // 너비 임계값 설정 (실제 테스트 기반으로 조정된 값)
   // 더 보수적으로 설정하여 버튼이 겹치지 않도록 함
   const buttonVisibilityThresholds = {
-    copy: 320,      // 첫 번째로 숨김 (Copy 버튼)
-    reply: 280,     // 두 번째로 숨김 (Reply 버튼)
-    newNote: 240,   // 세 번째로 숨김 (New Note 버튼)
-    uploadSlack: 200, // 네 번째로 숨김 (Upload Slack 버튼)
-    uploadWiki: 160   // 마지막으로 숨김 (Upload Wiki 버튼)
+    uploadSlack: 270,      // 첫 번째로 숨김 (Upload Slack 버튼)
+    uploadWiki: 240,     // 두 번째로 숨김 (Upload Wiki 버튼)
+    newNote: 210,   // 세 번째로 숨김 (New Note 버튼)
+    copy: 180, // 네 번째로 숨김 (Copy 버튼)
+    reply: 150   // 마지막으로 숨김 (Reply 버튼)
   };
 
   // 버튼 가시성 업데이트 함수
