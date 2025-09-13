@@ -1,5 +1,5 @@
 import { Platform, setIcon, addIcon } from "obsidian";
-import { ISummarUIRenderer, ISummarViewContext } from "./SummarViewTypes";
+import { ISummarUIRenderer, ISummarViewContext, HiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
 const PDF_SVG = `
@@ -34,6 +34,21 @@ const PDF_SVG = `
 `;
 
 export class SummarUIRenderer implements ISummarUIRenderer {
+  // 버튼 가시성 상태 관리
+  private hiddenButtons: HiddenButtonsState = {
+    uploadSlack: false,
+    uploadWiki: false
+  };
+
+  // 너비 임계값 설정 (2줄로 가기 전에 미리 버튼 숨김으로 1줄 유지)
+  private readonly buttonVisibilityThresholds = {
+    uploadSlack: 280,  // 첫 번째로 숨김 (더 큰 값)
+    uploadWiki: 245   // 두 번째로 숨김 (더 작은 값)
+  };
+
+  // ResizeObserver 참조
+  private resizeObserver: ResizeObserver | null = null;
+
   constructor(private context: ISummarViewContext) {}
 
   renderUrlInputContainer(container: HTMLElement): HTMLDivElement {
@@ -92,6 +107,12 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       pdfButton,
       webButton,
       recordButton
+    });
+    
+    // ResizeObserver 설정으로 반응형 버튼 가시성 관리
+    this.setupButtonVisibilityObserver(buttonContainer, {
+      uploadWikiButton,
+      uploadSlackButton
     });
     
     return buttonContainer;
@@ -176,7 +197,7 @@ export class SummarUIRenderer implements ISummarUIRenderer {
 
   private setupButtonContainerStyles(buttonContainer: HTMLDivElement): void {
     buttonContainer.style.display = "flex";
-    buttonContainer.style.flexWrap = "wrap";
+    buttonContainer.style.flexWrap = "nowrap";  // 2줄 방지 - 항상 1줄 유지
     buttonContainer.style.alignItems = "center";
     buttonContainer.style.alignContent = "flex-start";
     buttonContainer.style.gap = "5px";
@@ -394,5 +415,119 @@ export class SummarUIRenderer implements ISummarUIRenderer {
     // Save/Test 버튼 이벤트는 SummarEventHandler에서 위임 처리
 
     // 다른 버튼 이벤트들은 SummarEventHandler에서 처리
+  }
+
+  /**
+   * 버튼 컨테이너의 너비 변화를 감지하여 버튼 가시성을 동적으로 관리
+   */
+  private setupButtonVisibilityObserver(
+    buttonContainer: HTMLDivElement,
+    buttons: {
+      uploadWikiButton: HTMLButtonElement;
+      uploadSlackButton: HTMLButtonElement;
+    }
+  ): void {
+    // 디바운스를 위한 타이머
+    let resizeTimeout: NodeJS.Timeout;
+
+    this.resizeObserver = new ResizeObserver((entries) => {
+      // 이전 타이머 제거
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        this.context.timeoutRefs.delete(resizeTimeout);
+      }
+
+      // 디바운스 적용 (50ms 지연)
+      resizeTimeout = setTimeout(() => {
+        for (const entry of entries) {
+          const containerWidth = entry.contentRect.width;
+          this.updateButtonVisibility(containerWidth, buttons);
+        }
+      }, 50);
+
+      this.context.timeoutRefs.add(resizeTimeout);
+    });
+
+    this.resizeObserver.observe(buttonContainer);
+  }
+
+  /**
+   * 컨테이너 너비에 따라 버튼 가시성 업데이트
+   */
+  private updateButtonVisibility(
+    containerWidth: number,
+    buttons: {
+      uploadWikiButton: HTMLButtonElement;
+      uploadSlackButton: HTMLButtonElement;
+    }
+  ): void {
+    const previousState = { ...this.hiddenButtons };
+
+    // uploadSlack 버튼 가시성 (600px 이하에서 숨김)
+    const shouldHideSlack = containerWidth <= this.buttonVisibilityThresholds.uploadSlack;
+    this.hiddenButtons.uploadSlack = shouldHideSlack;
+
+    // uploadWiki 버튼 가시성 (500px 이하에서 숨김)
+    const shouldHideWiki = containerWidth <= this.buttonVisibilityThresholds.uploadWiki;
+    this.hiddenButtons.uploadWiki = shouldHideWiki;
+
+    // 실제 DOM 업데이트
+    this.applyButtonVisibility(buttons);
+
+    // 상태가 변경되었으면 이벤트 발생
+    if (
+      previousState.uploadSlack !== this.hiddenButtons.uploadSlack ||
+      previousState.uploadWiki !== this.hiddenButtons.uploadWiki
+    ) {
+      this.notifyButtonVisibilityChange();
+    }
+  }
+
+  /**
+   * 버튼 가시성을 실제 DOM에 적용
+   */
+  private applyButtonVisibility(buttons: {
+    uploadWikiButton: HTMLButtonElement;
+    uploadSlackButton: HTMLButtonElement;
+  }): void {
+    // uploadSlack 버튼
+    if (this.hiddenButtons.uploadSlack) {
+      buttons.uploadSlackButton.style.display = 'none';
+    } else {
+      buttons.uploadSlackButton.style.display = '';
+    }
+
+    // uploadWiki 버튼
+    if (this.hiddenButtons.uploadWiki) {
+      buttons.uploadWikiButton.style.display = 'none';
+    } else {
+      buttons.uploadWikiButton.style.display = '';
+    }
+  }
+
+  /**
+   * 버튼 가시성 변경 이벤트 발생
+   */
+  private notifyButtonVisibilityChange(): void {
+    if (this.context.onButtonVisibilityChanged) {
+      this.context.onButtonVisibilityChanged({ ...this.hiddenButtons });
+    }
+  }
+
+  /**
+   * 현재 숨겨진 버튼 상태 반환 (외부에서 접근 가능)
+   */
+  getHiddenButtonsState(): HiddenButtonsState {
+    return { ...this.hiddenButtons };
+  }
+
+  /**
+   * 리소스 정리
+   */
+  cleanup(): void {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
   }
 }

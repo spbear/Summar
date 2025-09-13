@@ -3,6 +3,12 @@ import SummarPlugin from "../main";
 import MarkdownIt from "markdown-it";
 import { SummarAIParam, SummarAIParamType } from "../summarai-types";
 
+// 버튼 가시성 상태 타입
+export interface HiddenButtonsState {
+  uploadSlack: boolean;
+  uploadWiki: boolean;
+}
+
 // 공통 인터페이스
 export interface ISummarViewContext {
   plugin: SummarPlugin;
@@ -16,6 +22,9 @@ export interface ISummarViewContext {
   markdownRenderer: MarkdownIt;
   abortController: AbortController;
   timeoutRefs: Set<NodeJS.Timeout>;
+  
+  // 버튼 가시성 변경 이벤트
+  onButtonVisibilityChanged?: (hiddenButtons: HiddenButtonsState) => void;
   
   // 매니저 참조들 (타입 안전성 향상)
   outputManager?: ISummarOutputManager;

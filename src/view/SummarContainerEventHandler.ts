@@ -1,5 +1,5 @@
 import { MarkdownView, normalizePath } from "obsidian";
-import { ISummarEventHandler, ISummarViewContext } from "./SummarViewTypes";
+import { ISummarEventHandler, ISummarViewContext, HiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 
 /**
@@ -7,7 +7,17 @@ import { SummarDebug } from "../globals";
  * UI 상단의 고정 버튼들 (fetch, PDF, record, test, upload) 처리
  */
 export class SummarContainerEventHandler implements ISummarEventHandler {
-  constructor(private context: ISummarViewContext) {}
+  private currentHiddenButtons: HiddenButtonsState = {
+    uploadSlack: false,
+    uploadWiki: false
+  };
+
+  constructor(private context: ISummarViewContext) {
+    // 버튼 가시성 변경 이벤트 리스너 등록
+    this.context.onButtonVisibilityChanged = (hiddenButtons) => {
+      this.currentHiddenButtons = hiddenButtons;
+    };
+  }
 
   setupEventListeners(): void {
     this.setupUIButtonEvents();        // fetch, PDF, record 버튼
@@ -69,7 +79,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     if (testButton) {
       testButton.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.showTestPopupMenu(event);
+        this.showSummarViewPopupMenu(event);
       }, { signal: this.context.abortController.signal });
     }
   }
@@ -135,19 +145,19 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     await this.context.plugin.toggleRecording();
   }
 
-  private showTestPopupMenu(event: MouseEvent): void {
+  private showSummarViewPopupMenu(event: MouseEvent): void {
     const button = event.target as HTMLButtonElement;
     const rect = button.getBoundingClientRect();
     
     // 기존 팝업 메뉴가 있다면 제거
-    const existingMenu = document.querySelector('.test-popup-menu');
+    const existingMenu = document.querySelector('.summarview-popup-menu');
     if (existingMenu) {
       existingMenu.remove();
     }
 
     // 팝업 메뉴 생성
     const menu = document.createElement('div');
-    menu.className = 'test-popup-menu';
+    menu.className = 'summarview-popup-menu';
     menu.style.cssText = `
       position: fixed;
       top: ${rect.bottom + 5}px;
@@ -161,17 +171,23 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
       padding: 4px;
     `;
 
-    // 메뉴 아이템들 생성
-    const menuItems = [
+    // 숨겨진 버튼들의 메뉴 아이템 생성
+    const hiddenButtonItems = this.getHiddenButtonMenuItems();
+    
+    // 기존 메뉴 아이템들
+    const defaultMenuItems = [
       { label: 'New prompt', action: () => this.handleComposer() },
       { label: 'Load conversation', action: () => this.handleLoadAllOutputs() },
       { label: 'Save all conversations', action: () => this.handleSaveAllOutputs() },
       { label: 'Clear all conversations', action: () => this.handleDeleteAllOutputs() }
     ];
 
-    menuItems.forEach(item => {
+    // 숨겨진 버튼 메뉴들을 맨 앞에 추가
+    const allMenuItems = [...hiddenButtonItems, ...defaultMenuItems];
+
+    allMenuItems.forEach((item, index) => {
       const menuItem = document.createElement('div');
-      menuItem.className = 'test-menu-item';
+      menuItem.className = 'summarview-menu-item';
       menuItem.textContent = item.label;
       menuItem.style.cssText = `
         padding: 8px 12px;
@@ -180,6 +196,13 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
         color: var(--text-normal);
         font-size: var(--font-ui-small);
       `;
+      
+      // 숨겨진 버튼 메뉴들은 다른 스타일 적용
+      if (index < hiddenButtonItems.length) {
+        // menuItem.style.fontWeight = 'bold';
+        menuItem.style.marginBottom = '4px';
+        // menuItem.style.borderBottom = '1px solid var(--background-modifier-border)';
+      }
       
       menuItem.addEventListener('mouseenter', () => {
         menuItem.style.backgroundColor = 'var(--background-modifier-hover)';
@@ -458,6 +481,96 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     const uploadManager = (this.context as any).uploadManager;
     if (uploadManager) {
       await uploadManager.uploadContentToSlack(title, content);
+    }
+  }
+
+  /**
+   * 숨겨진 버튼들을 위한 메뉴 아이템 생성
+   */
+  private getHiddenButtonMenuItems(): Array<{ label: string; action: () => void }> {
+    const items: Array<{ label: string; action: () => void }> = [];
+
+    // uploadWiki 버튼이 숨겨져 있으면 메뉴에 추가 (우선순위 높음)
+    if (this.currentHiddenButtons.uploadWiki) {
+      items.push({
+        label: 'Upload Note to Confluence',
+        action: () => this.executeUploadWikiAction()
+      });
+    }
+
+    // uploadSlack 버튼이 숨겨져 있으면 메뉴에 추가
+    if (this.currentHiddenButtons.uploadSlack) {
+      items.push({
+        label: this.getSlackButtonTooltip(),
+        action: () => this.executeUploadSlackAction()
+      });
+    }
+
+    return items;
+  }
+
+  /**
+   * Slack 버튼의 tooltip 텍스트 동적 생성
+   */
+  private getSlackButtonTooltip(): string {
+    const channelId = this.context.plugin.settingsv2.common.slackChannelId || "Not set";
+    let channelInfo = " (No Channel)";
+    
+    if (channelId !== "Not set") {
+      if (channelId.includes("#")) {
+        channelInfo = ` (Channel: ${channelId})`;
+      } else if (channelId.includes("@")) {
+        channelInfo = ` (DM: ${channelId})`;
+      } else {
+        channelInfo = ` (Channel: ${channelId})`;
+      }
+    }
+    
+    if (this.context.plugin.SLACK_UPLOAD_TO_CANVAS) {
+      return `Create Slack Canvas${channelInfo}`;
+    } else {
+      return `Send Slack Message${channelInfo}`;
+    }
+  }
+
+  /**
+   * Wiki 업로드 액션 실행 (기존 버튼 클릭과 동일한 로직)
+   */
+  private async executeUploadWikiAction(): Promise<void> {
+    const viewType = this.getCurrentMainPaneTabType();
+    if (viewType === "markdown") {
+      const file = this.context.plugin.app.workspace.getActiveFile();
+      if (file) {
+        let title = file.basename;
+        const content = await this.context.plugin.app.vault.read(file);
+        await this.uploadContentToWiki(title, content);
+      } else {
+        SummarDebug.Notice(0, "No active editor was found.");
+      }
+    } else {
+      this.showUploadFailedMessage("Wiki Upload Failed", "No active editor was found.");
+    }
+  }
+
+  /**
+   * Slack 업로드 액션 실행 (기존 버튼 클릭과 동일한 로직)
+   */
+  private async executeUploadSlackAction(): Promise<void> {
+    const viewType = this.getCurrentMainPaneTabType();
+    if (viewType === "markdown") {
+      const file = this.context.plugin.app.workspace.getActiveFile();
+      if (file) {
+        let title = file.basename;
+        const content = await this.context.plugin.app.vault.read(file);
+        await this.uploadContentToSlack(title, content);
+      } else {
+        SummarDebug.Notice(0, "No active editor was found.");
+      }
+    } else {
+      const messageTitle = this.context.plugin.SLACK_UPLOAD_TO_CANVAS 
+        ? "Slack Canvas Upload Failed" 
+        : "Slack Message Send Failed";
+      this.showUploadFailedMessage(messageTitle, "No active editor was found.");
     }
   }
 }

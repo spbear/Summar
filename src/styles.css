@@ -248,7 +248,7 @@
     margin-right: 5px !important;
     margin-top: 3px !important;
     margin-bottom: 0px !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     align-content: flex-start !important;
 }
 
