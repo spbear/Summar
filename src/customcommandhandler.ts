@@ -39,7 +39,7 @@ export class CustomCommandHandler extends SummarViewContainer {
 		const appendToNote = command.appendToNote;
 		const copyToClipboard = command.copyToClipboard;
 
-		this.initOutputRecord("custom");
+		this.initOutputRecord("custom", false);
 
 		const summarai = new SummarAI(this.plugin, cmdModel as string, 'custom');
 
