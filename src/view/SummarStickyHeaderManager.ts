@@ -150,10 +150,16 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     const outputText = firstVisibleItem.querySelector('.output-text') as HTMLDivElement;
     const isTextExpanded = outputText && outputText.style.display !== 'none';
     
-    // sticky header 표시 조건: 텍스트는 펼쳐져 있지만 헤더는 숨겨진 상태
-    const shouldShowSticky = isTextExpanded && !headerIsVisible;
+    // 스크롤 가능 여부 체크 - outputContainer에 스크롤바가 있는지 확인
+    const hasScrollableContent = this.context.outputContainer.scrollHeight > this.context.outputContainer.clientHeight;
     
-    SummarDebug.log(2, `Key: ${key}, shouldShow: ${shouldShowSticky} (textExpanded: ${isTextExpanded}, headerVisible: ${headerIsVisible})`);
+    // sticky header 표시 조건: 
+    // 1. 텍스트가 펼쳐져 있고
+    // 2. 헤더가 숨겨진 상태이고  
+    // 3. 실제로 스크롤 가능한 콘텐츠가 있어야 함
+    const shouldShowSticky = isTextExpanded && !headerIsVisible && hasScrollableContent;
+    
+    SummarDebug.log(2, `Key: ${key}, shouldShow: ${shouldShowSticky} (textExpanded: ${isTextExpanded}, headerVisible: ${headerIsVisible}, hasScrollableContent: ${hasScrollableContent})`);
     
     if (shouldShowSticky) {
       // 이미 같은 key로 표시중이면 스킵

@@ -48,7 +48,8 @@ export class SummarViewContainer {
       ({ label = "", clearOldItems: shouldClear } = arg);
     }
     this.outputRecord = this.createOutputRecord(label);
-    const doClear = typeof shouldClear === "boolean" ? shouldClear : (this.plugin.settingsv2.system.debugLevel < 3);
+    // const doClear = typeof shouldClear === "boolean" ? shouldClear : (this.plugin.settingsv2.system.debugLevel < 3);
+    const doClear = typeof shouldClear === "boolean" ? shouldClear : true;
     if (doClear) this.clearAllOutputItems();
   }
 

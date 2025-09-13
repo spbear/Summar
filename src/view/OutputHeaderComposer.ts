@@ -623,13 +623,11 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
       iconHolder.style.width = '14px';
       iconHolder.style.height = '14px';
       iconHolder.style.flexShrink = '0';
-      setIcon(iconHolder, item.icon);
+      SummarMenuUtils.setMenuItemIcon(iconHolder, item.icon);
       
-      // SVG 크기 조정
+      // 추가 스타일 조정
       const svg = iconHolder.querySelector('svg') as SVGElement | null;
       if (svg) {
-        svg.style.width = '14px';
-        svg.style.height = '14px';
         svg.style.strokeWidth = '2px';
       }
       

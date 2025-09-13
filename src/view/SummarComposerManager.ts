@@ -471,21 +471,6 @@ export class SummarComposerManager implements ISummarComposerManager {
     if (this.targetKey && this.context.outputManager) {
       const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
 
-      // const result = this.context.outputManager.addConversation(this.targetKey, 'assistant', `#### reply\n${message}`);
-      // this.context.outputManager.updateConversation(this.targetKey, result.addedIndex, `##### reply(2) \n${message}`);
-
-      // ~~1. setup에 conversation model 입력하는 UI 작성~~
-      // ~~2. conversations 내용 정리하는 함수 작성~~
-      // ~~- type이 output인 것을 제외하고 새로운 것 이전 user/assistant 15개까지만 남겨둔다~~
-      // ~~- gemini api의 경우 conversations에서 role이 assistant인 경우 model로 변경한다.~~
-      
-      // ~~3. addConversation을 할 때 final 여부를 전달하고, final일때는 conversations에도 추가한다~~
-      // ~~4. updateConversation을 할 때 final 여부를 전달하고 final일 때는 conversations에도 추가한다.~~
-      // ~~- summarai.complete()를 call하고 바로 updateConversation()을 false로 call하고 timer를 돌려서 진행중임을 표시하고 응답을 받으면 final을 true로 한다.~~
-
-      // 5. key가 존재하지 않을 경우에는 updateOutputText()를 호출하고, 그 key에 reply하도록 한다.
-
-      // const summarai = new SummarAI(this.context.plugin, `gpt-5-mini`, 'web');
       // Get selected model from modelchip
       const selectedModel = this.getSelectedModel();
       const summarai = new SummarAI(this.context.plugin, selectedModel, 'conversation');

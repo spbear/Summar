@@ -1,5 +1,6 @@
 import { ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
+import { setIcon } from "obsidian";
 
 export interface MenuItemConfig {
   label: string;
@@ -232,5 +233,30 @@ export class SummarMenuUtils {
         icon: 'trash-2'
       }
     ];
+  }
+
+  /**
+   * 메뉴 구분선을 생성합니다
+   * @param menuElement 구분선을 추가할 메뉴 요소
+   * @returns 생성된 구분선 요소
+   */
+  static createMenuSeparator(menuElement: HTMLElement): HTMLElement {
+    const separator = menuElement.createDiv();
+    separator.addClass('summar-menu-separator');
+    return separator;
+  }
+
+  /**
+   * 메뉴 아이템에 아이콘을 설정하고 크기를 조정합니다
+   * @param iconHolder 아이콘을 표시할 요소
+   * @param iconName 설정할 아이콘 이름
+   */
+  static setMenuItemIcon(iconHolder: HTMLElement, iconName: string): void {
+    setIcon(iconHolder, iconName);
+    const svg = iconHolder.querySelector('svg');
+    if (svg) {
+      svg.style.width = '14px';
+      svg.style.height = '14px';
+    }
   }
 }

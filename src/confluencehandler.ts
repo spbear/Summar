@@ -22,7 +22,7 @@ export class ConfluenceHandler extends SummarViewContainer {
 		const useConfluenceAPI = this.plugin.settingsv2.common.useConfluenceAPI;
 		const webPrompt = this.plugin.settingsv2.web.webPrompt;
 
-		this.initOutputRecord("web");
+		this.initOutputRecord("web", false);
 
 		const summarai = new SummarAI(this.plugin, this.plugin.settingsv2.web.webModel, 'web');
 		if (!summarai.hasKey(true, this.outputRecord.key, this.outputRecord.label as string)) return;			

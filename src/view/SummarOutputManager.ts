@@ -274,13 +274,13 @@ export class SummarOutputManager implements ISummarOutputManager {
     conversationDiv.style.width = '100%';
     conversationDiv.style.minHeight = '10px';
     conversationDiv.style.border = '1px solid var(--background-modifier-border)';
-    conversationDiv.style.padding = '0px 8px'; // 상하 패딩을 4px로 줄임 (기존 8px의 절반)
+    conversationDiv.style.padding = '0px 8px'; // 상하 패딩을 0px로 최소화
     conversationDiv.style.marginBottom = '0px'; // 간격 제거
     conversationDiv.style.wordWrap = 'break-word';
     conversationDiv.style.whiteSpace = 'pre-wrap';
     conversationDiv.style.color = 'var(--text-normal)';
     conversationDiv.style.fontSize = '12px';
-    conversationDiv.style.lineHeight = '1.4';
+    conversationDiv.style.lineHeight = '1.4'; // 라인 간격을 1.4에서 1.2로 줄임
     conversationDiv.style.userSelect = 'text';
     conversationDiv.style.cursor = 'text';
     conversationDiv.style.wordBreak = 'break-word';
@@ -336,6 +336,8 @@ export class SummarOutputManager implements ISummarOutputManager {
    * { "outputItems": [ { result, prompts, statId, key, label, noteName }, ... ] }
    */
   async importOutputItemsFromPluginDir(filename: string = "summar-conversations.json"): Promise<number> {
+    // this.cleanupOldConversationFiles();
+
     let importedCount = 0;
     try {
       const plugin = this.context.plugin;
@@ -525,6 +527,8 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   clearAllOutputItems(): void {
+    // this.saveOutputItemsToPluginDir();
+
     // 이벤트를 통해 각 outputItem 제거 알림
     this.context.outputRecords.forEach((rec, key) => {
       this.events.onOutputItemRemoved?.(key);
@@ -624,10 +628,92 @@ export class SummarOutputManager implements ISummarOutputManager {
 
 
   /**
+   * Clean up old conversation files from the conversations directory.
+   * Deletes files older than the specified number of minutes based on their filename timestamps.
+   * @param minutes Number of minutes - files older than this will be deleted
+   * @returns Object containing deletion count and any errors encountered
+   */
+  async cleanupOldConversationFiles(minutes: number = 5): Promise<{ deletedCount: number, errors: string[] }> {
+
+
+
+    const errors: string[] = [];
+    let deletedCount = 0;
+    
+    try {
+      const conversationsDir = normalizePath(`${this.context.plugin.PLUGIN_DIR}/conversations`);
+      
+      // Check if conversations directory exists
+      const dirExists = await this.context.plugin.app.vault.adapter.exists(conversationsDir);
+      if (!dirExists) {
+        return { deletedCount: 0, errors: ['Conversations directory does not exist'] };
+      }
+
+      // Get list of files in conversations directory
+      const files = await this.context.plugin.app.vault.adapter.list(conversationsDir);
+      const conversationFiles = files.files.filter(f => 
+        f.startsWith('summar-conversations-') && f.endsWith('.json')
+      );
+
+      if (conversationFiles.length === 0) {
+        return { deletedCount: 0, errors: [] };
+      }
+
+      // Calculate cutoff time (current time - minutes)
+      const cutoffTime = new Date(Date.now() - (minutes * 60 * 1000));
+      
+      // Process each file
+      for (const fileName of conversationFiles) {
+        try {
+          // Extract timestamp from filename: summar-conversations-YYYYMMDD-HHMMSS.json
+          const timestampMatch = fileName.match(/summar-conversations-(\d{8})-(\d{6})\.json$/);
+          if (!timestampMatch) {
+            continue; // Skip files that don't match expected format
+          }
+
+          const [, dateStr, timeStr] = timestampMatch;
+          
+          // Parse date and time: YYYYMMDD-HHMMSS
+          const year = parseInt(dateStr.substring(0, 4));
+          const month = parseInt(dateStr.substring(4, 6)) - 1; // Month is 0-indexed
+          const day = parseInt(dateStr.substring(6, 8));
+          const hour = parseInt(timeStr.substring(0, 2));
+          const minute = parseInt(timeStr.substring(2, 4));
+          const second = parseInt(timeStr.substring(4, 6));
+
+          const fileTime = new Date(year, month, day, hour, minute, second);
+          
+          // Check if file is older than cutoff time
+          if (fileTime < cutoffTime) {
+            const filePath = normalizePath(`${conversationsDir}/${fileName}`);
+            await this.context.plugin.app.vault.adapter.remove(filePath);
+            deletedCount++;
+            // SummarDebug.log(1, `Deleted old conversation file: ${fileName} (${fileTime.toISOString()})`);
+          }
+        } catch (fileError) {
+          const errorMsg = `Failed to process file ${fileName}: ${fileError instanceof Error ? fileError.message : String(fileError)}`;
+          errors.push(errorMsg);
+          // SummarDebug.error(1, errorMsg);
+        }
+      }
+
+    } catch (error) {
+      const errorMsg = `Failed to cleanup conversation files: ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(errorMsg);
+      // SummarDebug.error(1, errorMsg);
+    }
+
+    // SummarDebug.log(1, `Cleanup completed: ${deletedCount} files deleted, ${errors.length} errors`);
+    return { deletedCount, errors };
+  }
+
+  /**
    * Serialize current result records into a JSON payload and write to plugin directory.
    * Returns the written file path.
    */
   async saveOutputItemsToPluginDir(): Promise<string> {
+    // this.cleanupOldConversationFiles();
+
     const outputItems: any[] = [];
     this.context.outputRecords.forEach((rec) => {
       outputItems.push({

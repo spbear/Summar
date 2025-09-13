@@ -1,6 +1,12 @@
 import { MarkdownView, normalizePath, setIcon } from "obsidian";
 import { ISummarEventHandler, ISummarViewContext, HiddenButtonsState, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
+import { SummarMenuUtils } from "./SummarMenuUtils";
+
+interface FileInfo {
+  displayName: string;  // 표시용: "2024-12-13 14:30:22"
+  originalName: string; // 원본: "summar-conversations-20241213-143022.json"
+}
 
 /**
  * Container 레벨 이벤트 핸들러
@@ -40,6 +46,29 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
   cleanup(): void {
     // AbortController가 이미 모든 이벤트 리스너를 정리하므로 추가 작업 없음
+  }
+
+  /**
+   * 파일명을 사용자 친화적인 날짜 형식으로 변환
+   * "summar-conversations-20241213-143022.json" → "2024-12-13 14:30:22"
+   */
+  private formatDisplayName(filename: string): string {
+    // 'summar-conversations-'와 '.json' 제거
+    const rawName = filename
+      .replace(/^summar-conversations-/, '')
+      .replace(/\.json$/, '');
+    
+    // 날짜 시간 패턴 매칭: YYYYMMDD-HHMMSS
+    const match = rawName.match(/^(\d{8})-(\d{6})$/);
+    if (match) {
+      const [, date, time] = match;
+      const formattedDate = `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`;
+      const formattedTime = `${time.slice(0,2)}:${time.slice(2,4)}:${time.slice(4,6)}`;
+      return `${formattedDate} ${formattedTime}`;
+    }
+    
+    // 패턴이 맞지 않으면 그대로 반환
+    return rawName;
   }
 
   private setupUploadEvents(): void {
@@ -227,13 +256,11 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
         iconHolder.style.width = '14px';
         iconHolder.style.height = '14px';
         iconHolder.style.flexShrink = '0';
-        setIcon(iconHolder, item.icon);
+        SummarMenuUtils.setMenuItemIcon(iconHolder, item.icon);
         
-        // SVG 크기 조정
+        // 추가 스타일 조정
         const svg = iconHolder.querySelector('svg') as SVGElement | null;
         if (svg) {
-          svg.style.width = '14px';
-          svg.style.height = '14px';
           svg.style.strokeWidth = '2px';
         }
         
@@ -362,8 +389,14 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
         return;
       }
 
+      // FileInfo 배열로 변환
+      const fileInfos: FileInfo[] = jsonFiles.map(filename => ({
+        displayName: this.formatDisplayName(filename),
+        originalName: filename
+      }));
+
       // JSON 파일 선택 메뉴 표시
-      this.showFileSelectionMenu(jsonFiles);
+      this.showFileSelectionMenu(fileInfos);
 
     } catch (error) {
       SummarDebug.error(1, 'Failed to list result files:', error);
@@ -371,7 +404,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     }
   }
 
-  private showFileSelectionMenu(jsonFiles: string[]): void {
+  private showFileSelectionMenu(fileInfos: FileInfo[]): void {
     // 기존 팝업 메뉴가 있다면 제거
     const existingMenu = document.querySelector('.file-selection-menu');
     if (existingMenu) {
@@ -411,10 +444,10 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     menu.appendChild(title);
 
     // 파일 목록 추가
-    jsonFiles.forEach(filename => {
+    fileInfos.forEach(fileInfo => {
       const fileItem = document.createElement('div');
       fileItem.className = 'file-menu-item';
-      fileItem.textContent = filename;
+      fileItem.textContent = fileInfo.displayName; // 표시용 이름 사용
       fileItem.style.cssText = `
         padding: 12px 16px;
         cursor: pointer;
@@ -435,7 +468,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
       
       fileItem.addEventListener('click', async () => {
         menu.remove();
-        await this.loadSelectedFile(filename);
+        await this.loadSelectedFile(fileInfo.originalName); // 원본 파일명 사용
       });
       
       menu.appendChild(fileItem);
