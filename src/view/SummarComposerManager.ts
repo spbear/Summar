@@ -460,6 +460,10 @@ export class SummarComposerManager implements ISummarComposerManager {
     if (!message.trim()) return;
 
     // SummarDebug.Notice(1, `Composer message: ${message}`);
+    // Get selected model from modelchip
+    const selectedModel = this.getSelectedModel();
+    const summarai = new SummarAI(this.context.plugin, selectedModel, 'conversation');
+    if (!summarai.hasKey(true)) return;
     
     // 입력 필드 초기화
     if (this.promptEditor) {
@@ -481,10 +485,6 @@ export class SummarComposerManager implements ISummarComposerManager {
     // targetKey가 있으면 해당 output에 대화 추가
     if (this.targetKey && this.context.outputManager) {
       const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
-
-      // Get selected model from modelchip
-      const selectedModel = this.getSelectedModel();
-      const summarai = new SummarAI(this.context.plugin, selectedModel, 'conversation');
 
       // summarai.complete()에 전달할 conversations 준비
       const conversationsForAI = this.prepareConversations(result.conversations, selectedModel);

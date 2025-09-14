@@ -890,6 +890,12 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       dropdown.appendChild(menuItem);
     });
 
+    // 메뉴를 임시로 DOM에 추가하여 실제 크기 측정 (SummarMenuUtils.ts와 동일한 패턴)
+    dropdown.style.top = '-9999px';
+    dropdown.style.left = '-9999px';
+    dropdown.style.visibility = 'hidden';
+    document.body.appendChild(dropdown);
+
     // 메뉴 위치 계산 및 설정
     const rect = menuButton.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
@@ -898,23 +904,24 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     let left = rect.left;
     let top = rect.bottom + 5;
     
+    // 실제 메뉴 크기 측정
+    const dropdownRect = dropdown.getBoundingClientRect();
+    const menuWidth = dropdownRect.width;
+    const menuHeight = dropdownRect.height;
+    
     // 우측 경계 체크
-    const menuWidth = 200; // 예상 메뉴 너비
     if (left + menuWidth > viewportWidth) {
       left = rect.right - menuWidth;
     }
     
     // 하단 경계 체크
-    const menuHeight = allMenuItems.length * 40; // 예상 메뉴 높이
     if (top + menuHeight > viewportHeight) {
       top = rect.top - menuHeight - 5;
     }
     
     dropdown.style.left = `${Math.max(5, left)}px`;
     dropdown.style.top = `${Math.max(5, top)}px`;
-
-    // document.body에 추가하여 z-index 문제 해결
-    document.body.appendChild(dropdown);
+    dropdown.style.visibility = 'visible';
 
     // 외부 클릭 시 메뉴 닫기
     const handleOutsideClick = (e: MouseEvent) => {

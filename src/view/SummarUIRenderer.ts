@@ -376,8 +376,8 @@ export class SummarUIRenderer implements ISummarUIRenderer {
       buttons.recordButton.style.width = "100%";
       
       // macOS가 아니면 테스트 버튼 숨김
-      buttons.menuButton.style.display = 'none';
-      buttons.menuButton.disabled = true;
+      // buttons.menuButton.style.display = 'none';
+      // buttons.menuButton.disabled = true;
     } else {
       // macOS 데스크톱인 경우 초기 버튼 상태 설정
       this.context.plugin.updateSlackButtonState();

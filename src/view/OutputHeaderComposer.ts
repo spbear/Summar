@@ -579,31 +579,7 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
   dropdown.style.overflowY = 'auto';
   dropdown.style.padding = '4px';
 
-  // 메뉴 버튼의 위치를 기준으로 드롭다운 위치 계산
-  const rect = menuButton.getBoundingClientRect();
-  let top = rect.bottom + 5;
-  let left = rect.left;
-  
-  // 화면 경계를 벗어나지 않도록 조정
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const menuWidth = 150; // minWidth와 동일
-  const menuHeight = 200; // maxHeight와 동일
-  
-  // 오른쪽 경계 체크
-  if (left + menuWidth > viewportWidth) {
-    left = viewportWidth - menuWidth - 10;
-  }
-  
-  // 하단 경계 체크
-  if (top + menuHeight > viewportHeight) {
-    top = rect.top - menuHeight - 5; // 버튼 위쪽에 표시
-  }
-  
-  dropdown.style.top = `${top}px`;
-  dropdown.style.left = `${left}px`;
-
-  // 메뉴 아이템들 추가
+  // 메뉴 아이템들 추가 (크기 측정을 위해)
   allMenuItems.forEach((item, index) => {
     const menuItem = document.createElement('div');
     menuItem.style.padding = '6px 8px';
@@ -665,8 +641,40 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
     }
   });
 
-  // 메뉴를 document.body에 추가 (기존 메뉴 시스템과 동일)
+  // 메뉴를 임시로 DOM에 추가하여 실제 크기 측정 (SummarMenuUtils.ts와 동일한 패턴)
+  dropdown.style.top = '-9999px';
+  dropdown.style.left = '-9999px';
+  dropdown.style.visibility = 'hidden';
   document.body.appendChild(dropdown);
+  
+  // 메뉴 버튼의 위치를 기준으로 드롭다운 위치 계산
+  const rect = menuButton.getBoundingClientRect();
+  let top = rect.bottom + 5;
+  let left = rect.left;
+  
+  // 화면 경계를 벗어나지 않도록 조정
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  // 실제 메뉴 크기 측정
+  const dropdownRect = dropdown.getBoundingClientRect();
+  const menuWidth = dropdownRect.width;
+  const menuHeight = dropdownRect.height;
+  
+  // 오른쪽 경계 체크
+  if (left + menuWidth > viewportWidth) {
+    left = viewportWidth - menuWidth - 10;
+  }
+  
+  // 하단 경계 체크
+  if (top + menuHeight > viewportHeight) {
+    top = rect.top - menuHeight - 5; // 버튼 위쪽에 표시
+  }
+  
+  // 최종 위치 설정
+  dropdown.style.top = `${top}px`;
+  dropdown.style.left = `${left}px`;
+  dropdown.style.visibility = 'visible';
 
   // 외부 클릭 시 드롭다운 닫기
   const closeDropdown = (e: Event) => {
