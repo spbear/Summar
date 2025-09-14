@@ -25,7 +25,8 @@ const config = {
   coverageReporters: ['text', 'lcov', 'html', 'json'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^obsidian$': '<rootDir>/tests/__mocks__/obsidian.js'
   },
   testTimeout: 30000
 };

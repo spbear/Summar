@@ -9,6 +9,9 @@ export class SummarOutputManager implements ISummarOutputManager {
   // key별 지연 렌더 타이머(append 폭주 시 렌더 횟수 축소)
   private renderTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly RENDER_DEBOUNCE_MS = 60;
+  
+  // Cleanup configuration constants
+  private static readonly DEFAULT_CLEANUP_RETENTION_MINUTES = 60 * 24 * 7; // 7 days
 
   constructor(private context: ISummarViewContext) {}
 
@@ -527,8 +530,17 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   clearAllOutputItems(): void {
-    // this.saveOutputItemsToPluginDir();
+    // 저장 완료 후 메모리 정리 실행
+    this.saveOutputItemsToPluginDir().then(() => {
+      this.performMemoryCleanup();
+    }).catch((error) => {
+      console.error('Failed to save output items before clearing:', error);
+      // 저장 실패해도 메모리 정리는 진행 (데이터 누수 방지)
+      this.performMemoryCleanup();
+    });
+  }
 
+  private performMemoryCleanup(): void {
     // 이벤트를 통해 각 outputItem 제거 알림
     this.context.outputRecords.forEach((rec, key) => {
       this.events.onOutputItemRemoved?.(key);
@@ -630,44 +642,66 @@ export class SummarOutputManager implements ISummarOutputManager {
   /**
    * Clean up old conversation files from the conversations directory.
    * Deletes files older than the specified number of minutes based on their filename timestamps.
-   * @param minutes Number of minutes - files older than this will be deleted
+   * @param minutes Number of minutes - files older than this will be deleted (default: 7 days)
    * @returns Object containing deletion count and any errors encountered
    */
-  async cleanupOldConversationFiles(minutes: number = 5): Promise<{ deletedCount: number, errors: string[] }> {
-
-
+  async cleanupOldConversationFiles(minutes: number = SummarOutputManager.DEFAULT_CLEANUP_RETENTION_MINUTES): Promise<{ deletedCount: number, errors: string[] }> {
+    SummarDebug.log(1, `cleanupOldConversationFiles called with minutes=${minutes}`);
 
     const errors: string[] = [];
     let deletedCount = 0;
     
     try {
       const conversationsDir = normalizePath(`${this.context.plugin.PLUGIN_DIR}/conversations`);
+      SummarDebug.log(1, `Checking conversations directory: ${conversationsDir}`);
       
       // Check if conversations directory exists
       const dirExists = await this.context.plugin.app.vault.adapter.exists(conversationsDir);
       if (!dirExists) {
+        SummarDebug.log(1, `Conversations directory does not exist`);
         return { deletedCount: 0, errors: ['Conversations directory does not exist'] };
       }
 
       // Get list of files in conversations directory
       const files = await this.context.plugin.app.vault.adapter.list(conversationsDir);
-      const conversationFiles = files.files.filter(f => 
-        f.startsWith('summar-conversations-') && f.endsWith('.json')
-      );
+      SummarDebug.log(1, `Raw files list:`, files);
+      SummarDebug.log(1, `Files array:`, files.files);
+      
+      // Extract filenames from full paths and filter
+      const conversationFiles = files.files
+        .map(fullPath => {
+          // Extract filename from full path: .obsidian/plugins/summar/conversations/filename.json -> filename.json
+          const filename = fullPath.split('/').pop() || '';
+          return { fullPath, filename };
+        })
+        .filter(({ filename }) => 
+          filename.startsWith('summar-conversations-') && filename.endsWith('.json')
+        );
+
+      SummarDebug.log(1, `Found ${conversationFiles.length} conversation files: ${conversationFiles.map(f => f.filename).join(', ')}`);
 
       if (conversationFiles.length === 0) {
+        SummarDebug.log(1, `No conversation files found, checking filter logic...`);
+        files.files.forEach((file, index) => {
+          const filename = file.split('/').pop() || '';
+          const startsWithCheck = filename.startsWith('summar-conversations-');
+          const endsWithCheck = filename.endsWith('.json');
+          SummarDebug.log(1, `File ${index}: "${file}" -> filename: "${filename}" - starts with: ${startsWithCheck}, ends with: ${endsWithCheck}`);
+        });
         return { deletedCount: 0, errors: [] };
       }
 
       // Calculate cutoff time (current time - minutes)
       const cutoffTime = new Date(Date.now() - (minutes * 60 * 1000));
+      SummarDebug.log(1, `Cutoff time: ${cutoffTime.toISOString()} (${minutes} minutes ago)`);
       
       // Process each file
-      for (const fileName of conversationFiles) {
+      for (const { fullPath, filename } of conversationFiles) {
         try {
           // Extract timestamp from filename: summar-conversations-YYYYMMDD-HHMMSS.json
-          const timestampMatch = fileName.match(/summar-conversations-(\d{8})-(\d{6})\.json$/);
+          const timestampMatch = filename.match(/summar-conversations-(\d{8})-(\d{6})\.json$/);
           if (!timestampMatch) {
+            SummarDebug.log(1, `Skipping file with invalid format: ${filename}`);
             continue; // Skip files that don't match expected format
           }
 
@@ -682,28 +716,31 @@ export class SummarOutputManager implements ISummarOutputManager {
           const second = parseInt(timeStr.substring(4, 6));
 
           const fileTime = new Date(year, month, day, hour, minute, second);
+          SummarDebug.log(1, `File ${filename}: timestamp=${fileTime.toISOString()}`);
           
           // Check if file is older than cutoff time
           if (fileTime < cutoffTime) {
-            const filePath = normalizePath(`${conversationsDir}/${fileName}`);
+            const filePath = normalizePath(`${conversationsDir}/${filename}`);
             await this.context.plugin.app.vault.adapter.remove(filePath);
             deletedCount++;
-            // SummarDebug.log(1, `Deleted old conversation file: ${fileName} (${fileTime.toISOString()})`);
+            SummarDebug.log(1, `Deleted old conversation file: ${filename} (${fileTime.toISOString()})`);
+          } else {
+            SummarDebug.log(1, `Keeping recent file: ${filename} (${fileTime.toISOString()})`);
           }
         } catch (fileError) {
-          const errorMsg = `Failed to process file ${fileName}: ${fileError instanceof Error ? fileError.message : String(fileError)}`;
+          const errorMsg = `Failed to process file ${filename}: ${fileError instanceof Error ? fileError.message : String(fileError)}`;
           errors.push(errorMsg);
-          // SummarDebug.error(1, errorMsg);
+          SummarDebug.error(1, errorMsg);
         }
       }
 
     } catch (error) {
       const errorMsg = `Failed to cleanup conversation files: ${error instanceof Error ? error.message : String(error)}`;
       errors.push(errorMsg);
-      // SummarDebug.error(1, errorMsg);
+      SummarDebug.error(1, errorMsg);
     }
 
-    // SummarDebug.log(1, `Cleanup completed: ${deletedCount} files deleted, ${errors.length} errors`);
+    SummarDebug.log(1, `Cleanup completed: ${deletedCount} files deleted, ${errors.length} errors`);
     return { deletedCount, errors };
   }
 
@@ -712,19 +749,30 @@ export class SummarOutputManager implements ISummarOutputManager {
    * Returns the written file path.
    */
   async saveOutputItemsToPluginDir(): Promise<string> {
-    // this.cleanupOldConversationFiles();
+    SummarDebug.log(1, `saveOutputItemsToPluginDir called`);
+    await this.cleanupOldConversationFiles();
 
     const outputItems: any[] = [];
+    let skippedCount = 0;
     this.context.outputRecords.forEach((rec) => {
+      // Skip items with empty conversations array
+      if (!Array.isArray(rec.conversations) || rec.conversations.length === 0) {
+        skippedCount++;
+        SummarDebug.log(1, `Skipping outputItem with key "${rec.key}" - empty conversations array`);
+        return;
+      }
+
       outputItems.push({
         key: rec.key ?? "",
         label: rec.label ?? "",
         noteName: rec.noteName ?? "",
-        conversations: Array.isArray(rec.conversations) ? rec.conversations : [],
+        conversations: rec.conversations,
         // result field removed - data is now only in conversations
         // statId: rec.statId ?? "",
       });
     });
+
+    SummarDebug.log(1, `Preparing to save ${outputItems.length} output items (skipped ${skippedCount} items with empty conversations)`);
 
     const payload = { outputItems };
 
@@ -735,26 +783,32 @@ export class SummarOutputManager implements ISummarOutputManager {
     const conversationsDir = normalizePath(`${this.context.plugin.PLUGIN_DIR}/conversations`);
     const targetPath = normalizePath(`${conversationsDir}/summar-conversations-${stamp}.json`);
     
+    SummarDebug.log(1, `Target file path: ${targetPath}`);
+    
     try {
       // conversations 디렉토리만 생성 (파일명이 아닌 디렉토리)
       const exists = await this.context.plugin.app.vault.adapter.exists(conversationsDir);
       if (!exists) {
         await this.context.plugin.app.vault.createFolder(conversationsDir);
-        // SummarDebug.log(1, "Directory created:", conversationsDir);
+        SummarDebug.log(1, "Directory created:", conversationsDir);
+      } else {
+        SummarDebug.log(1, "Directory already exists:", conversationsDir);
       }
     } catch (error) {
       // 폴백으로 adapter.mkdir 시도
       try {
         await this.context.plugin.app.vault.adapter.mkdir(conversationsDir);
-        // SummarDebug.log(1, "Directory created via adapter:", conversationsDir);
+        SummarDebug.log(1, "Directory created via adapter:", conversationsDir);
       } catch (adapterError) {
-        // SummarDebug.error(1, "Failed to create directory:", conversationsDir, adapterError);
+        SummarDebug.error(1, "Failed to create directory:", conversationsDir, adapterError);
         throw new Error(`Failed to create directory: ${conversationsDir}`);
       }
     }
 
     // JSON 파일 생성
+    SummarDebug.log(1, `Writing JSON file with ${JSON.stringify(payload).length} characters`);
     await this.context.plugin.app.vault.adapter.write(targetPath, JSON.stringify(payload, null, 2));
+    SummarDebug.log(1, `Successfully saved conversation file: ${targetPath}`);
     return targetPath;
   }
 

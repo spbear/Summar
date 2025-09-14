@@ -412,6 +412,17 @@ export class SummarComposerManager implements ISummarComposerManager {
       this.context.view.updateOutputContainerMargin();
     }
     
+    // 입력창에 포커스 설정
+    if (this.promptEditor) {
+      // DOM 업데이트 완료 후 포커스 설정을 위해 짧은 지연
+      setTimeout(() => {
+        if (this.promptEditor) {
+          this.promptEditor.focus();
+          SummarDebug.log(2, 'Focus set to prompt editor');
+        }
+      }, 50);
+    }
+    
     SummarDebug.log(1, `Composer container shown, output height adjusted to ${newOutputHeight}px with composer margins`);
   }
 
