@@ -94,8 +94,8 @@ export class SummarViewContainer {
     this.plugin.foldOutput(this.outputRecord.key, fold);
   }
   
-  clearAllOutputItems(): void {
-    this.plugin.clearAllOutputItems();
+  async clearAllOutputItems(): Promise<void> {
+    await this.plugin.clearAllOutputItems();
   }
 
   // 타이머 시작 함수

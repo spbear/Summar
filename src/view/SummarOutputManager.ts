@@ -529,15 +529,31 @@ export class SummarOutputManager implements ISummarOutputManager {
     }
   }
 
-  clearAllOutputItems(): void {
-    // 저장 완료 후 메모리 정리 실행
-    this.saveOutputItemsToPluginDir().then(() => {
+  async clearAllOutputItems(): Promise<void> {
+    // 저장할 데이터가 있는지 먼저 확인
+    if (this.context.outputRecords.size === 0) {
+      SummarDebug.log(1, "No output items to save - outputRecords is empty");
+      return;
+    }
+
+    SummarDebug.log(1, `Starting to save ${this.context.outputRecords.size} output items before clearing`);
+
+    try {
+      // 저장 완료까지 기다림
+      const savedPath = await this.saveOutputItemsToPluginDir();
+      if (savedPath) {
+        SummarDebug.log(1, `Successfully saved conversations to: ${savedPath}`);
+      } else {
+        SummarDebug.log(1, "No conversations were saved (empty data)");
+      }
+      
+      // 저장 완료 후 메모리 정리 실행
       this.performMemoryCleanup();
-    }).catch((error) => {
-      console.error('Failed to save output items before clearing:', error);
+    } catch (error) {
+      SummarDebug.error(1, 'Failed to save output items before clearing:', error);
       // 저장 실패해도 메모리 정리는 진행 (데이터 누수 방지)
       this.performMemoryCleanup();
-    });
+    }
   }
 
   private performMemoryCleanup(): void {
@@ -773,6 +789,12 @@ export class SummarOutputManager implements ISummarOutputManager {
     });
 
     SummarDebug.log(1, `Preparing to save ${outputItems.length} output items (skipped ${skippedCount} items with empty conversations)`);
+
+    // outputItems가 비어있으면 저장하지 않고 반환
+    if (outputItems.length === 0) {
+      SummarDebug.log(1, `No output items to save - all items were skipped due to empty conversations`);
+      return ""; // 빈 문자열 반환하여 저장하지 않았음을 표시
+    }
 
     const payload = { outputItems };
 

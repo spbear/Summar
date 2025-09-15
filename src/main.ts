@@ -3,7 +3,7 @@ import { PluginSettings, ModelCategory, ModelInfo, ModelData, PromptData, LangPr
 import { SummarDebug, extractDomain, parseHotkey } from "./globals";
 import { PluginSettingsV2 } from "./pluginsettingsv2";
 import { PluginUpdater } from "./pluginupdater";
-import { SummarView } from "./summarview"
+import { SummarView } from "./view/SummarView"
 import { SummarSettingsTab } from "./summarsettingtab";
 import { ConfluenceHandler } from "./confluencehandler";
 import { PdfHandler } from "./pdfhandler";
@@ -783,6 +783,20 @@ export default class SummarPlugin extends Plugin {
     SummarDebug.log(1, "Starting Summar Plugin unload process");
 
     try {
+      // Save conversations before cleanup - SummarView가 열려있다면 conversation 저장 후 정리
+      const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+      for (const leaf of leaves) {
+        const view = leaf.view as SummarView;
+        if (view) {
+          try {
+            await view.saveConversationsBeforeUnload();
+            SummarDebug.log(1, "Saved conversations before plugin unload");
+          } catch (error) {
+            SummarDebug.error(1, "Failed to save conversations during unload:", error);
+          }
+        }
+      }
+
       // Stop all background processes and watchers
       if (this.recordingManager) {
         await this.recordingManager.cleanup();
@@ -1545,14 +1559,15 @@ export default class SummarPlugin extends Plugin {
     );
   }
 
-  clearAllOutputItems(): void {
-    this.safeCallOutputManager(
-      (outputManager) => {
-        outputManager.clearAllOutputItems();
-        return true;
-      },
-      false
-    );
+  async clearAllOutputItems(): Promise<void> {
+    const leaves = this.app.workspace.getLeavesOfType(SummarView.VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as SummarView;
+      if (view) {
+        await view.saveConversationsBeforeUnload();
+        break; // 첫 번째 view만 처리
+      }
+    }
   }
 
   /**

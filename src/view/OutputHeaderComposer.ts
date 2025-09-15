@@ -565,9 +565,13 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
     return; // 메뉴 아이템이 없으면 메뉴를 표시하지 않음
   }
 
+  // 기존 Summar 팝업 메뉴들이 있다면 모두 제거
+  const existingMenus = document.querySelectorAll('.summar-popup-menu');
+  existingMenus.forEach(menu => menu.remove());
+
   // 드롭다운 메뉴 생성
   const dropdown = document.createElement('div');
-  dropdown.classList.add('output-header-hidden-menu');
+  dropdown.classList.add('output-header-hidden-menu', 'summar-popup-menu');
   dropdown.style.position = 'fixed'; // fixed positioning like existing menus
   dropdown.style.backgroundColor = 'var(--background-primary)';
   dropdown.style.border = '1px solid var(--background-modifier-border)';

@@ -33,15 +33,13 @@ export class SummarMenuUtils {
     const rect = button.getBoundingClientRect();
     const { zIndex = 1000, context } = options;
     
-    // 기존 팝업 메뉴가 있다면 제거
-    const existingMenu = document.querySelector('.item-popup-menu');
-    if (existingMenu) {
-      existingMenu.remove();
-    }
+    // 기존 Summar 팝업 메뉴들이 있다면 모두 제거
+    const existingMenus = document.querySelectorAll('.summar-popup-menu');
+    existingMenus.forEach(menu => menu.remove());
 
     // 팝업 메뉴 생성 (임시로 화면 밖에 배치하여 크기 측정)
     const menu = document.createElement('div');
-    menu.className = 'item-popup-menu';
+    menu.className = 'item-popup-menu summar-popup-menu';
     menu.style.cssText = `
       position: fixed;
       top: -9999px;

@@ -171,7 +171,7 @@ export interface ISummarOutputManager {
 
   importOutputItemsFromPluginDir(filename?: string): Promise<number>;
   saveOutputItemsToPluginDir(): Promise<string>;
-  clearAllOutputItems(): void;
+  clearAllOutputItems(): Promise<void>;
   
   cleanupMarkdownOutput(html: string): string;
   cleanup(): void;

@@ -818,11 +818,9 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   }
 
   private showStickyHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState, context: ISummarViewContext, key: string): void {
-    // 기존 드롭다운 제거
-    const existingDropdown = document.querySelector('.output-header-hidden-menu');
-    if (existingDropdown) {
-      existingDropdown.remove();
-    }
+    // 기존 Summar 팝업 메뉴들이 있다면 모두 제거
+    const existingMenus = document.querySelectorAll('.summar-popup-menu');
+    existingMenus.forEach(menu => menu.remove());
 
     // 숨겨진 버튼들의 메뉴 아이템 생성
     const hiddenButtonMenuItems = this.getHiddenButtonMenuItems(buttons, hiddenButtons);
@@ -845,7 +843,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
 
     // 드롭다운 메뉴 생성
     const dropdown = document.createElement('div');
-    dropdown.className = 'output-header-hidden-menu';
+    dropdown.className = 'output-header-hidden-menu summar-popup-menu';
     dropdown.style.cssText = `
       position: fixed;
       background: var(--background-primary);

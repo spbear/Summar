@@ -8,6 +8,18 @@ interface FileInfo {
   originalName: string; // 원본: "summar-conversations-20241213-143022.json"
 }
 
+interface FileGroup {
+  date: string;           // 20240915
+  displayDate: string;    // "2024년 9월 15일"
+  files: FileInfo[];
+}
+
+interface DateTimeInfo {
+  date: string;      // 20240915
+  time: string;      // 143022
+  timestamp: string; // 20240915143022 (정렬용)
+}
+
 /**
  * Container 레벨 이벤트 핸들러
  * UI 상단의 고정 버튼들 (fetch, PDF, record, test, upload) 처리
@@ -191,15 +203,13 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     const button = event.target as HTMLButtonElement;
     const rect = button.getBoundingClientRect();
     
-    // 기존 팝업 메뉴가 있다면 제거
-    const existingMenu = document.querySelector('.summarview-popup-menu');
-    if (existingMenu) {
-      existingMenu.remove();
-    }
+    // 기존 Summar 팝업 메뉴들이 있다면 모두 제거
+    const existingMenus = document.querySelectorAll('.summar-popup-menu');
+    existingMenus.forEach(menu => menu.remove());
 
     // 팝업 메뉴 생성
     const menu = document.createElement('div');
-    menu.className = 'summarview-popup-menu';
+    menu.className = 'summarview-popup-menu summar-popup-menu';
     menu.style.cssText = `
       position: fixed;
       top: ${rect.bottom + 5}px;
@@ -229,7 +239,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     defaultMenuItems.push(
       { label: 'Load conversation', action: () => this.handleLoadAllOutputs(), icon: 'history' },
       // { label: 'Save all conversations', action: () => this.handleSaveAllOutputs(), icon: 'save' },
-      { label: 'Clear all conversations', action: () => this.context.plugin.clearAllOutputItems(), icon: 'rotate-ccw' }
+      { label: 'Clear all conversations', action: async () => await this.context.plugin.clearAllOutputItems(), icon: 'sparkles' }
     );
 
     // 숨겨진 버튼 메뉴들을 맨 앞에 추가
@@ -382,7 +392,12 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
       const jsonFiles = files.files
         .filter(file => file.endsWith('.json') && file.includes('summar-conversations'))
         .map(file => file.replace(`${conversationsDir}/`, '')) // 상대 경로로 변환
-        .sort((a, b) => b.localeCompare(a)); // 최신 파일이 위로 오도록 정렬
+        .sort((a, b) => {
+          // 파일명의 타임스탬프 기준으로 최신이 위로 (내림차순)
+          const timestampA = this.extractDateTimeFromFilename(a).timestamp;
+          const timestampB = this.extractDateTimeFromFilename(b).timestamp;
+          return timestampB.localeCompare(timestampA);
+        });
 
       if (jsonFiles.length === 0) {
         SummarDebug.Notice(1, "No saved result files found");
@@ -405,15 +420,16 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   }
 
   private showFileSelectionMenu(fileInfos: FileInfo[]): void {
-    // 기존 팝업 메뉴가 있다면 제거
-    const existingMenu = document.querySelector('.file-selection-menu');
-    if (existingMenu) {
-      existingMenu.remove();
-    }
+    // 기존 Summar 팝업 메뉴들이 있다면 모두 제거
+    const existingMenus = document.querySelectorAll('.summar-popup-menu');
+    existingMenus.forEach(menu => menu.remove());
 
-    // 팝업 메뉴 생성
+    // 날짜별로 그룹화
+    const groupedFiles = this.groupFilesByDate(fileInfos);
+
+    // 팝업 메뉴 컨테이너 생성
     const menu = document.createElement('div');
-    menu.className = 'file-selection-menu';
+    menu.className = 'file-selection-menu summar-popup-menu';
     menu.style.cssText = `
       position: fixed;
       top: 50%;
@@ -427,79 +443,132 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
       min-width: 400px;
       max-width: 600px;
       max-height: 500px;
-      overflow-y: auto;
-      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     `;
 
-    // 제목 추가
+    // 헤더 영역 (제목 + X 버튼)
+    const header = document.createElement('div');
+    header.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 16px 0 16px;
+      flex-shrink: 0;
+    `;
+
+    // 제목
     const title = document.createElement('div');
     title.textContent = 'Select a file to load:';
     title.style.cssText = `
       font-size: 16px;
       font-weight: bold;
-      margin-bottom: 12px;
       color: var(--text-normal);
-      text-align: center;
     `;
-    menu.appendChild(title);
 
-    // 파일 목록 추가
-    fileInfos.forEach(fileInfo => {
-      const fileItem = document.createElement('div');
-      fileItem.className = 'file-menu-item';
-      fileItem.textContent = fileInfo.displayName; // 표시용 이름 사용
-      fileItem.style.cssText = `
-        padding: 12px 16px;
-        cursor: pointer;
-        border-radius: 4px;
-        color: var(--text-normal);
-        border-bottom: 1px solid var(--background-modifier-border);
-        font-family: var(--font-monospace);
-        font-size: 14px;
-      `;
-      
-      fileItem.addEventListener('mouseenter', () => {
-        fileItem.style.backgroundColor = 'var(--background-modifier-hover)';
-      });
-      
-      fileItem.addEventListener('mouseleave', () => {
-        fileItem.style.backgroundColor = 'transparent';
-      });
-      
-      fileItem.addEventListener('click', async () => {
-        menu.remove();
-        await this.loadSelectedFile(fileInfo.originalName); // 원본 파일명 사용
-      });
-      
-      menu.appendChild(fileItem);
-    });
-
-    // 취소 버튼 추가
-    const cancelButton = document.createElement('div');
-    cancelButton.textContent = 'Cancel';
-    cancelButton.style.cssText = `
-      padding: 12px 16px;
+    // X 버튼
+    const closeButton = document.createElement('button');
+    closeButton.innerHTML = '×';
+    closeButton.style.cssText = `
+      background: none;
+      border: none;
+      font-size: 20px;
       cursor: pointer;
-      border-radius: 4px;
       color: var(--text-muted);
-      text-align: center;
-      margin-top: 8px;
-      border: 1px solid var(--background-modifier-border);
+      padding: 4px 8px;
+      border-radius: 3px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
     `;
-    
-    cancelButton.addEventListener('mouseenter', () => {
-      cancelButton.style.backgroundColor = 'var(--background-modifier-hover)';
+
+    closeButton.addEventListener('mouseenter', () => {
+      closeButton.style.backgroundColor = 'var(--background-modifier-hover)';
+      closeButton.style.color = 'var(--text-normal)';
     });
-    
-    cancelButton.addEventListener('mouseleave', () => {
-      cancelButton.style.backgroundColor = 'transparent';
+
+    closeButton.addEventListener('mouseleave', () => {
+      closeButton.style.backgroundColor = 'transparent';
+      closeButton.style.color = 'var(--text-muted)';
     });
-    
-    cancelButton.addEventListener('click', () => {
+
+    closeButton.addEventListener('click', () => {
       menu.remove();
     });
-    
-    menu.appendChild(cancelButton);
+
+    header.appendChild(title);
+    header.appendChild(closeButton);
+    menu.appendChild(header);
+
+    // 스크롤 가능한 컨텐츠 영역
+    const content = document.createElement('div');
+    content.style.cssText = `
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 16px 16px;
+    `;
+
+    // 날짜별 그룹 렌더링
+    groupedFiles.forEach((group, groupIndex) => {
+      // 날짜 구분자 추가 (첫 번째 그룹 제외)
+      if (groupIndex > 0) {
+        const separator = document.createElement('div');
+        separator.style.cssText = `
+          border-top: 1px solid var(--background-modifier-border);
+          margin: 12px 0 8px 0;
+        `;
+        content.appendChild(separator);
+      }
+      
+      // 날짜 헤더 추가
+      const dateHeader = document.createElement('div');
+      dateHeader.textContent = group.displayDate;
+      dateHeader.style.cssText = `
+        font-size: 12px;
+        color: var(--text-muted);
+        text-align: center;
+        margin-bottom: 8px;
+        font-weight: 500;
+      `;
+      content.appendChild(dateHeader);
+      
+      // 파일 목록 추가 (border 제거됨)
+      group.files.forEach(fileInfo => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-menu-item';
+        fileItem.textContent = fileInfo.displayName; // 표시용 이름 사용
+        fileItem.style.cssText = `
+          padding: 12px 16px;
+          cursor: pointer;
+          border-radius: 4px;
+          color: var(--text-normal);
+          font-family: var(--font-monospace);
+          font-size: 14px;
+        `;
+        
+        fileItem.addEventListener('mouseenter', () => {
+          fileItem.style.backgroundColor = 'var(--background-modifier-hover)';
+        });
+        
+        fileItem.addEventListener('mouseleave', () => {
+          fileItem.style.backgroundColor = 'transparent';
+        });
+        
+        fileItem.addEventListener('click', async () => {
+          menu.remove();
+          await this.loadSelectedFile(fileInfo.originalName); // 원본 파일명 사용
+        });
+        
+        content.appendChild(fileItem);
+      });
+    });
+
+    // 컨텐츠 영역을 메뉴에 추가
+    menu.appendChild(content);
     document.body.appendChild(menu);
 
     // 메뉴 외부 클릭 시 닫기
@@ -664,5 +733,62 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
         : "Slack Message Send Failed";
       this.showUploadFailedMessage(messageTitle, "No active editor was found.");
     }
+  }
+
+  /**
+   * 파일명에서 날짜/시간 정보를 추출합니다
+   */
+  private extractDateTimeFromFilename(filename: string): DateTimeInfo {
+    const match = filename.match(/summar-conversations-(\d{8})-(\d{6})\.json/);
+    if (match) {
+      return {
+        date: match[1],     // 20240915
+        time: match[2],     // 143022
+        timestamp: match[1] + match[2]  // 20240915143022 (정렬용)
+      };
+    }
+    return { date: '', time: '', timestamp: '' };
+  }
+
+  /**
+   * 날짜 문자열을 표시용으로 포맷팅합니다
+   */
+  private formatDateForDisplay(dateStr: string): string {
+    if (dateStr.length !== 8) return dateStr;
+    
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+  }
+
+  /**
+   * 파일들을 날짜별로 그룹화합니다
+   */
+  private groupFilesByDate(files: FileInfo[]): FileGroup[] {
+    const groups = new Map<string, FileInfo[]>();
+    
+    files.forEach(file => {
+      const { date } = this.extractDateTimeFromFilename(file.originalName);
+      if (date) {
+        if (!groups.has(date)) {
+          groups.set(date, []);
+        }
+        groups.get(date)!.push(file);
+      }
+    });
+    
+    // 날짜별로 정렬 (최신 날짜가 위로)
+    return Array.from(groups.entries())
+      .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+      .map(([date, files]) => ({
+        date,
+        displayDate: this.formatDateForDisplay(date),
+        files: files.sort((a, b) => {
+          const timestampA = this.extractDateTimeFromFilename(a.originalName).timestamp;
+          const timestampB = this.extractDateTimeFromFilename(b.originalName).timestamp;
+          return timestampB.localeCompare(timestampA); // 같은 날짜 내에서도 최신이 위로
+        })
+      }));
   }
 }

@@ -145,6 +145,15 @@ export class SummarView extends View {
   async onClose(): Promise<void> {
     SummarDebug.log(1, "Summar View closed");
     
+    // Save conversations before cleanup
+    try {
+      SummarDebug.log(1, `Starting conversation save on view close - outputRecords size: ${this.context.outputRecords.size}`);
+      await this.outputManager.clearAllOutputItems();
+      SummarDebug.log(1, "Saved conversations before view close");
+    } catch (error) {
+      SummarDebug.error(1, "Failed to save conversations during view close:", error);
+    }
+    
     // Cleanup all managers
     this.outputManager.cleanup();
     this.stickyHeaderManager.cleanup();
@@ -168,6 +177,19 @@ export class SummarView extends View {
     // Create new AbortController for potential reuse
     this.abortController = new AbortController();
     this.context.abortController = this.abortController;
+  }
+
+  /**
+   * Public method to save conversations before plugin unload
+   * This method is called by the main plugin during onunload()
+   */
+  async saveConversationsBeforeUnload(): Promise<void> {
+    if (this.outputManager && this.context.outputRecords.size > 0) {
+      await this.outputManager.clearAllOutputItems();
+      SummarDebug.log(1, "Saved conversations before plugin unload");
+    } else {
+      SummarDebug.log(1, "No conversations to save during plugin unload");
+    }
   }
 
   private setupStyleProtection(urlInputContainer: HTMLDivElement | null, buttonContainer: HTMLDivElement): void {
