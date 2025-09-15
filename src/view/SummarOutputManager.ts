@@ -9,9 +9,6 @@ export class SummarOutputManager implements ISummarOutputManager {
   // key별 지연 렌더 타이머(append 폭주 시 렌더 횟수 축소)
   private renderTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly RENDER_DEBOUNCE_MS = 60;
-  
-  // Cleanup configuration constants
-  private static readonly DEFAULT_CLEANUP_RETENTION_MINUTES = 60 * 24 * 7; // 7 days
 
   constructor(private context: ISummarViewContext) {}
 
@@ -658,10 +655,15 @@ export class SummarOutputManager implements ISummarOutputManager {
   /**
    * Clean up old conversation files from the conversations directory.
    * Deletes files older than the specified number of minutes based on their filename timestamps.
-   * @param minutes Number of minutes - files older than this will be deleted (default: 7 days)
+   * @param minutes Number of minutes - files older than this will be deleted (default: from settings)
    * @returns Object containing deletion count and any errors encountered
    */
-  async cleanupOldConversationFiles(minutes: number = SummarOutputManager.DEFAULT_CLEANUP_RETENTION_MINUTES): Promise<{ deletedCount: number, errors: string[] }> {
+  async cleanupOldConversationFiles(minutes: number = -1): Promise<{ deletedCount: number, errors: string[] }> {
+    // Use settings value if default parameter is used
+    if (minutes === -1) {
+      minutes = this.context.plugin.settingsv2.conversation.cleanupRetentionMinutes;
+    }
+    
     SummarDebug.log(1, `cleanupOldConversationFiles called with minutes=${minutes}`);
 
     const errors: string[] = [];

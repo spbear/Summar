@@ -126,8 +126,10 @@ export class PluginSettingsV2 {
 
   conversation: {
     conversationModel : string;
+    cleanupRetentionMinutes: number;
   } = {
-    conversationModel : ""
+    conversationModel : "",
+    cleanupRetentionMinutes: 60 * 24 * 7  // 7 days
   }
   
   system: {

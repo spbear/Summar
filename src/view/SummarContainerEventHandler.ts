@@ -237,7 +237,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     
     // 나머지 항목들 추가
     defaultMenuItems.push(
-      { label: 'Load conversation', action: () => this.handleLoadAllOutputs(), icon: 'history' },
+      { label: 'Load conversations', action: () => this.handleLoadAllOutputs(), icon: 'history' },
       // { label: 'Save all conversations', action: () => this.handleSaveAllOutputs(), icon: 'save' },
       { label: 'Clear all conversations', action: async () => await this.context.plugin.clearAllOutputItems(), icon: 'sparkles' }
     );

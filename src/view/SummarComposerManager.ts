@@ -188,6 +188,12 @@ export class SummarComposerManager implements ISummarComposerManager {
           this.sendMessage(message);
         }
       }
+      
+      // ESC 키 처리 - composer 닫기
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.hideComposerContainer();
+      }
     });
 
     return promptEditor;
