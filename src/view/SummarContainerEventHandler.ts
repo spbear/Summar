@@ -227,9 +227,9 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     
     // 나머지 항목들 추가
     defaultMenuItems.push(
-      { label: 'Load conversation', action: () => this.handleLoadAllOutputs(), icon: 'folder-open' },
-      { label: 'Save all conversations', action: () => this.handleSaveAllOutputs(), icon: 'save' },
-      { label: 'Clear all conversations', action: () => this.handleDeleteAllOutputs(), icon: 'trash-2' }
+      { label: 'Load conversation', action: () => this.handleLoadAllOutputs(), icon: 'history' },
+      // { label: 'Save all conversations', action: () => this.handleSaveAllOutputs(), icon: 'save' },
+      { label: 'Clear all conversations', action: () => this.context.plugin.clearAllOutputItems(), icon: 'rotate-ccw' }
     );
 
     // 숨겨진 버튼 메뉴들을 맨 앞에 추가
@@ -320,11 +320,11 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     }, 100);
   }
 
-  private handleDeleteAllOutputs(): void {
-    this.context.outputRecords.clear();
-    this.context.outputContainer.empty();
-    SummarDebug.Notice(1, "All output items have been deleted");
-  }
+  // private handleDeleteAllOutputs(): void {
+  //   this.context.outputRecords.clear();
+  //   this.context.outputContainer.empty();
+  //   SummarDebug.Notice(1, "All output items have been deleted");
+  // }
 
   private async handleSaveAllOutputs(): Promise<void> {
     try {
