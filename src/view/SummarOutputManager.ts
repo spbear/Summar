@@ -9,6 +9,8 @@ export class SummarOutputManager implements ISummarOutputManager {
   // key별 지연 렌더 타이머(append 폭주 시 렌더 횟수 축소)
   private renderTimers: Map<string, NodeJS.Timeout> = new Map();
   private readonly RENDER_DEBOUNCE_MS = 60;
+  // 원본 import 파일명 추적 (첫 번째 import만 유효)
+  private originalImportFilename: string | null = null;
 
   constructor(private context: ISummarViewContext) {}
 
@@ -338,7 +340,11 @@ export class SummarOutputManager implements ISummarOutputManager {
   async importOutputItemsFromPluginDir(filename: string = "summar-conversations.json"): Promise<number> {
     // this.cleanupOldConversationFiles();
 
+    // 첫 번째 import인지 확인 (빈 상태에서만 originalImportFilename 설정)
+    const isFirstImport = this.context.outputRecords.size === 0;
+
     let importedCount = 0;
+    let actualReadPath = ""; // 실제로 읽은 파일의 전체 경로
     try {
       const plugin = this.context.plugin;
       
@@ -379,6 +385,9 @@ export class SummarOutputManager implements ISummarOutputManager {
         // SummarDebug.log(1, `File does not exist: ${path}`);
         return importedCount;
       }
+
+      // 파일을 성공적으로 찾았으므로 실제 읽은 경로 저장
+      actualReadPath = path;
 
       const jsonText = await plugin.app.vault.adapter.read(path);
       // SummarDebug.log(1, `File content length: ${jsonText.length} characters`);
@@ -498,6 +507,16 @@ export class SummarOutputManager implements ISummarOutputManager {
       } else {
         // Nothing to import
       }
+
+      // 첫 번째 import이고 성공적으로 아이템을 import했다면 원본 파일명 저장
+      if (isFirstImport && importedCount > 0 && actualReadPath) {
+        // 파일명만 추출 (전체 경로에서 파일명만)
+        const filename = actualReadPath.split('/').pop() || '';
+        this.originalImportFilename = filename;
+        SummarDebug.log(1, `First import successful: originalImportFilename set to "${filename}"`);
+      } else if (!isFirstImport) {
+        SummarDebug.log(1, `Not first import (outputRecords.size=${this.context.outputRecords.size}): originalImportFilename ignored`);
+      }
     } catch (error) {
       console.error('Failed to import output items:', error);
     }
@@ -572,6 +591,10 @@ export class SummarOutputManager implements ISummarOutputManager {
       this.context.timeoutRefs.delete(t);
     });
     this.renderTimers.clear();
+
+    // 원본 import 파일명 초기화
+    this.originalImportFilename = null;
+    SummarDebug.log(1, "originalImportFilename reset to null after cleanup");
   }
 
   cleanup(): void {
@@ -800,12 +823,21 @@ export class SummarOutputManager implements ISummarOutputManager {
 
     const payload = { outputItems };
 
-    const ts = new Date();
-    const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, "0")}${String(ts.getDate()).padStart(2, "0")}-${String(ts.getHours()).padStart(2, "0")}${String(ts.getMinutes()).padStart(2, "0")}${String(ts.getSeconds()).padStart(2, "0")}`;
-    
-    // 올바른 경로 분리: 디렉토리와 파일 경로를 명확히 구분
+    // 저장할 파일 경로 결정: originalImportFilename이 있으면 해당 파일명 사용, 없으면 새 타임스탬프 파일명
+    let targetPath: string;
     const conversationsDir = normalizePath(`${this.context.plugin.PLUGIN_DIR}/conversations`);
-    const targetPath = normalizePath(`${conversationsDir}/summar-conversations-${stamp}.json`);
+    
+    if (this.originalImportFilename) {
+      // 원본 import 파일명으로 덮어쓰기
+      targetPath = normalizePath(`${conversationsDir}/${this.originalImportFilename}`);
+      SummarDebug.log(1, `Using original import filename for save: ${this.originalImportFilename}`);
+    } else {
+      // 새로운 타임스탬프 파일명으로 저장
+      const ts = new Date();
+      const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, "0")}${String(ts.getDate()).padStart(2, "0")}-${String(ts.getHours()).padStart(2, "0")}${String(ts.getMinutes()).padStart(2, "0")}${String(ts.getSeconds()).padStart(2, "0")}`;
+      targetPath = normalizePath(`${conversationsDir}/summar-conversations-${stamp}.json`);
+      SummarDebug.log(1, `Creating new timestamped file: summar-conversations-${stamp}.json`);
+    }
     
     SummarDebug.log(1, `Target file path: ${targetPath}`);
     
