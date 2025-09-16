@@ -1,5 +1,5 @@
 import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
-import { composeStandardOutputHeader, getDefaultLabelIcon } from "./OutputHeaderComposer";
+import { createOutputHeader, getDefaultLabelIcon } from "./SummarHeader";
 import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { SummarAIParam, SummarAIParamType } from "../summarai-types";
@@ -1039,7 +1039,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     const icon = getDefaultLabelIcon(label);
     const rec = this.ensureRecord(key);
     rec.label = label;
-    return composeStandardOutputHeader(label, {
+    return createOutputHeader(label, {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
       newNote: newNoteButton,

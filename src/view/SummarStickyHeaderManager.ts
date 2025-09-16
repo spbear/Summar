@@ -1,7 +1,7 @@
 import { ISummarStickyHeaderManager, ISummarViewContext, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { setIcon } from "obsidian";
-import { composeStandardOutputHeader, getDefaultLabelIcon, HeaderButtonsSet } from "./OutputHeaderComposer";
+import { createOutputHeader, getDefaultLabelIcon, HeaderButtonsSet } from "./SummarHeader";
 import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 
 export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
@@ -507,7 +507,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     const rec = this.context.outputRecords.get(key);
     const icon = getDefaultLabelIcon(label);
     const stickyLabel = rec?.label || label;
-    const header = composeStandardOutputHeader(stickyLabel, {
+    const header = createOutputHeader(stickyLabel, {
       uploadWiki: uploadWikiButton,
       uploadSlack: uploadSlackButton,
       newNote: newNoteButton,
@@ -706,7 +706,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       menu: button
     };
     
-    // OutputHeaderComposer의 메뉴 함수 사용
+    // SummarHeader의 메뉴 함수 사용
     this.showStickyHeaderHiddenButtonsMenu(button, buttons, hiddenButtons, this.context, key);
 
     SummarDebug.log(1, `Sticky responsive menu opened for key: ${key}`);

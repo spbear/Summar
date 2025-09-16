@@ -1,7 +1,7 @@
 import { setIcon } from "obsidian";
 import { ISummarComposerManager, ISummarViewContext, SummarOutputRecord } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
-import { setStandardComposerHeader, ComposerHeaderButtonsSet } from "./OutputHeaderComposer";
+import { createComposerHeader, ComposerHeaderButtonsSet } from "./SummarHeader";
 import { SummarAI } from "../summarai";
 import { SummarAIParam } from "../summarai-types";
 
@@ -122,8 +122,8 @@ export class SummarComposerManager implements ISummarComposerManager {
       close: closeButton
     };
 
-    // setStandardComposerHeader 사용
-    const header = setStandardComposerHeader('compose prompt', buttons, this.context, { 
+    // createComposerHeader 사용
+    const header = createComposerHeader('compose prompt', buttons, this.context, { 
       icon: 'message-square',
       selectedModel: this.context.plugin.settingsv2.conversation.conversationModel ? this.context.plugin.settingsv2.conversation.conversationModel : 'gpt-4.1-mini'
     });

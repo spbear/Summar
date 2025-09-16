@@ -180,7 +180,7 @@ function getAvailableModels(plugin?: any): string[] {
 }
 
 // Build a standardized output header: label + buttons in fixed order.
-export function composeStandardOutputHeader(label: string, buttons: HeaderButtonsSet, context?: ISummarViewContext, options?: LabelOptions): HTMLDivElement {
+export function createOutputHeader(label: string, buttons: HeaderButtonsSet, context?: ISummarViewContext, options?: LabelOptions): HTMLDivElement {
   const outputHeader = document.createElement('div');
   outputHeader.className = 'output-header';
   outputHeader.style.width = '100%';
@@ -254,7 +254,7 @@ export function composeStandardOutputHeader(label: string, buttons: HeaderButton
 }
 
 // Build a standardized composer header: label + buttons in fixed order.
-export function setStandardComposerHeader(label: string, buttons: ComposerHeaderButtonsSet, context: ISummarViewContext, options?: LabelOptions): HTMLDivElement {
+export function createComposerHeader(label: string, buttons: ComposerHeaderButtonsSet, context: ISummarViewContext, options?: LabelOptions): HTMLDivElement {
   const composerHeader = document.createElement('div');
   composerHeader.className = 'composer-header';
   composerHeader.style.width = '100%';
@@ -263,15 +263,10 @@ export function setStandardComposerHeader(label: string, buttons: ComposerHeader
   composerHeader.style.alignItems = 'flex-start';
   composerHeader.style.gap = '0px';
   composerHeader.style.marginBottom = '0px';
-  // composerHeader.style.padding = '0px';
   composerHeader.style.border = 'none';
-  // composerHeader.style.border = '1px solid var(--background-modifier-border)';
   composerHeader.style.backgroundColor = 'var(--background-secondary)';
-//  composerHeader.style.height = '44px';
-
   composerHeader.style.height = '40px';
   composerHeader.style.padding = '2px 2px';
-
   composerHeader.style.boxSizing = 'border-box';
 
   // Left side: label and model container
