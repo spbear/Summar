@@ -210,7 +210,7 @@ export interface ISummarComposerManager {
   setupComposerContainer(): void;
   sendMessage(message: string): Promise<void>;
   clearComposer(): void;
-  toggleComposerContainer(): void;
+  newPrompt(): void;
   showComposerContainer(): void;
   hideComposerContainer(): void;
   setOutput(key: string): void;

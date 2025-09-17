@@ -25,6 +25,67 @@ export type LabelOptions = {
   selectedModel?: string; // selected model for modelchip
 };
 
+function createIconButton(buttonId: string, ariaLabel: string, iconName: string): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.className = 'lucide-icon-button';
+  button.setAttribute('button-id', buttonId);
+  button.setAttribute('aria-label', ariaLabel);
+  button.style.transform = 'scale(0.7)';
+  button.style.transformOrigin = 'center';
+  button.style.margin = '0';
+  setIcon(button, iconName);
+  return button;
+}
+
+export function createOutputHeaderButtons(key: string, context: ISummarViewContext): HeaderButtonsSet {
+  const uploadWikiButton = createIconButton('upload-output-to-wiki-button', 'Upload this result to Confluence', 'file-up');
+  uploadWikiButton.disabled = true;
+  uploadWikiButton.style.display = 'none';
+
+  const uploadSlackButton = createIconButton('upload-output-to-slack-button', 'Upload this result to Slack', 'hash');
+  uploadSlackButton.disabled = true;
+  uploadSlackButton.style.display = 'none';
+
+  const newNoteButton = createIconButton('new-note-button', 'Create new note with this result', 'file-output');
+  newNoteButton.disabled = true;
+  newNoteButton.style.display = 'none';
+
+  const replyButton = createIconButton('reply-output-button', 'reply', 'message-square-reply');
+  replyButton.disabled = true;
+  const canShowComposer = context.composerManager?.canShowComposer(200)?.canShow ?? false;
+  replyButton.style.display = 'none';
+
+  if (!canShowComposer) {
+    replyButton.disabled = true;
+  }
+
+  const toggleButton = createIconButton('toggle-fold-button', 'Toggle fold/unfold this result', 'square-chevron-up');
+  toggleButton.setAttribute('toggled', 'false');
+
+  const copyButton = createIconButton('copy-output-button', 'Copy this result to clipboard', 'copy');
+  copyButton.disabled = true;
+  copyButton.style.display = 'none';
+
+  const spacer = document.createElement('div');
+  spacer.style.flex = '1';
+  spacer.style.minWidth = '8px';
+  spacer.classList.add('spacer');
+
+  const showMenuButton = createIconButton('show-menu-button', 'Show menu', 'menu');
+  showMenuButton.setAttribute('data-key', key);
+
+  return {
+    uploadWiki: uploadWikiButton,
+    uploadSlack: uploadSlackButton,
+    newNote: newNoteButton,
+    reply: replyButton,
+    toggle: toggleButton,
+    copy: copyButton,
+    spacer,
+    menu: showMenuButton,
+  };
+}
+
 // Basic heuristic to suggest an icon by label.
 export function getDefaultLabelIcon(label: string): string {
   const l = label.toLowerCase();
@@ -337,7 +398,7 @@ function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext
       
       fileOption.addEventListener('click', (e) => {
         e.stopPropagation();
-        onSelect('open-file', fileName);
+        onSelect('link-note', fileName);
         dropdown.remove();
         
         // Reset chip hover state after selection
@@ -707,12 +768,12 @@ export function createComposerHeader(label: string, buttons: ComposerHeaderButto
       if (action === 'new-prompt') {
         // Handle new prompt action
         const composerManager = (context as any).composerManager;
-        if (composerManager && composerManager.toggleComposerContainer) {
-          composerManager.toggleComposerContainer();
+        if (composerManager && composerManager.newPrompt) {
+          composerManager.newPrompt();
         }
-      } else if (action === 'open-file' && file) {
+      } else if (action === 'link-note' && file) {
         // Handle opening specific file
-        context.plugin.app.workspace.openLinkText(file, '', false);
+        // context.plugin.app.workspace.openLinkText(file, '', false);
       }
     });
   });

@@ -367,14 +367,21 @@ export class SummarComposerManager implements ISummarComposerManager {
     };
   }
 
-  toggleComposerContainer(): void {
-    this.isComposerVisible = !this.isComposerVisible;
+  newPrompt(): void {
+
+    // targetKey 초기화 및 하이라이팅 제거
+    this.targetKey = null;
+    this.clearAllHighlighting();
+    this.resetComposerLabel();
+    this.showComposerContainer();
     
-    if (this.isComposerVisible) {
-      this.showComposerContainer();
-    } else {
-      this.hideComposerContainer();
-    }
+    // this.isComposerVisible = !this.isComposerVisible;
+    
+    // if (this.isComposerVisible) {
+    //   this.showComposerContainer();
+    // } else {
+    //   this.hideComposerContainer();
+    // }
   }
 
   showComposerContainer(): void {

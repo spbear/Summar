@@ -1,5 +1,5 @@
 import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
-import { createOutputHeader, getDefaultLabelIcon } from "./SummarHeader";
+import { createOutputHeader, createOutputHeaderButtons, getDefaultLabelIcon } from "./SummarHeader";
 import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { SummarAIParam, SummarAIParamType } from "../summarai-types";
@@ -1024,31 +1024,13 @@ export class SummarOutputManager implements ISummarOutputManager {
   }
 
   private createOutputHeader(key: string, label: string): HTMLDivElement {
-    const uploadWikiButton = this.createUploadWikiButton(key);
-    const uploadSlackButton = this.createUploadSlackButton(key);
-    const newNoteButton = this.createNewNoteButton(key);
-    const replyButton = this.createReplyButton(key);
-    const toggleButton = this.createToggleButton();
-    const copyButton = this.createCopyButton(key);
-    const rightSpacer = document.createElement('div');
-    rightSpacer.style.flex = '1';
-    rightSpacer.style.minWidth = '8px';
-    const showMenuButton = this.createShowMenuButton(key);
+    const buttons = createOutputHeaderButtons(key, this.context);
 
     // Pick an icon by label; callers could be updated to pass explicit icon if desired.
     const icon = getDefaultLabelIcon(label);
     const rec = this.ensureRecord(key);
     rec.label = label;
-    return createOutputHeader(label, {
-      uploadWiki: uploadWikiButton,
-      uploadSlack: uploadSlackButton,
-      newNote: newNoteButton,
-      reply: replyButton,
-      toggle: toggleButton,
-      copy: copyButton,
-      spacer: rightSpacer,
-      menu: showMenuButton,
-    }, this.context, { icon });
+    return createOutputHeader(label, buttons, this.context, { icon });
   }
 
   private createOutputText(key: string): HTMLDivElement {
@@ -1169,131 +1151,6 @@ export class SummarOutputManager implements ISummarOutputManager {
         this.context.timeoutRefs.add(timeoutId);
       }
     }, { signal });
-  }
-
-  private addHeaderButtons(_: HTMLDivElement, __: string): void { /* deprecated by composer */ }
-
-  private createToggleButton(): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'toggle-fold-button');
-    button.setAttribute('toggled', 'false');
-    button.setAttribute('aria-label', 'Toggle fold/unfold this result');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    
-    setIcon(button, 'square-chevron-up');
-    
-    return button;
-  }
-
-  private createNewNoteButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'new-note-button');
-    button.setAttribute('aria-label', 'Create new note with this result');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    button.disabled = true;
-    button.style.display = 'none';
-    
-    setIcon(button, 'file-output');
-    
-    // 이벤트 리스너는 별도 매니저에서 처리
-    
-    return button;
-  }
-
-  private createReplyButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'reply-output-button');
-    button.setAttribute('aria-label', 'reply');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    button.disabled = true;
-    
-    // Composer 사용 가능 여부 확인
-    const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
-    if (!canShowComposer) {
-      button.style.display = 'none';
-    } else {
-      button.style.display = 'none'; // 기본적으로 숨김 (enableOutputItemButtons에서 활성화)
-    }
-    
-    setIcon(button, 'message-square-reply');
-    
-    // 이벤트 리스너는 별도 매니저에서 처리
-    
-    return button;
-  }
-
-  private createUploadWikiButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'upload-output-to-wiki-button');
-    button.setAttribute('aria-label', 'Upload this result to Confluence');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    button.disabled = true;
-    button.style.display = 'none';
-    
-    setIcon(button, 'file-up');
-    
-    return button;
-  }
-
-  private createUploadSlackButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'upload-output-to-slack-button');
-    button.setAttribute('aria-label', 'Upload this result to Slack');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    button.disabled = true;
-    button.style.display = 'none';
-    
-    setIcon(button, 'hash');
-    
-    return button;
-  }
-
-  private createCopyButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'copy-output-button');
-    button.setAttribute('aria-label', 'Copy this result to clipboard');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    button.disabled = true;
-    button.style.display = 'none';
-    
-    setIcon(button, 'copy');
-    
-    return button;
-  }
-  
-  private createShowMenuButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'show-menu-button');
-    button.setAttribute('aria-label', 'Show menu');
-    button.setAttribute('data-key', key); // key 정보 저장
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    
-    setIcon(button, 'menu');
-    
-    // 이벤트 리스너는 SummarEventHandler에서 처리
-    
-    return button;
   }
 
   enableOutputItemButtons(outputItem: HTMLDivElement, buttons: string[] = [

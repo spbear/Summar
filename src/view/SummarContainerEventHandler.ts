@@ -361,8 +361,8 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
   private async handleComposer(): Promise<void> {
     const composerManager = (this.context as any).composerManager;
-    if (composerManager && composerManager.toggleComposerContainer) {
-      composerManager.toggleComposerContainer();
+    if (composerManager && composerManager.newPrompt) {
+      composerManager.newPrompt();
     }
   }
 

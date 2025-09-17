@@ -1,7 +1,7 @@
 import { ISummarStickyHeaderManager, ISummarViewContext, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { setIcon } from "obsidian";
-import { createOutputHeader, getDefaultLabelIcon, HeaderButtonsSet } from "./SummarHeader";
+import { createOutputHeader, createOutputHeaderButtons, getDefaultLabelIcon, HeaderButtonsSet } from "./SummarHeader";
 import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 
 export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
@@ -492,72 +492,73 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   }
 
   private createOutputHeader(key: string, label: string): HTMLDivElement {
-    const uploadWikiButton = this.createStickyButton('upload-output-to-wiki-button', 'Upload this output to Confluence', 'file-up', key);
-    const uploadSlackButton = this.createStickyButton('upload-output-to-slack-button', 'Upload this output to Slack', 'hash', key);
-    const newNoteButton = this.createStickyButton('new-note-button', 'Create new note with this output', 'file-output', key);
-    const replyButton = this.createStickyButton('reply-output-button', 'reply', 'message-square-reply', key);
-    const toggleButton = this.createStickyToggleButton(key);
-    const copyButton = this.createStickyButton('copy-output-button', 'Copy this output to clipboard', 'copy', key);
-    const rightSpacer = document.createElement('div');
-    rightSpacer.style.flex = '1';
-    rightSpacer.style.minWidth = '8px';
-    const showMenuButton = this.createStickyButton('show-menu-button', 'Show menu', 'menu', key);
+    const buttons = this.createStickyHeaderButtons(key);
 
-    // Use unified record if present to keep header consistent
     const rec = this.context.outputRecords.get(key);
     const icon = getDefaultLabelIcon(label);
     const stickyLabel = rec?.label || label;
-    const header = createOutputHeader(stickyLabel, {
-      uploadWiki: uploadWikiButton,
-      uploadSlack: uploadSlackButton,
-      newNote: newNoteButton,
-      reply: replyButton,
-      toggle: toggleButton,
-      copy: copyButton,
-      spacer: rightSpacer,
-      menu: showMenuButton,
-    }, this.context, { icon });
+    const header = createOutputHeader(stickyLabel, buttons, this.context, { icon });
 
     return header;
   }
 
-  private addStickyHeaderButtons(_: HTMLDivElement, __: string): void { /* deprecated by composer */ }
+  private createStickyHeaderButtons(key: string): HeaderButtonsSet {
+    const buttons = createOutputHeaderButtons(key, this.context);
 
-  private createStickyButton(buttonId: string, ariaLabel: string, iconName: string, key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', buttonId);
-    button.setAttribute('aria-label', ariaLabel);
-    button.setAttribute('data-key', key); // key 정보 저장
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    
-    // Reply 버튼의 경우 composer 가용성 확인
-    if (buttonId === 'reply-output-button') {
-      const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
-      if (!canShowComposer) {
-        button.style.display = 'none';
-        button.disabled = true;
+    this.configureStickyProxyButton(buttons.uploadWiki as HTMLButtonElement, 'upload-output-to-wiki-button', key);
+    this.configureStickyProxyButton(buttons.uploadSlack as HTMLButtonElement, 'upload-output-to-slack-button', key);
+    this.configureStickyProxyButton(buttons.newNote as HTMLButtonElement, 'new-note-button', key);
+    this.configureStickyReplyButton(buttons.reply as HTMLButtonElement, key);
+    this.configureStickyToggleButton(buttons.toggle as HTMLButtonElement, key);
+    this.configureStickyProxyButton(buttons.copy as HTMLButtonElement, 'copy-output-button', key);
+    this.configureStickyMenuButton(buttons.menu as HTMLButtonElement, key);
+
+    return buttons;
+  }
+
+  private configureStickyProxyButton(button: HTMLButtonElement | null, buttonId: string, key: string): void {
+    if (!button) return;
+
+    button.setAttribute('data-key', key);
+
+    const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
+    if (originalItem) {
+      const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+      if (originalButton) {
+        button.disabled = originalButton.disabled;
+        button.style.display = originalButton.style.display;
       } else {
-        // 원본 버튼 상태 동기화
-        const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
-        if (originalItem) {
-          const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
-          if (originalButton) {
-            button.disabled = originalButton.disabled;
-            button.style.display = originalButton.style.display;
-          } else {
-            button.disabled = true;
-            button.style.display = 'none';
-          }
-        }
+        button.disabled = true;
+        button.style.display = 'none';
       }
     } else {
-      // 다른 버튼들은 기존 로직 사용
+      button.disabled = true;
+      button.style.display = 'none';
+    }
+
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const targetItem = this.context.outputRecords.get(key)?.itemEl || null;
+      if (targetItem) {
+        const originalButton = targetItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+        originalButton?.click();
+      }
+    }, { signal: this.context.abortController.signal });
+  }
+
+  private configureStickyReplyButton(button: HTMLButtonElement | null, key: string): void {
+    if (!button) return;
+
+    button.setAttribute('data-key', key);
+
+    const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
+    if (!canShowComposer) {
+      button.style.display = 'none';
+      button.disabled = true;
+    } else {
       const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
       if (originalItem) {
-        const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
+        const originalButton = originalItem.querySelector('button[button-id="reply-output-button"]') as HTMLButtonElement;
         if (originalButton) {
           button.disabled = originalButton.disabled;
           button.style.display = originalButton.style.display;
@@ -565,42 +566,27 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
           button.disabled = true;
           button.style.display = 'none';
         }
+      } else {
+        button.disabled = true;
+        button.style.display = 'none';
       }
     }
-    
-    setIcon(button, iconName);
-    
-    // show-menu-button은 특별 처리 (sticky header 위치에 메뉴 표시)
-    if (buttonId === 'show-menu-button') {
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        this.handleStickyMenuClick(key, event);
-      }, { signal: this.context.abortController.signal });
-    } else {
-      // 다른 버튼들은 원본 버튼 클릭으로 위임
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
-        if (originalItem) {
-          const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
-          originalButton?.click();
-        }
-      }, { signal: this.context.abortController.signal });
-    }
-    
-    return button;
+
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const targetItem = this.context.outputRecords.get(key)?.itemEl || null;
+      if (targetItem) {
+        const originalButton = targetItem.querySelector('button[button-id="reply-output-button"]') as HTMLButtonElement;
+        originalButton?.click();
+      }
+    }, { signal: this.context.abortController.signal });
   }
 
-  private createStickyToggleButton(key: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'lucide-icon-button';
-    button.setAttribute('button-id', 'toggle-fold-button');
-    button.setAttribute('aria-label', 'Toggle fold/unfold this output');
-    button.style.transform = 'scale(0.7)';
-    button.style.transformOrigin = 'center';
-    button.style.margin = '0';
-    
-    // 원본 토글 버튼 상태 동기화
+  private configureStickyToggleButton(button: HTMLButtonElement | null, key: string): void {
+    if (!button) return;
+
+    button.setAttribute('data-key', key);
+
     const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
     if (originalItem) {
       const originalToggleButton = originalItem.querySelector('button[button-id="toggle-fold-button"]') as HTMLButtonElement;
@@ -609,18 +595,23 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
         button.setAttribute('toggled', isToggled ? 'true' : 'false');
         setIcon(button, isToggled ? 'square-chevron-down' : 'square-chevron-up');
       }
-    } else {
-      button.setAttribute('toggled', 'false');
-      setIcon(button, 'square-chevron-up');
     }
-    
-    // Toggle 버튼 특별 처리
+
     button.addEventListener('click', (event) => {
       event.stopPropagation();
       this.handleStickyToggleClick(key, button);
     }, { signal: this.context.abortController.signal });
-    
-    return button;
+  }
+
+  private configureStickyMenuButton(button: HTMLButtonElement | null, key: string): void {
+    if (!button) return;
+
+    button.setAttribute('data-key', key);
+
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.handleStickyMenuClick(key, event);
+    }, { signal: this.context.abortController.signal });
   }
 
   private handleStickyToggleClick(key: string, stickyToggleButton: HTMLButtonElement): void {
