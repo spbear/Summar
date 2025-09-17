@@ -201,6 +201,15 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
 
   private showSummarViewPopupMenu(event: MouseEvent): void {
     const button = event.target as HTMLButtonElement;
+    
+    // Check if this specific SummarView menu is already open
+    const existingSummarViewMenu = document.querySelector('.summarview-popup-menu[data-button-id="' + button.getAttribute('button-id') + '"]');
+    if (existingSummarViewMenu) {
+      // If clicking the same button, close the menu
+      existingSummarViewMenu.remove();
+      return;
+    }
+    
     const rect = button.getBoundingClientRect();
     
     // 기존 Summar 팝업 메뉴들이 있다면 모두 제거
@@ -210,6 +219,7 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
     // 팝업 메뉴 생성
     const menu = document.createElement('div');
     menu.className = 'summarview-popup-menu summar-popup-menu';
+    menu.setAttribute('data-button-id', button.getAttribute('button-id') || '');
     menu.style.cssText = `
       position: fixed;
       top: ${rect.bottom + 5}px;

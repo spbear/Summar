@@ -30,6 +30,19 @@ export class SummarMenuUtils {
     menuItems: MenuItemConfig[], 
     options: MenuOptions
   ): void {
+    // Generate a unique identifier for this button
+    const buttonId = button.getAttribute('button-id') || button.getAttribute('aria-label') || 'unknown';
+    const buttonKey = button.getAttribute('data-key') || 'unknown';
+    const menuId = `${buttonId}-${buttonKey}`;
+    
+    // Check if this specific menu is already open
+    const existingMenu = document.querySelector('.item-popup-menu[data-menu-id="' + menuId + '"]');
+    if (existingMenu) {
+      // If clicking the same button, close the menu
+      existingMenu.remove();
+      return;
+    }
+    
     const rect = button.getBoundingClientRect();
     const { zIndex = 1000, context } = options;
     
@@ -40,6 +53,7 @@ export class SummarMenuUtils {
     // 팝업 메뉴 생성 (임시로 화면 밖에 배치하여 크기 측정)
     const menu = document.createElement('div');
     menu.className = 'item-popup-menu summar-popup-menu';
+    menu.setAttribute('data-menu-id', menuId);
     menu.style.cssText = `
       position: fixed;
       top: -9999px;

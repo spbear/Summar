@@ -61,10 +61,24 @@ export function getModelDisplayText(modelKey: string): string {
 
 // Show model selection dropdown
 function showModelDropdown(chipElement: HTMLElement, plugin: any, onSelect: (model: string) => void): void {
-  // Remove any existing dropdown
-  const existingDropdown = document.querySelector('.model-dropdown');
-  if (existingDropdown) {
-    existingDropdown.remove();
+  // Check if this specific model dropdown is already open
+  const existingModelDropdown = document.querySelector('.model-dropdown[data-chip-id="' + chipElement.id + '"]');
+  if (existingModelDropdown) {
+    // If clicking the same button, close the menu
+    existingModelDropdown.remove();
+    // Reset chip hover state
+    chipElement.style.backgroundColor = 'var(--interactive-normal)';
+    chipElement.style.color = 'var(--text-muted)';
+    return;
+  }
+
+  // Remove any existing Summar popup menus
+  const existingMenus = document.querySelectorAll('.summar-popup-menu');
+  existingMenus.forEach(menu => menu.remove());
+
+  // Ensure chip has an ID for tracking
+  if (!chipElement.id) {
+    chipElement.id = 'model-chip-' + Math.random().toString(36).substr(2, 9);
   }
 
   // Get available models - pass plugin reference
@@ -76,7 +90,8 @@ function showModelDropdown(chipElement: HTMLElement, plugin: any, onSelect: (mod
 
   // Create dropdown
   const dropdown = document.createElement('div');
-  dropdown.classList.add('model-dropdown');
+  dropdown.classList.add('model-dropdown', 'summar-popup-menu');
+  dropdown.setAttribute('data-chip-id', chipElement.id);
   dropdown.style.position = 'absolute';
   dropdown.style.top = '100%';
   dropdown.style.left = '0';
@@ -122,9 +137,42 @@ function showModelDropdown(chipElement: HTMLElement, plugin: any, onSelect: (mod
     dropdown.appendChild(option);
   });
 
-  // Position relative to chip
-  chipElement.style.position = 'relative';
-  chipElement.appendChild(dropdown);
+  // Position dropdown using absolute positioning with boundary checks
+  // 메뉴를 임시로 DOM에 추가하여 실제 크기 측정
+  dropdown.style.position = 'fixed';
+  dropdown.style.top = '-9999px';
+  dropdown.style.left = '-9999px';
+  dropdown.style.visibility = 'hidden';
+  document.body.appendChild(dropdown);
+  
+  // chip의 위치를 기준으로 드롭다운 위치 계산
+  const chipRect = chipElement.getBoundingClientRect();
+  let top = chipRect.bottom + 5;
+  let left = chipRect.left;
+  
+  // 화면 경계를 벗어나지 않도록 조정
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  // 실제 메뉴 크기 측정
+  const dropdownRect = dropdown.getBoundingClientRect();
+  const menuWidth = dropdownRect.width;
+  const menuHeight = dropdownRect.height;
+  
+  // 오른쪽 경계 체크
+  if (left + menuWidth > viewportWidth) {
+    left = viewportWidth - menuWidth - 10;
+  }
+  
+  // 하단 경계 체크
+  if (top + menuHeight > viewportHeight) {
+    top = chipRect.top - menuHeight - 5; // chip 위쪽에 표시
+  }
+  
+  // 최종 위치 설정
+  dropdown.style.top = `${top}px`;
+  dropdown.style.left = `${left}px`;
+  dropdown.style.visibility = 'visible';
 
   // Close dropdown when clicking outside
   const closeDropdown = (e: Event) => {
@@ -141,6 +189,327 @@ function showModelDropdown(chipElement: HTMLElement, plugin: any, onSelect: (mod
   setTimeout(() => {
     document.addEventListener('click', closeDropdown);
   }, 0);
+}
+
+// Show label selection dropdown with New Prompt and open files
+function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext, onSelect: (action: string, file?: string) => void): void {
+  // Check if this specific label dropdown is already open
+  const existingLabelDropdown = document.querySelector('.label-dropdown[data-chip-id="' + chipElement.id + '"]');
+  if (existingLabelDropdown) {
+    // If clicking the same button, close the menu
+    existingLabelDropdown.remove();
+    // Reset chip hover state
+    chipElement.style.backgroundColor = 'var(--interactive-normal)';
+    chipElement.style.color = 'var(--text-muted)';
+    return;
+  }
+
+  // Remove any existing Summar popup menus
+  const existingMenus = document.querySelectorAll('.summar-popup-menu');
+  existingMenus.forEach(menu => menu.remove());
+
+  // Ensure chip has an ID for tracking
+  if (!chipElement.id) {
+    chipElement.id = 'label-chip-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  // Create dropdown
+  const dropdown = document.createElement('div');
+  dropdown.classList.add('label-dropdown', 'summar-popup-menu');
+  dropdown.setAttribute('data-chip-id', chipElement.id);
+  dropdown.style.position = 'absolute';
+  dropdown.style.top = '100%';
+  dropdown.style.left = '0';
+  dropdown.style.backgroundColor = 'var(--background-primary)';
+  dropdown.style.border = '1px solid var(--background-modifier-border)';
+  dropdown.style.borderRadius = '6px';
+  dropdown.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
+  dropdown.style.zIndex = '1000';
+  dropdown.style.minWidth = '200px';
+  dropdown.style.maxHeight = '200px';
+  dropdown.style.overflowY = 'auto';
+  dropdown.style.padding = '4px';
+
+  // Add "New Prompt" option
+  const newPromptOption = document.createElement('div');
+  newPromptOption.style.padding = '6px 8px';
+  newPromptOption.style.cursor = 'pointer';
+  newPromptOption.style.borderRadius = '3px';
+  newPromptOption.style.fontSize = '12px';
+  newPromptOption.style.color = 'var(--text-normal)';
+  newPromptOption.style.transition = 'background-color 0.1s ease';
+  newPromptOption.style.display = 'flex';
+  newPromptOption.style.alignItems = 'center';
+  newPromptOption.style.gap = '6px';
+
+  // Add icon for New Prompt
+  const newPromptIcon = document.createElement('span');
+  newPromptIcon.style.display = 'inline-flex';
+  newPromptIcon.style.width = '14px';
+  newPromptIcon.style.height = '14px';
+  newPromptIcon.style.flexShrink = '0';
+  setIcon(newPromptIcon, 'message-square-more');
+  const newPromptSvg = newPromptIcon.querySelector('svg') as SVGElement | null;
+  if (newPromptSvg) {
+    newPromptSvg.style.width = '14px';
+    newPromptSvg.style.height = '14px';
+    newPromptSvg.style.strokeWidth = '2px';
+  }
+  newPromptOption.appendChild(newPromptIcon);
+
+  const newPromptText = document.createElement('span');
+  newPromptText.textContent = 'New Prompt';
+  newPromptOption.appendChild(newPromptText);
+
+  newPromptOption.addEventListener('mouseenter', () => {
+    newPromptOption.style.backgroundColor = 'var(--background-modifier-hover)';
+  });
+  
+  newPromptOption.addEventListener('mouseleave', () => {
+    newPromptOption.style.backgroundColor = 'transparent';
+  });
+  
+  newPromptOption.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onSelect('new-prompt');
+    dropdown.remove();
+    
+    // Reset chip hover state after selection
+    chipElement.style.backgroundColor = 'var(--interactive-normal)';
+    chipElement.style.color = 'var(--text-muted)';
+  });
+  
+  dropdown.appendChild(newPromptOption);
+
+  // Get open markdown files
+  const openFiles = getOpenMarkdownFiles(context);
+  
+  if (openFiles.length > 0) {
+    // Add separator
+    const separator = document.createElement('div');
+    separator.style.height = '1px';
+    separator.style.backgroundColor = 'var(--background-modifier-border)';
+    separator.style.margin = '4px 0';
+    dropdown.appendChild(separator);
+
+    // Add open file options
+    openFiles.forEach(fileName => {
+      const fileOption = document.createElement('div');
+      fileOption.style.padding = '6px 8px';
+      fileOption.style.cursor = 'pointer';
+      fileOption.style.borderRadius = '3px';
+      fileOption.style.fontSize = '12px';
+      fileOption.style.color = 'var(--text-normal)';
+      fileOption.style.transition = 'background-color 0.1s ease';
+      fileOption.style.display = 'flex';
+      fileOption.style.alignItems = 'center';
+      fileOption.style.gap = '6px';
+
+      // Add file icon
+      const fileIcon = document.createElement('span');
+      fileIcon.style.display = 'inline-flex';
+      fileIcon.style.width = '14px';
+      fileIcon.style.height = '14px';
+      fileIcon.style.flexShrink = '0';
+      setIcon(fileIcon, 'file-text');
+      const fileSvg = fileIcon.querySelector('svg') as SVGElement | null;
+      if (fileSvg) {
+        fileSvg.style.width = '14px';
+        fileSvg.style.height = '14px';
+        fileSvg.style.strokeWidth = '2px';
+      }
+      fileOption.appendChild(fileIcon);
+
+      const fileText = document.createElement('span');
+      fileText.textContent = fileName;
+      fileText.style.overflow = 'hidden';
+      fileText.style.textOverflow = 'ellipsis';
+      fileText.style.whiteSpace = 'nowrap';
+      fileOption.appendChild(fileText);
+
+      fileOption.addEventListener('mouseenter', () => {
+        fileOption.style.backgroundColor = 'var(--background-modifier-hover)';
+      });
+      
+      fileOption.addEventListener('mouseleave', () => {
+        fileOption.style.backgroundColor = 'transparent';
+      });
+      
+      fileOption.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onSelect('open-file', fileName);
+        dropdown.remove();
+        
+        // Reset chip hover state after selection
+        chipElement.style.backgroundColor = 'var(--interactive-normal)';
+        chipElement.style.color = 'var(--text-muted)';
+      });
+      
+      dropdown.appendChild(fileOption);
+    });
+  }
+
+  // Position dropdown using absolute positioning with boundary checks
+  // 메뉴를 임시로 DOM에 추가하여 실제 크기 측정
+  dropdown.style.position = 'fixed';
+  dropdown.style.top = '-9999px';
+  dropdown.style.left = '-9999px';
+  dropdown.style.visibility = 'hidden';
+  document.body.appendChild(dropdown);
+  
+  // chip의 위치를 기준으로 드롭다운 위치 계산
+  const chipRect = chipElement.getBoundingClientRect();
+  let top = chipRect.bottom + 5;
+  let left = chipRect.left;
+  
+  // 화면 경계를 벗어나지 않도록 조정
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  // 실제 메뉴 크기 측정
+  const dropdownRect = dropdown.getBoundingClientRect();
+  const menuWidth = dropdownRect.width;
+  const menuHeight = dropdownRect.height;
+  
+  // 오른쪽 경계 체크
+  if (left + menuWidth > viewportWidth) {
+    left = viewportWidth - menuWidth - 10;
+  }
+  
+  // 하단 경계 체크
+  if (top + menuHeight > viewportHeight) {
+    top = chipRect.top - menuHeight - 5; // chip 위쪽에 표시
+  }
+  
+  // 최종 위치 설정
+  dropdown.style.top = `${top}px`;
+  dropdown.style.left = `${left}px`;
+  dropdown.style.visibility = 'visible';
+
+  // Close dropdown when clicking outside
+  const closeDropdown = (e: Event) => {
+    if (!dropdown.contains(e.target as Node) && !chipElement.contains(e.target as Node)) {
+      dropdown.remove();
+      // Reset chip hover state when dropdown closes
+      chipElement.style.backgroundColor = 'var(--interactive-normal)';
+      chipElement.style.color = 'var(--text-muted)';
+      document.removeEventListener('click', closeDropdown);
+    }
+  };
+  
+  // Delay adding the listener to avoid immediate closure
+  setTimeout(() => {
+    document.addEventListener('click', closeDropdown);
+  }, 0);
+}
+
+// Get open markdown files
+function getOpenMarkdownFiles(context: ISummarViewContext): string[] {
+  const openFiles: string[] = [];
+  
+  try {
+    // Method 1: Get all markdown leaves
+    const markdownLeaves = context.plugin.app.workspace.getLeavesOfType('markdown');
+    // console.log('Found markdown leaves:', markdownLeaves.length);
+    
+    markdownLeaves.forEach((leaf, index) => {
+      // console.log(`Leaf ${index}:`, leaf);
+      if (leaf.view) {
+        // console.log(`Leaf ${index} view type:`, leaf.view.getViewType());
+        
+        // Try multiple ways to get the file
+        let file = null;
+        
+        // Method A: Direct file property
+        if ((leaf.view as any).file) {
+          file = (leaf.view as any).file;
+          // console.log(`Leaf ${index} file from direct property:`, file?.basename);
+        }
+        
+        // Method B: Through getState if available
+        if (!file && typeof (leaf.view as any).getState === 'function') {
+          try {
+            const state = (leaf.view as any).getState();
+            if (state && state.file) {
+              const abstractFile = context.plugin.app.vault.getAbstractFileByPath(state.file);
+              if (abstractFile && 'basename' in abstractFile) {
+                file = abstractFile;
+                // console.log(`Leaf ${index} file from state:`, (file as any).basename);
+              }
+            }
+          } catch (e) {
+            // console.log(`Leaf ${index} getState failed:`, e);
+          }
+        }
+        
+        // Method C: Through app.workspace if it's the active leaf
+        if (!file && leaf === context.plugin.app.workspace.activeLeaf) {
+          file = context.plugin.app.workspace.getActiveFile();
+          // console.log(`Leaf ${index} file from activeFile:`, file?.basename);
+        }
+        
+        // Method D: Check if it's a MarkdownView and use its properties
+        if (!file && leaf.view.constructor.name === 'MarkdownView') {
+          try {
+            const markdownView = leaf.view as any;
+            if (markdownView.data && markdownView.file) {
+              file = markdownView.file;
+              // console.log(`Leaf ${index} file from MarkdownView:`, file?.basename);
+            }
+          } catch (e) {
+            // console.log(`Leaf ${index} MarkdownView access failed:`, e);
+          }
+        }
+        
+        if (file && (file as any).basename) {
+          openFiles.push((file as any).basename);
+          // console.log(`Added file: ${(file as any).basename}`);
+        } else {
+          // console.log(`Leaf ${index} - no file found or no basename`);
+        }
+      } else {
+        // console.log(`Leaf ${index} has no view`);
+      }
+    });
+
+    // Method 2: Also try getting all open files from vault
+    const allFiles = context.plugin.app.vault.getAllLoadedFiles();
+    const openTabs = context.plugin.app.workspace.getLeavesOfType('markdown');
+    
+    // console.log('All loaded files count:', allFiles.length);
+    // console.log('Open tabs count:', openTabs.length);
+    
+    // Get files that are currently in tabs
+    openTabs.forEach(leaf => {
+      if (leaf.view) {
+        // Try to get display text or title from the leaf
+        const displayText = (leaf as any).getDisplayText?.() || '';
+        const tabHeaderEl = (leaf as any).tabHeaderEl;
+        const tabTitle = tabHeaderEl?.querySelector('.workspace-tab-header-inner-title')?.textContent || '';
+        
+        // console.log('Tab display text:', displayText);
+        // console.log('Tab title:', tabTitle);
+        
+        if (displayText && !openFiles.includes(displayText)) {
+          openFiles.push(displayText);
+          // console.log('Added from display text:', displayText);
+        }
+        
+        if (tabTitle && !openFiles.includes(tabTitle)) {
+          openFiles.push(tabTitle);
+          // console.log('Added from tab title:', tabTitle);
+        }
+      }
+    });
+
+  } catch (error) {
+    // console.error('Error getting open markdown files:', error);
+  }
+  
+  // Remove duplicates and sort
+  const uniqueFiles = [...new Set(openFiles)].sort();
+  // console.log('Final unique files:', uniqueFiles);
+  return uniqueFiles;
 }
 
 // Get available models - use the plugin's getAllModelKeyValues method
@@ -202,7 +571,6 @@ export function createOutputHeader(label: string, buttons: HeaderButtonsSet, con
   labelChip.style.color = 'var(--text-muted)';
   labelChip.style.marginLeft = '2px';
   labelChip.style.marginRight = '0px';
-  labelChip.style.fontWeight = 'bold';
   labelChip.style.flexShrink = '0';
   labelChip.style.backgroundColor = 'var(--interactive-normal)';
   labelChip.style.padding = '2px 6px 2px 4px';
@@ -287,13 +655,15 @@ export function createComposerHeader(label: string, buttons: ComposerHeaderButto
   labelChip.style.color = 'var(--text-muted)';
   labelChip.style.marginLeft = '2px';
   labelChip.style.marginRight = '0px';
-  labelChip.style.fontWeight = 'bold';
   labelChip.style.flexShrink = '0';
   labelChip.style.width = 'auto';
   labelChip.style.minWidth = 'fit-content';
   labelChip.style.backgroundColor = 'var(--interactive-normal)';
   labelChip.style.padding = '2px 6px 2px 4px';
   labelChip.style.borderRadius = '3px';
+  labelChip.style.cursor = 'pointer';
+  labelChip.style.transition = 'all 0.2s ease';
+  labelChip.style.position = 'relative';
 
   if (options?.icon) {
     const iconHolder = document.createElement('span');
@@ -318,6 +688,35 @@ export function createComposerHeader(label: string, buttons: ComposerHeaderButto
   labelText.classList.add('composer-label-text');
   labelText.textContent = label;
   labelChip.appendChild(labelText);
+
+  // Hover effects for labelChip
+  labelChip.addEventListener('mouseenter', () => {
+    labelChip.style.backgroundColor = 'var(--interactive-accent)';
+    labelChip.style.color = 'var(--text-on-accent)';
+  });
+
+  labelChip.addEventListener('mouseleave', () => {
+    labelChip.style.backgroundColor = 'var(--interactive-normal)';
+    labelChip.style.color = 'var(--text-muted)';
+  });
+
+  // Click event for labelChip dropdown
+  labelChip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showLabelDropdown(labelChip, context, (action: string, file?: string) => {
+      if (action === 'new-prompt') {
+        // Handle new prompt action
+        const composerManager = (context as any).composerManager;
+        if (composerManager && composerManager.toggleComposerContainer) {
+          composerManager.toggleComposerContainer();
+        }
+      } else if (action === 'open-file' && file) {
+        // Handle opening specific file
+        context.plugin.app.workspace.openLinkText(file, '', false);
+      }
+    });
+  });
+
   labelModelContainer.appendChild(labelChip);
 
   // Model chip
@@ -331,7 +730,6 @@ export function createComposerHeader(label: string, buttons: ComposerHeaderButto
   modelChip.style.color = 'var(--text-muted)';
   modelChip.style.marginLeft = '2px';
   modelChip.style.marginRight = '0px';
-  modelChip.style.fontWeight = 'bold';
   modelChip.style.flexShrink = '0';
   modelChip.style.width = 'auto';
   modelChip.style.minWidth = 'fit-content';
@@ -527,10 +925,11 @@ function setupOutputHeaderMenuButton(menuButton: HTMLElement, buttons: HeaderBut
 
 // 숨겨진 버튼들의 메뉴 표시
 function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: HeaderButtonsSet, hiddenButtons: OutputHeaderHiddenButtonsState, context: ISummarViewContext, key: string): void {
-  // 기존 드롭다운 제거
-  const existingDropdown = document.querySelector('.output-header-hidden-menu');
-  if (existingDropdown) {
-    existingDropdown.remove();
+  // Check if this specific output header menu is already open
+  const existingOutputHeaderMenu = document.querySelector('.output-header-hidden-menu[data-key="' + key + '"]');
+  if (existingOutputHeaderMenu) {
+    // If clicking the same button, close the menu
+    existingOutputHeaderMenu.remove();
     return;
   }
 
@@ -567,6 +966,7 @@ function showOutputHeaderHiddenButtonsMenu(menuButton: HTMLElement, buttons: Hea
   // 드롭다운 메뉴 생성
   const dropdown = document.createElement('div');
   dropdown.classList.add('output-header-hidden-menu', 'summar-popup-menu');
+  dropdown.setAttribute('data-key', key);
   dropdown.style.position = 'fixed'; // fixed positioning like existing menus
   dropdown.style.backgroundColor = 'var(--background-primary)';
   dropdown.style.border = '1px solid var(--background-modifier-border)';
