@@ -211,6 +211,7 @@ export interface ISummarComposerManager {
   sendMessage(message: string): Promise<void>;
   clearComposer(): void;
   newPrompt(): void;
+  linkNote(filePath: string): void;
   showComposerContainer(): void;
   hideComposerContainer(): void;
   setOutput(key: string): void;

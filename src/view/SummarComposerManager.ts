@@ -374,14 +374,28 @@ export class SummarComposerManager implements ISummarComposerManager {
     this.clearAllHighlighting();
     this.resetComposerLabel();
     this.showComposerContainer();
-    
+
     // this.isComposerVisible = !this.isComposerVisible;
-    
+
     // if (this.isComposerVisible) {
     //   this.showComposerContainer();
     // } else {
     //   this.hideComposerContainer();
     // }
+  }
+
+  linkNote(filePath: string): void {
+    this.targetKey = null;
+    this.clearAllHighlighting();
+
+    const segments = filePath.split(/[\\\/]/);
+    const fileName = segments.length > 0 ? segments[segments.length - 1] : filePath;
+    this.setComposerLabel(`${fileName}`);
+
+    this.targetKey = this.context.plugin.generateUniqueId();
+
+    this.showComposerContainer();
+    SummarDebug.log(1, `Composer linked to note: ${fileName} (key: ${this.targetKey})`);
   }
 
   showComposerContainer(): void {
@@ -485,18 +499,25 @@ export class SummarComposerManager implements ISummarComposerManager {
 
     if (!this.targetKey && this.context.outputManager) {
       this.targetKey = this.context.plugin.generateUniqueId();
-      this.context.plugin.updateOutputText(this.targetKey,
-                                          'conversation', 
-                                          '',
-                                          true);
-      let outputItem = this.context.outputRecords.get(this.targetKey)?.itemEl || null;
-      if (outputItem) {
-        this.context.outputManager.enableOutputItemButtons(outputItem,['reply-output-button']);
-      }
-      this.setOutput(this.targetKey);
     }
-    // targetKey가 있으면 해당 output에 대화 추가
+
     if (this.targetKey && this.context.outputManager) {
+      let rec = this.context.outputRecords.get(this.targetKey) || null;
+      if (!rec || !rec.itemEl) {
+        const composerLabel = this.composerHeaderLabel?.textContent || 'compose prompt';
+        const headerLabel = composerLabel === 'compose prompt' ? 'conversation' : composerLabel;
+        this.context.plugin.updateOutputText(this.targetKey,
+                                            headerLabel,
+                                            '',
+                                            false);
+        rec = this.context.outputRecords.get(this.targetKey) || null;
+        const outputItem = rec?.itemEl || null;
+        if (outputItem) {
+          this.context.outputManager.enableOutputItemButtons(outputItem as HTMLDivElement, ['reply-output-button']);
+        }
+        this.setOutput(this.targetKey);
+      }
+
       const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
 
       // summarai.complete()에 전달할 conversations 준비
@@ -595,9 +616,6 @@ export class SummarComposerManager implements ISummarComposerManager {
   }
 
   private updateComposerLabel(key: string): void {
-    if (!this.composerHeaderLabel) return;
-
-    // outputRecords에서 타겟 아이템의 라벨 찾기
     const targetRecord = this.context.outputRecords.get(key);
     let targetLabel = '';
     
@@ -605,19 +623,20 @@ export class SummarComposerManager implements ISummarComposerManager {
       targetLabel = targetRecord.label;
     }
 
-    // 저장된 label element 직접 사용
     if (targetLabel) {
-      this.composerHeaderLabel.textContent = `reply to: ${targetLabel}`;
+      this.setComposerLabel(`reply to: ${targetLabel}`);
       SummarDebug.log(1, `Composer label updated to: Reply to: ${targetLabel}`);
     }
   }
 
   private resetComposerLabel(): void {
-    if (!this.composerHeaderLabel) return;
-
-    // 저장된 label element 직접 사용
-    this.composerHeaderLabel.textContent = 'compose prompt';
+    this.setComposerLabel('compose prompt');
     SummarDebug.log(1, 'Composer label reset to default');
+  }
+
+  private setComposerLabel(label: string): void {
+    if (!this.composerHeaderLabel) return;
+    this.composerHeaderLabel.textContent = label;
   }
 
   cleanup(): void {

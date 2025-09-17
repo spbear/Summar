@@ -398,7 +398,7 @@ function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext
       
       fileOption.addEventListener('click', (e) => {
         e.stopPropagation();
-        onSelect('link-note', fileName);
+        onSelect('open-file', fileName);
         dropdown.remove();
         
         // Reset chip hover state after selection
@@ -766,13 +766,15 @@ export function createComposerHeader(label: string, buttons: ComposerHeaderButto
     e.stopPropagation();
     showLabelDropdown(labelChip, context, (action: string, file?: string) => {
       if (action === 'new-prompt') {
-        // Handle new prompt action
         const composerManager = (context as any).composerManager;
         if (composerManager && composerManager.newPrompt) {
           composerManager.newPrompt();
         }
-      } else if (action === 'link-note' && file) {
-        // Handle opening specific file
+      } else if (action === 'open-file' && file) {
+        const composerManager = (context as any).composerManager;
+        if (composerManager && composerManager.linkNote) {
+          composerManager.linkNote(file);
+        }
         // context.plugin.app.workspace.openLinkText(file, '', false);
       }
     });
