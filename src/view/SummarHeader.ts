@@ -1,4 +1,4 @@
-import { setIcon } from 'obsidian';
+import { setIcon, TFile } from 'obsidian';
 import { ISummarViewContext, OutputHeaderHiddenButtonsState } from './SummarViewTypes';
 import { SummarMenuUtils } from './SummarMenuUtils';
 
@@ -27,6 +27,11 @@ export type LabelOptions = {
 
 export type HeaderHighlightOptions = {
   useImportant?: boolean;
+};
+
+type OpenMarkdownFile = {
+  displayName: string;
+  path?: string;
 };
 
 function setStyleProperty(element: HTMLElement, property: string, value: string, useImportant: boolean): void {
@@ -389,7 +394,9 @@ function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext
     dropdown.appendChild(separator);
 
     // Add open file options
-    openFiles.forEach(fileName => {
+    openFiles.forEach(fileInfo => {
+      const displayName = fileInfo.displayName;
+      const filePath = fileInfo.path;
       const fileOption = document.createElement('div');
       fileOption.style.padding = '6px 8px';
       fileOption.style.cursor = 'pointer';
@@ -417,7 +424,8 @@ function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext
       fileOption.appendChild(fileIcon);
 
       const fileText = document.createElement('span');
-      fileText.textContent = fileName;
+      fileText.textContent = displayName;
+      fileText.title = filePath ?? displayName;
       fileText.style.overflow = 'hidden';
       fileText.style.textOverflow = 'ellipsis';
       fileText.style.whiteSpace = 'nowrap';
@@ -433,9 +441,9 @@ function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext
       
       fileOption.addEventListener('click', (e) => {
         e.stopPropagation();
-        onSelect('open-file', fileName);
+        onSelect('open-file', filePath ?? displayName);
         dropdown.remove();
-        
+
         // Reset chip hover state after selection
         chipElement.style.backgroundColor = 'var(--interactive-normal)';
         chipElement.style.color = 'var(--text-muted)';
@@ -500,112 +508,108 @@ function showLabelDropdown(chipElement: HTMLElement, context: ISummarViewContext
 }
 
 // Get open markdown files
-function getOpenMarkdownFiles(context: ISummarViewContext): string[] {
-  const openFiles: string[] = [];
-  
+function getOpenMarkdownFiles(context: ISummarViewContext): OpenMarkdownFile[] {
+  const openFiles: OpenMarkdownFile[] = [];
+  const fallbackDisplayNames = new Set<string>();
+  const seenPaths = new Set<string>();
+  const seenDisplayNames = new Set<string>();
+
+  const isTFile = (value: unknown): value is TFile => {
+    return Boolean(
+      value &&
+      typeof value === 'object' &&
+      typeof (value as TFile).path === 'string' &&
+      typeof (value as TFile).basename === 'string'
+    );
+  };
+
+  const addFileEntry = (file: TFile) => {
+    if (seenPaths.has(file.path)) {
+      return;
+    }
+    seenPaths.add(file.path);
+    seenDisplayNames.add(file.basename);
+    openFiles.push({ displayName: file.basename, path: file.path });
+  };
+
+  const addFallbackDisplayName = (name: string) => {
+    if (!name || seenDisplayNames.has(name)) {
+      return;
+    }
+    seenDisplayNames.add(name);
+    fallbackDisplayNames.add(name);
+  };
+
   try {
-    // Method 1: Get all markdown leaves
     const markdownLeaves = context.plugin.app.workspace.getLeavesOfType('markdown');
-    // console.log('Found markdown leaves:', markdownLeaves.length);
-    
-    markdownLeaves.forEach((leaf, index) => {
-      // console.log(`Leaf ${index}:`, leaf);
-      if (leaf.view) {
-        // console.log(`Leaf ${index} view type:`, leaf.view.getViewType());
-        
-        // Try multiple ways to get the file
-        let file = null;
-        
-        // Method A: Direct file property
-        if ((leaf.view as any).file) {
-          file = (leaf.view as any).file;
-          // console.log(`Leaf ${index} file from direct property:`, file?.basename);
-        }
-        
-        // Method B: Through getState if available
-        if (!file && typeof (leaf.view as any).getState === 'function') {
-          try {
-            const state = (leaf.view as any).getState();
-            if (state && state.file) {
-              const abstractFile = context.plugin.app.vault.getAbstractFileByPath(state.file);
-              if (abstractFile && 'basename' in abstractFile) {
-                file = abstractFile;
-                // console.log(`Leaf ${index} file from state:`, (file as any).basename);
-              }
+
+    markdownLeaves.forEach((leaf) => {
+      if (!leaf.view) {
+        return;
+      }
+
+      let file: TFile | null = null;
+
+      if ((leaf.view as any).file) {
+        file = (leaf.view as any).file as TFile;
+      }
+
+      if (!file && typeof (leaf.view as any).getState === 'function') {
+        try {
+          const state = (leaf.view as any).getState();
+          if (state?.file) {
+            const abstractFile = context.plugin.app.vault.getAbstractFileByPath(state.file);
+            if (isTFile(abstractFile)) {
+              file = abstractFile;
             }
-          } catch (e) {
-            // console.log(`Leaf ${index} getState failed:`, e);
           }
+        } catch (e) {
+          // noop — best effort lookup
         }
-        
-        // Method C: Through app.workspace if it's the active leaf
-        if (!file && leaf === context.plugin.app.workspace.activeLeaf) {
-          file = context.plugin.app.workspace.getActiveFile();
-          // console.log(`Leaf ${index} file from activeFile:`, file?.basename);
+      }
+
+      if (!file && leaf === context.plugin.app.workspace.activeLeaf) {
+        const activeFile = context.plugin.app.workspace.getActiveFile();
+        if (isTFile(activeFile)) {
+          file = activeFile;
         }
-        
-        // Method D: Check if it's a MarkdownView and use its properties
-        if (!file && leaf.view.constructor.name === 'MarkdownView') {
-          try {
-            const markdownView = leaf.view as any;
-            if (markdownView.data && markdownView.file) {
-              file = markdownView.file;
-              // console.log(`Leaf ${index} file from MarkdownView:`, file?.basename);
-            }
-          } catch (e) {
-            // console.log(`Leaf ${index} MarkdownView access failed:`, e);
+      }
+
+      if (!file && leaf.view.constructor.name === 'MarkdownView') {
+        try {
+          const markdownView = leaf.view as any;
+          if (isTFile(markdownView.file)) {
+            file = markdownView.file as TFile;
           }
+        } catch (e) {
+          // noop — best effort lookup
         }
-        
-        if (file && (file as any).basename) {
-          openFiles.push((file as any).basename);
-          // console.log(`Added file: ${(file as any).basename}`);
-        } else {
-          // console.log(`Leaf ${index} - no file found or no basename`);
-        }
+      }
+
+      if (file && isTFile(file)) {
+        addFileEntry(file);
       } else {
-        // console.log(`Leaf ${index} has no view`);
-      }
-    });
+        const displayText = (leaf as any).getDisplayText?.();
+        if (typeof displayText === 'string') {
+          addFallbackDisplayName(displayText);
+        }
 
-    // Method 2: Also try getting all open files from vault
-    const allFiles = context.plugin.app.vault.getAllLoadedFiles();
-    const openTabs = context.plugin.app.workspace.getLeavesOfType('markdown');
-    
-    // console.log('All loaded files count:', allFiles.length);
-    // console.log('Open tabs count:', openTabs.length);
-    
-    // Get files that are currently in tabs
-    openTabs.forEach(leaf => {
-      if (leaf.view) {
-        // Try to get display text or title from the leaf
-        const displayText = (leaf as any).getDisplayText?.() || '';
         const tabHeaderEl = (leaf as any).tabHeaderEl;
-        const tabTitle = tabHeaderEl?.querySelector('.workspace-tab-header-inner-title')?.textContent || '';
-        
-        // console.log('Tab display text:', displayText);
-        // console.log('Tab title:', tabTitle);
-        
-        if (displayText && !openFiles.includes(displayText)) {
-          openFiles.push(displayText);
-          // console.log('Added from display text:', displayText);
-        }
-        
-        if (tabTitle && !openFiles.includes(tabTitle)) {
-          openFiles.push(tabTitle);
-          // console.log('Added from tab title:', tabTitle);
+        const tabTitle = tabHeaderEl?.querySelector('.workspace-tab-header-inner-title')?.textContent;
+        if (typeof tabTitle === 'string') {
+          addFallbackDisplayName(tabTitle);
         }
       }
     });
-
   } catch (error) {
-    // console.error('Error getting open markdown files:', error);
+    // noop — best effort lookup
   }
-  
-  // Remove duplicates and sort
-  const uniqueFiles = [...new Set(openFiles)].sort();
-  // console.log('Final unique files:', uniqueFiles);
-  return uniqueFiles;
+
+  fallbackDisplayNames.forEach((name) => {
+    openFiles.push({ displayName: name });
+  });
+
+  return openFiles.sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 // Get available models - use the plugin's getAllModelKeyValues method

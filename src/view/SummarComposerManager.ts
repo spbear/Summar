@@ -13,7 +13,6 @@ export class SummarComposerManager implements ISummarComposerManager {
   private composerHeader: HTMLDivElement | null = null;
   private composerHeaderLabel: HTMLElement | null = null;
   private promptEditor: HTMLTextAreaElement | null = null;
-  private isComposerVisible: boolean = false;
   private splitter: HTMLDivElement | null = null;
   private isResizing: boolean = false;
   private minComposerHeight: number = 100;
@@ -329,7 +328,6 @@ export class SummarComposerManager implements ISummarComposerManager {
       if (!canShow) {
         // canShow가 false가 되면 composer를 자동으로 숨김
         SummarDebug.log(1, `View resized: composer cannot be shown anymore (height=${currentComposerHeight}px), hiding automatically`);
-        this.isComposerVisible = false;
         this.hideComposerContainer();
         return;
       }
@@ -389,13 +387,26 @@ export class SummarComposerManager implements ISummarComposerManager {
     this.clearAllHighlighting();
 
     const segments = filePath.split(/[\\\/]/);
-    const fileName = segments.length > 0 ? segments[segments.length - 1] : filePath;
-    this.setComposerLabel(`${fileName}`);
+    const lastSegment = segments.length > 0 ? segments[segments.length - 1] : filePath;
+    const dotIndex = lastSegment.lastIndexOf('.');
+    const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
+    this.setComposerLabel(displayName);
 
     this.targetKey = this.context.plugin.generateUniqueId();
 
+
+    if (this.context.outputManager) {
+      let rec = this.context.outputRecords.get(this.targetKey);
+      if (!rec) {
+        // this.context.outputManager.setNewNoteName(this.targetKey, filePath);
+        // const rec = new SummarOutputRecord(this.targetKey);
+        // rec.noteName = filePath;
+SummarDebug.log(1, `filePath: ${filePath}`);       
+      }
+    }
+
     this.showComposerContainer();
-    SummarDebug.log(1, `Composer linked to note: ${fileName} (key: ${this.targetKey})`);
+    SummarDebug.log(1, `Composer linked to note: ${displayName} (key: ${this.targetKey})`);
   }
 
   showComposerContainer(): void {
@@ -404,9 +415,6 @@ export class SummarComposerManager implements ISummarComposerManager {
     
     // 높이 제한 검사 - composer가 전체 높이의 절반보다 클 경우 표시하지 않음
     if (!canShow) {
-      // 상태 복원
-      this.isComposerVisible = false;
-      
       // 사용자에게 알림
       SummarDebug.Notice(0, `Composer cannot be shown: required height (${proposedHeight}px) exceeds half of view height (${Math.floor(maxAllowedHeight)}px)`);
       
