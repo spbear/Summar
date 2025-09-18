@@ -1,8 +1,8 @@
 import { ISummarStickyHeaderManager, ISummarViewContext, OutputHeaderHiddenButtonsState } from "./SummarViewTypes";
 import { SummarDebug } from "../globals";
 import { setIcon } from "obsidian";
-import { createOutputHeader, createOutputHeaderButtons, getDefaultLabelIcon, HeaderButtonsSet } from "./SummarHeader";
-import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
+import { createOutputHeader, createOutputHeaderButtons, getDefaultLabelIcon, HeaderButtonsSet, setHeaderHighlight as applyHeaderHighlight, clearHeaderHighlight as resetHeaderHighlight } from "./SummarHeader";
+import { SummarMenuUtils } from "./SummarMenuUtils";
 
 export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
   private stickyHeaderContainer: HTMLDivElement | null = null;
@@ -713,66 +713,22 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
 
   // ===== 하이라이트 관련 메서드 =====
   
-  highlightStickyHeader(key: string): void {
+  setHeaderHighlight(key: string): void {
     // 해당 key의 sticky header 찾기
     const stickyHeader = this.context.containerEl.querySelector(`.sticky-header[data-key="${key}"] .output-header`) as HTMLElement;
     if (stickyHeader) {
-      // 배색 반전 효과 적용 (!important로 강제 적용)
-      this.applyInvertedColorScheme(stickyHeader);
+      applyHeaderHighlight(stickyHeader, { useImportant: true });
       SummarDebug.log(1, `Sticky header highlighted with inverted colors for key: ${key}`);
     }
   }
 
-  clearAllStickyHeaderHighlights(): void {
+  clearHeaderHighlight(): void {
     // 모든 sticky header에서 하이라이팅 제거
     const stickyHeaders = this.context.containerEl.querySelectorAll('.sticky-header .output-header');
     stickyHeaders.forEach((header: HTMLElement) => {
-      this.applyOriginalColorScheme(header);
+      resetHeaderHighlight(header, { useImportant: true });
     });
     SummarDebug.log(1, 'All sticky header highlights cleared');
-  }
-
-  /**
-   * Sticky 헤더에 하이라이트 효과를 적용합니다 (!important 사용)
-   */
-  private applyInvertedColorScheme(header: HTMLElement): void {
-    // 헤더 배경색 변경 (!important로 강제 적용)
-    header.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
-    
-    // 헤더 내부의 모든 텍스트 요소(라벨) 배경색을 투명하게 (!important로 강제 적용)
-    const textElements = header.querySelectorAll('.output-label-text, .data-label, .output-label-chip, .output-label-icon');
-    textElements.forEach((element: HTMLElement) => {
-      element.style.setProperty('background-color', 'var(--background-primary)', 'important');
-    });
-    
-    // 헤더 내부의 모든 버튼 배경색을 투명하게 (!important로 강제 적용)
-    const buttons = header.querySelectorAll('button, .lucide-icon-button');
-    buttons.forEach((button: HTMLElement) => {
-      button.style.setProperty('background-color', 'var(--background-primary)', 'important');
-    });
-  }
-
-  /**
-   * Sticky 헤더를 원래 배색으로 복원합니다
-   */
-  /**
-   * Sticky 헤더에서 원래 배색으로 복원합니다
-   */
-  private applyOriginalColorScheme(header: HTMLElement): void {
-    // 헤더 배경색 제거
-    header.style.removeProperty('background-color');
-    
-    // 헤더 내부의 모든 텍스트 요소(라벨) 배경색을 hover 색상으로
-    const textElements = header.querySelectorAll('.output-label-text, .data-label, .output-label-chip, .output-label-icon');
-    textElements.forEach((element: HTMLElement) => {
-      element.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
-    });
-    
-    // 헤더 내부의 모든 버튼 배경색을 hover 색상으로
-    const buttons = header.querySelectorAll('button, .lucide-icon-button');
-    buttons.forEach((button: HTMLElement) => {
-      button.style.setProperty('background-color', 'var(--background-modifier-hover)', 'important');
-    });
   }
 
   private applyCurrentHighlightState(key: string): void {
@@ -787,8 +743,7 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       SummarDebug.log(1, `Found sticky header element:`, stickyHeader);
       
       if (stickyHeader) {
-        // 배색 반전 효과 적용
-        this.applyInvertedColorScheme(stickyHeader);
+        applyHeaderHighlight(stickyHeader, { useImportant: true });
         SummarDebug.log(1, `Applied current inverted color scheme to sticky header for key: ${key}`);
       } else {
         SummarDebug.log(1, `Failed to find sticky header for key: ${key}`);

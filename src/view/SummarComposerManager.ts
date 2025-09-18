@@ -599,19 +599,19 @@ export class SummarComposerManager implements ISummarComposerManager {
     
     // 새로운 하이라이팅 적용
     if (this.context.outputManager) {
-      this.context.outputManager.highlightOutputHeader(key);
+      this.context.outputManager.setHeaderHighlight(key);
     }
     if (this.context.stickyHeaderManager) {
-      this.context.stickyHeaderManager.highlightStickyHeader(key);
+      this.context.stickyHeaderManager.setHeaderHighlight(key);
     }
   }
 
   private clearAllHighlighting(): void {
     if (this.context.outputManager) {
-      this.context.outputManager.clearAllHeaderHighlights();
+      this.context.outputManager.clearHeaderHighlight();
     }
     if (this.context.stickyHeaderManager) {
-      this.context.stickyHeaderManager.clearAllStickyHeaderHighlights();
+      this.context.stickyHeaderManager.clearHeaderHighlight();
     }
   }
 

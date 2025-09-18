@@ -25,6 +25,41 @@ export type LabelOptions = {
   selectedModel?: string; // selected model for modelchip
 };
 
+export type HeaderHighlightOptions = {
+  useImportant?: boolean;
+};
+
+function setStyleProperty(element: HTMLElement, property: string, value: string, useImportant: boolean): void {
+  if (useImportant) {
+    element.style.setProperty(property, value, 'important');
+  } else {
+    (element.style as any)[property.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = value;
+  }
+}
+
+export function setHeaderHighlight(header: HTMLElement, options?: HeaderHighlightOptions): void {
+  const useImportant = options?.useImportant ?? false;
+  setStyleProperty(header, 'background-color', 'var(--background-modifier-hover)', useImportant);
+
+  const textElements = header.querySelectorAll('.output-label-chip, .output-label-icon, .output-label-text, .data-label');
+  textElements.forEach(element => setStyleProperty(element as HTMLElement, 'background-color', 'var(--background-primary)', useImportant));
+
+  const buttons = header.querySelectorAll('button, .lucide-icon-button');
+  buttons.forEach(button => setStyleProperty(button as HTMLElement, 'background-color', 'var(--background-primary)', useImportant));
+}
+
+export function clearHeaderHighlight(header: HTMLElement, options?: HeaderHighlightOptions): void {
+  const useImportant = options?.useImportant ?? false;
+
+  header.style.removeProperty('background-color');
+
+  const textElements = header.querySelectorAll('.output-label-chip, .output-label-icon, .output-label-text, .data-label');
+  textElements.forEach(element => setStyleProperty(element as HTMLElement, 'background-color', 'var(--background-modifier-hover)', useImportant));
+
+  const buttons = header.querySelectorAll('button, .lucide-icon-button');
+  buttons.forEach(button => setStyleProperty(button as HTMLElement, 'background-color', 'var(--background-modifier-hover)', useImportant));
+}
+
 function createIconButton(buttonId: string, ariaLabel: string, iconName: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.className = 'lucide-icon-button';

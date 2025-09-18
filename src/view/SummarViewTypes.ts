@@ -165,7 +165,6 @@ export interface ISummarOutputManager {
   getOutputText(key: string): string;
   foldOutput(key: string | null, fold: boolean): void;
   getNoteName(key: string): string;
-  highlightOutputHeader(key: string): void;
 
   setEventHandlers(events: SummarViewEvents): void;
 
@@ -177,7 +176,8 @@ export interface ISummarOutputManager {
   cleanup(): void;
   
   // 하이라이트 관련 메서드
-  clearAllHeaderHighlights(): void;
+  setHeaderHighlight(key: string): void;
+  clearHeaderHighlight(): void;
 }
 
 export interface ISummarStickyHeaderManager {
@@ -186,13 +186,15 @@ export interface ISummarStickyHeaderManager {
   setupResizeObserver(): void;
   updateStickyHeaderVisibility(): void;
   cleanup(): void;
+
   observeHeader(outputHeader: HTMLDivElement): void;
   unobserveHeader(outputHeader: HTMLDivElement): void;
+  
   getCurrentStickyKey(): string | null;
   
   // 하이라이트 관련 메서드
-  highlightStickyHeader(key: string): void;
-  clearAllStickyHeaderHighlights(): void;
+  setHeaderHighlight(key: string): void;
+  clearHeaderHighlight(): void;
 }
 
 export interface ISummarEventHandler {
