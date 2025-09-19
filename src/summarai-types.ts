@@ -7,7 +7,8 @@ export interface SummarAIResponse {
 
 export enum SummarAIParamType {
   CONVERSATION = 'conversation',
-  OUTPUT = 'output'
+  OUTPUT = 'output',
+  NOTESYNC = 'notesync'
 }
 
 export class SummarAIParam {

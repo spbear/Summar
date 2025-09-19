@@ -61,6 +61,7 @@ export class SummarOutputRecord {
   statId?: string;
   noteName?: string;
   folded?: boolean;
+  syncNote: boolean = false;
   conversations: SummarAIParam[] = [];
 
   constructor(key: string = '') {
@@ -213,7 +214,7 @@ export interface ISummarComposerManager {
   sendMessage(message: string): Promise<void>;
   clearComposer(): void;
   newPrompt(): void;
-  linkNote(filePath: string): void;
+  linkNote(filePath: string): Promise<void>;
   showComposerContainer(): void;
   hideComposerContainer(): void;
   setOutput(key: string): void;

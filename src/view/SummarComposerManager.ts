@@ -3,7 +3,7 @@ import { ISummarComposerManager, ISummarViewContext, SummarOutputRecord } from "
 import { SummarDebug } from "../globals";
 import { createComposerHeader, ComposerHeaderButtonsSet } from "./SummarHeader";
 import { SummarAI } from "../summarai";
-import { SummarAIParam } from "../summarai-types";
+import { SummarAIParam, SummarAIParamType } from "../summarai-types";
 
 /**
  * Composer 기능 관리자
@@ -382,7 +382,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     // }
   }
 
-  linkNote(filePath: string): void {
+  async linkNote(filePath: string): Promise<void> {
     this.targetKey = null;
     this.clearAllHighlighting();
 
@@ -399,8 +399,29 @@ export class SummarComposerManager implements ISummarComposerManager {
       let rec = this.context.outputRecords.get(this.targetKey);
       if (!rec) {
         // this.context.outputManager.setNewNoteName(this.targetKey, filePath);
-        // const rec = new SummarOutputRecord(this.targetKey);
-        // rec.noteName = filePath;
+
+        const rec = new SummarOutputRecord(this.targetKey);
+        rec.noteName = filePath;
+        rec.label = displayName;
+        rec.noteName = filePath;
+        rec.syncNote = true;
+        const notePrompt = "I will provide the full content of a note.\n" + 
+                           "Please read and understand the note carefully.\n" +
+                           "After that, I will ask you a question. When answering, \n" + 
+                           "make sure to base your response primarily on the content of the note, \n "+ 
+                           "while also using your own reasoning if necessary. " + 
+                           "Do not ignore or overlook the note — it is the main context for your answer";
+
+        const noteContent = await this.context.plugin.app.vault.adapter.read(filePath).catch((error) => {
+          SummarDebug.log(1, `Failed to read note content: ${error}`);
+          return '';
+        });
+
+        
+        rec.conversations.push(new SummarAIParam('user', notePrompt, SummarAIParamType.NOTESYNC));
+        rec.conversations.push(new SummarAIParam('assistant', noteContent, SummarAIParamType.NOTESYNC));
+        this.context.outputRecords.set(this.targetKey, rec);
+        
 SummarDebug.log(1, `filePath: ${filePath}`);       
       }
     }
@@ -514,11 +535,19 @@ SummarDebug.log(1, `filePath: ${filePath}`);
       if (!rec || !rec.itemEl) {
         const composerLabel = this.composerHeaderLabel?.textContent || 'compose prompt';
         const headerLabel = composerLabel === 'compose prompt' ? 'conversation' : composerLabel;
+
+        rec = this.context.outputRecords.get(this.targetKey) || null;
+
+        let outputText = '';
+        if (rec?.syncNote) {
+          const encodedPath = encodeURI(rec.noteName as string).replace(/%5B/g, '[').replace(/%5D/g, ']'); // 공백·한글 처리
+          outputText = `[${rec.label}](${encodedPath})`;
+        }
         this.context.plugin.updateOutputText(this.targetKey,
                                             headerLabel,
-                                            '',
+                                            outputText,
                                             false);
-        rec = this.context.outputRecords.get(this.targetKey) || null;
+
         const outputItem = rec?.itemEl || null;
         if (outputItem) {
           this.context.outputManager.enableOutputItemButtons(outputItem as HTMLDivElement, ['reply-output-button']);
@@ -718,13 +747,14 @@ SummarDebug.log(1, `filePath: ${filePath}`);
   private prepareConversations(conversations: SummarAIParam[], selectedModel: string): SummarAIParam[] {
     // 1. type별로 분리
     const outputConversations = conversations.filter(conv => conv.type === 'output');
+    const noteItems = conversations.filter(conv => conv.type === 'notesync');
     const conversationItems = conversations.filter(conv => conv.type === 'conversation');
     
     // 2. conversation 타입은 최근 15개만 선택
     const recentConversations = conversationItems.slice(-15);
     
     // 3. 순서를 유지하면서 합치기 (output + 최근 conversation)
-    const filteredConversations = [...outputConversations, ...recentConversations];
+    const filteredConversations = [...outputConversations, ...noteItems, ...recentConversations];
     
     // 4. Gemini 모델인 경우 assistant -> model 변환
     if (selectedModel.includes('gemini')) {
