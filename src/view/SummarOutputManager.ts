@@ -444,6 +444,7 @@ export class SummarOutputManager implements ISummarOutputManager {
             
             // Process all conversations and add UI elements for conversation type
             let lastAssistantOutput = '';
+            let noteSyncOutput: string | null = null;
             for (let i = 0; i < conversations.length; i++) {
               const conv = conversations[i];
               // SummarDebug.log(1, `Conversation ${i}: role="${conv.role}", type="${conv.type}", textLength=${conv.text?.length || 0}`);
@@ -457,18 +458,29 @@ export class SummarOutputManager implements ISummarOutputManager {
               }
               
               // Find the last assistant OUTPUT message to display in main output area
-              if (conv.role === 'assistant' && 
-                  (conv.type === 'output' || conv.type === SummarAIParamType.OUTPUT)) {
-                lastAssistantOutput = conv.text || '';
-                // SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
+              if (conv.role === 'assistant') {
+                const convType = conv.type;
+                if ((convType === SummarAIParamType.NOTESYNC || convType === 'notesync') && noteName) {
+                  const encodedPath = encodeURI(noteName).replace(/%5B/g, '[').replace(/%5D/g, ']'); // 공백·한글 처리
+                  const segments = noteName.split(/[\\\/]/);
+                  const lastSegment = segments.length > 0 ? segments[segments.length - 1] : noteName;
+                  const dotIndex = lastSegment.lastIndexOf('.');
+                  const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
+                  
+                  noteSyncOutput = `from: [[${displayName}](${encodedPath})]`;
+                } else if (convType === 'output' || convType === SummarAIParamType.OUTPUT) {
+                  lastAssistantOutput = conv.text || '';
+                  // SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
+                }
               }
             }
             
-            if (lastAssistantOutput) {
+            const outputText = noteSyncOutput ?? lastAssistantOutput;
+            if (outputText) {
               // SummarDebug.log(1, `Found assistant OUTPUT message for key: ${key}`);
               // SummarDebug.log(1, `Message length: ${lastAssistantOutput.length}, content preview: ${lastAssistantOutput.substring(0, 100)}...`);
               // isFinal=false로 설정하여 conversations에 추가하지 않고 UI만 업데이트
-              this.updateOutputText(key, label, lastAssistantOutput, false);
+              this.updateOutputText(key, label, outputText, false);
               
               // 추가 디버깅: 업데이트 후 상태 확인
               const updatedRec = this.context.outputRecords.get(key);
@@ -927,6 +939,24 @@ export class SummarOutputManager implements ISummarOutputManager {
   getNoteName(key: string): string {
     const rec = this.context.outputRecords.get(key);
     return rec?.noteName || "";
+  }
+
+  getNoteContent(key: string): string {
+    const rec = this.context.outputRecords.get(key);
+    if (!rec || !Array.isArray(rec.conversations)) {
+      return '';
+    }
+
+    for (let i = rec.conversations.length - 1; i >= 0; i--) {
+      const conv = rec.conversations[i];
+      if (!conv) continue;
+      const { role, type, text } = conv as { role?: string; type?: string; text?: string };
+      if (role === 'assistant' && (type === SummarAIParamType.OUTPUT || type === SummarAIParamType.NOTESYNC || type === 'output' || type === 'notesync')) {
+        return text || '';
+      }
+    }
+
+    return '';    
   }
 
   cleanupMarkdownOutput(html: string): string {

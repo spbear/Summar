@@ -3,6 +3,7 @@ import { ISummarEventHandler, ISummarViewContext } from "./SummarViewTypes";
 import { SummarDebug, openNote } from "../globals";
 import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
 import SummarPlugin from "src/main";
+import { SummarAIParamType } from "../summarai-types";
 
 /**
  * Item 레벨 이벤트 핸들러
@@ -120,7 +121,13 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   }
 
   private async handleNewNoteClick(key: string): Promise<void> {
-    await openNote(this.context.plugin, this.getNoteName(key), this.getOutputText(key));
+    let outputTextContent = '';
+    const rec = this.context.outputRecords.get(key);
+    if (rec) {
+      outputTextContent = this.getNoteContent(key);
+    }
+
+    await openNote(this.context.plugin, this.getNoteName(key), outputTextContent);
   }
 
   private async handleUploadOutputToWiki(key: string): Promise<void> {
@@ -270,6 +277,13 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     if (outputManager) return outputManager.getNoteName(key);
     const rec = this.context.outputRecords.get(key);
     return rec?.noteName || "";
+  }
+  
+  private getNoteContent(key: string) : string {
+    const outputManager = (this.context as any).outputManager as { getNoteContent: (k: string) => string } | undefined;
+    if (outputManager) return outputManager.getNoteContent(key);
+
+    return '';
   }
 
   // 업로드 메서드들 (원래 SummarView에서 이동)
