@@ -224,7 +224,7 @@ export class PdfHandler extends SummarViewContainer {
 			await this.plugin.app.workspace.openLinkText(filePath, "", true);
 			this.updateOutputText(content,true);
 			this.setNewNoteName(filePath);
-			this.foldOutput(true);
+			// this.foldOutput(true);
 
 			SummarDebug.Notice(1, `Created new note: ${uniqueFileName}`, 3000);
 		} catch (error) {

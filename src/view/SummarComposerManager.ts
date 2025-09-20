@@ -536,8 +536,6 @@ SummarDebug.log(1, `filePath: ${filePath}`);
         const composerLabel = this.composerHeaderLabel?.textContent || 'compose prompt';
         const headerLabel = composerLabel === 'compose prompt' ? 'conversation' : composerLabel;
 
-        rec = this.context.outputRecords.get(this.targetKey) || null;
-
         let outputText = '';
         if (rec?.syncNote) {
           outputText = `from: [[${rec.label}](${this.targetKey})]`;
@@ -547,9 +545,14 @@ SummarDebug.log(1, `filePath: ${filePath}`);
                                             outputText,
                                             false);
 
-        const outputItem = rec?.itemEl || null;
+        const updatedRecord = this.context.outputRecords.get(this.targetKey) || rec;
+        if (updatedRecord?.syncNote) {
+          await this.syncNoteContent(this.targetKey, updatedRecord);
+        }
+
+        const outputItem = updatedRecord?.itemEl || null;
         if (outputItem) {
-          if (rec?.syncNote) {
+          if (updatedRecord?.syncNote) {
             this.context.outputManager.enableOutputItemButtons(outputItem as HTMLDivElement, 
               [
                 'new-note-button',
@@ -564,6 +567,8 @@ SummarDebug.log(1, `filePath: ${filePath}`);
           }
         }
         this.setOutput(this.targetKey);
+      } else if (rec?.syncNote) {
+        await this.syncNoteContent(this.targetKey, rec);
       }
 
       const result = this.context.outputManager.addConversation(this.targetKey, 'user', message);
@@ -660,6 +665,35 @@ SummarDebug.log(1, `filePath: ${filePath}`);
     }
     if (this.context.stickyHeaderManager) {
       this.context.stickyHeaderManager.clearHeaderHighlight();
+    }
+  }
+
+  private async syncNoteContent(key: string, rec: SummarOutputRecord): Promise<void> {
+    if (!rec || !rec.syncNote) {
+      return;
+    }
+
+    const notePath = rec.noteName;
+    if (!notePath) {
+      return;
+    }
+
+    try {
+      const adapter = this.context.plugin.app.vault.adapter;
+      const exists = await adapter.exists(notePath);
+      if (!exists) {
+        return;
+      }
+
+      const noteContent = await adapter.read(notePath);
+      rec.conversations
+        .filter(conv => conv.role === 'assistant' && conv.type === SummarAIParamType.NOTESYNC)
+        .forEach(conv => {
+          conv.text = noteContent;
+        });
+      this.context.outputRecords.set(key, rec);
+    } catch (error) {
+      SummarDebug.log(1, `Failed to populate sync note content for ${notePath}: ${error}`);
     }
   }
 

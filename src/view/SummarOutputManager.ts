@@ -468,6 +468,11 @@ export class SummarOutputManager implements ISummarOutputManager {
                   const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
                   
                   noteSyncOutput = `from: [[${displayName}](${key})]`;
+                  const rec = this.context.outputRecords.get(key);
+                  if (rec) {
+                    rec.syncNote = true;
+                    this.context.outputRecords.set(key, rec);
+                  }
                 } else if (convType === 'output' || convType === SummarAIParamType.OUTPUT) {
                   lastAssistantOutput = conv.text || '';
                   // SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
