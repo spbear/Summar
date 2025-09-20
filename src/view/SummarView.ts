@@ -1,6 +1,6 @@
-import { View, WorkspaceLeaf } from "obsidian";
+import { View, WorkspaceLeaf, normalizePath, TFile } from "obsidian";
 import SummarPlugin from "../main";
-import { SummarDebug } from "../globals";
+import { SummarDebug, openNote } from "../globals";
 import MarkdownIt from "markdown-it";
 
 // 매니저 클래스들 import
@@ -64,6 +64,7 @@ export class SummarView extends View {
       typographer: true,
     });
     this.markdownRenderer.disable(['replacements']);
+    this.setupMarkdownLinkHandling();
 
     // Create context for managers
     this.context = {
@@ -87,6 +88,9 @@ export class SummarView extends View {
 
     // Initialize managers
     this.initializeManagers();
+
+    // Setup link interception once per view
+    this.registerDomEvent(this.containerEl, 'click', this.handleNoteLinkClick);
   }
 
   private initializeManagers(): void {
@@ -229,6 +233,85 @@ export class SummarView extends View {
       observer.disconnect();
     });
   }
+
+  private setupMarkdownLinkHandling(): void {
+    const defaultRender = this.markdownRenderer.renderer.rules.link_open ?? ((tokens, idx, options, env, self) => {
+      return self.renderToken(tokens, idx, options);
+    });
+
+    this.markdownRenderer.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+      const token = tokens[idx];
+      const hrefIndex = token.attrIndex('href');
+      if (hrefIndex >= 0 && token.attrs) {
+        const hrefValue = token.attrs[hrefIndex][1] ?? '';
+        const vaultPath = this.resolveVaultFilePath(hrefValue);
+        if (vaultPath) {
+          token.attrSet('href', '#');
+          token.attrSet('data-obsidian-path', vaultPath);
+          token.attrJoin('class', 'obsidian-note-link');
+        }
+      }
+
+      return defaultRender(tokens, idx, options, env, self);
+    };
+  }
+
+  private resolveVaultFilePath(href: string): string | null {
+    if (!href) {
+      return null;
+    }
+    const trimmed = href.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('mailto:')) {
+      return null;
+    }
+    if (trimmed.startsWith('#')) {
+      return null;
+    }
+
+    let decoded = trimmed;
+    try {
+      decoded = decodeURI(trimmed);
+    } catch (error) {
+      SummarDebug.log(1, `Failed to decode link URI: ${trimmed}`);
+    }
+
+    const normalized = normalizePath(decoded);
+    const file = this.app.vault.getAbstractFileByPath(normalized);
+    if (file && file instanceof TFile) {
+      return normalized;
+    }
+
+    return null;
+  }
+
+  private handleNoteLinkClick = (event: MouseEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const anchor = target.closest('a.obsidian-note-link') as HTMLAnchorElement | null;
+    if (!anchor) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const filePath = anchor.getAttribute('data-obsidian-path');
+    if (!filePath) {
+      return;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!file || !(file instanceof TFile)) {
+      SummarDebug.log(1, `Note link target not found: ${filePath}`);
+      return;
+    }
+
+    // this.app.workspace.openLinkText(filePath, '', false);
+    openNote(this.context.plugin, filePath, '')
+  };
 
   private async renderView(): Promise<void> {
     const container: HTMLElement = this.containerEl;

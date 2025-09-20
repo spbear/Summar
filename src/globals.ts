@@ -1,4 +1,13 @@
-import { Notice, requestUrl, Hotkey, Modifier, RequestUrlParam, RequestUrlResponsePromise } from "obsidian";
+import { 
+  Notice, 
+  requestUrl, 
+  Hotkey, 
+  Modifier, 
+  RequestUrlParam, 
+  RequestUrlResponsePromise, 
+  MarkdownView, 
+  normalizePath 
+} from "obsidian";
 import * as os from 'os';
 import { Device } from '@capacitor/device';
 
@@ -521,3 +530,37 @@ export function sanitizeFileName(fileName: string): string {
     .replace(/^[-\s]+|[-\s]+$/g, '')  // 시작과 끝의 하이픈, 공백 제거
     .trim();
 }
+
+export async function openNote(plugin: SummarPlugin, noteName: string, outputTextContent: string) {
+    try {
+      const filePath = normalizePath(noteName);
+      const existingFile = plugin.app.vault.getAbstractFileByPath(filePath);
+
+      if (existingFile) {
+        SummarDebug.log(1, `file exist: ${filePath}`);
+        const leaves = plugin.app.workspace.getLeavesOfType("markdown");
+
+        for (const leaf of leaves) {
+          const view = leaf.view;
+          if (view instanceof MarkdownView && view.file && view.file.path === filePath) {
+            plugin.app.workspace.setActiveLeaf(leaf);
+            return;
+          }
+        }
+        await plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);        
+      } else {
+        SummarDebug.log(1, `file is not exist: ${filePath}`);
+        const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
+        const folderExists = await plugin.app.vault.adapter.exists(folderPath);
+        if (!folderExists) {
+          plugin.app.vault.adapter.mkdir(folderPath);
+        }
+        
+        SummarDebug.log(1, `outputText content===\n${outputTextContent}`);
+        await plugin.app.vault.create(filePath, outputTextContent);
+        await plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
+      }
+    } catch (error) {
+      SummarDebug.error(1, "Error creating/opening note:", error);
+    }
+  }

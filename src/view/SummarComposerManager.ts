@@ -550,7 +550,19 @@ SummarDebug.log(1, `filePath: ${filePath}`);
 
         const outputItem = rec?.itemEl || null;
         if (outputItem) {
-          this.context.outputManager.enableOutputItemButtons(outputItem as HTMLDivElement, ['reply-output-button']);
+          if (rec?.syncNote) {
+            this.context.outputManager.enableOutputItemButtons(outputItem as HTMLDivElement, 
+              [
+                'new-note-button',
+                'upload-output-to-wiki-button', 
+                'upload-output-to-slack-button',
+                'copy-output-button',
+                'reply-output-button'
+              ]
+            );
+          } else {
+            this.context.outputManager.enableOutputItemButtons(outputItem as HTMLDivElement, ['reply-output-button']);
+          }
         }
         this.setOutput(this.targetKey);
       }

@@ -1,7 +1,8 @@
 import { Platform, MarkdownView, normalizePath, setIcon } from "obsidian";
 import { ISummarEventHandler, ISummarViewContext } from "./SummarViewTypes";
-import { SummarDebug } from "../globals";
+import { SummarDebug, openNote } from "../globals";
 import { SummarMenuUtils, MenuItemConfig } from "./SummarMenuUtils";
+import SummarPlugin from "src/main";
 
 /**
  * Item 레벨 이벤트 핸들러
@@ -119,39 +120,7 @@ export class SummarItemEventHandler implements ISummarEventHandler {
   }
 
   private async handleNewNoteClick(key: string): Promise<void> {
-    try {
-      let noteName = this.getNoteName(key);
-      const filePath = normalizePath(noteName);
-      const existingFile = this.context.plugin.app.vault.getAbstractFileByPath(filePath);
-
-      if (existingFile) {
-        SummarDebug.log(1, `file exist: ${filePath}`);
-        const leaves = this.context.plugin.app.workspace.getLeavesOfType("markdown");
-        
-        for (const leaf of leaves) {
-          const view = leaf.view;
-          if (view instanceof MarkdownView && view.file && view.file.path === filePath) {
-            this.context.plugin.app.workspace.setActiveLeaf(leaf);
-            return;
-          }
-        }
-        await this.context.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
-      } else {
-        SummarDebug.log(1, `file is not exist: ${filePath}`);
-        const folderPath = filePath.substring(0, filePath.lastIndexOf("/"));
-        const folderExists = await this.context.plugin.app.vault.adapter.exists(folderPath);
-        if (!folderExists) {
-          await this.context.plugin.app.vault.adapter.mkdir(folderPath);
-        }
-        
-        const outputTextContent = this.getOutputText(key);
-        SummarDebug.log(1, `outputText content===\n${outputTextContent}`);
-        await this.context.plugin.app.vault.create(filePath, outputTextContent);
-        await this.context.plugin.app.workspace.openLinkText(normalizePath(filePath), "", true);
-      }
-    } catch (error) {
-      SummarDebug.error(1, "Error creating/opening note:", error);
-    }
+    await openNote(this.context.plugin, this.getNoteName(key), this.getOutputText(key));
   }
 
   private async handleUploadOutputToWiki(key: string): Promise<void> {

@@ -766,10 +766,27 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
   private formatDateForDisplay(dateStr: string): string {
     if (dateStr.length !== 8) return dateStr;
     
-    const year = dateStr.substring(0, 4);
-    const month = dateStr.substring(4, 6);
-    const day = dateStr.substring(6, 8);
-    return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+    const year = parseInt(dateStr.substring(0, 4), 10);
+    const month = parseInt(dateStr.substring(4, 6), 10);
+    const day = parseInt(dateStr.substring(6, 8), 10);
+
+    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+      return dateStr;
+    }
+
+    const jsDate = new Date(year, month - 1, day);
+    if (Number.isNaN(jsDate.getTime())) {
+      return dateStr;
+    }
+
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return formatter.format(jsDate);
   }
 
   /**
