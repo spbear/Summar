@@ -35,4 +35,8 @@ export class SummarEventHandler implements ISummarEventHandler {
     this.itemEventHandler.cleanup();
     this.composerEventHandler.cleanup();
   }
+
+  async handleNewNoteClick(key: string): Promise<void> {
+    await this.itemEventHandler.handleNewNoteClick(key);
+  }
 }

@@ -120,7 +120,7 @@ export class SummarItemEventHandler implements ISummarEventHandler {
     SummarMenuUtils.handleReply(key, this.context, false);
   }
 
-  private async handleNewNoteClick(key: string): Promise<void> {
+  public async handleNewNoteClick(key: string): Promise<void> {
     let outputTextContent = '';
     const rec = this.context.outputRecords.get(key);
     if (rec) {

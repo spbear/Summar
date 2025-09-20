@@ -19,7 +19,6 @@ import {
   ISummarUIRenderer,
   ISummarOutputManager,
   ISummarStickyHeaderManager,
-  ISummarEventHandler,
   ISummarUploadManager,
   ISummarComposerManager,
   SummarViewEvents,
@@ -46,7 +45,7 @@ export class SummarView extends View {
   private uiRenderer: ISummarUIRenderer;
   private outputManager: ISummarOutputManager;
   private stickyHeaderManager: ISummarStickyHeaderManager;
-  private eventHandler: ISummarEventHandler;
+  private eventHandler: SummarEventHandler;
   private uploadManager: ISummarUploadManager;
   private composerManager: ISummarComposerManager;
 
@@ -249,11 +248,35 @@ export class SummarView extends View {
           token.attrSet('href', '#');
           token.attrSet('data-obsidian-path', vaultPath);
           token.attrJoin('class', 'obsidian-note-link');
+        } else {
+          const outputKey = this.resolveOutputKey(hrefValue);
+          if (outputKey) {
+            token.attrSet('href', '#');
+            token.attrSet('data-summar-output-key', outputKey);
+            token.attrJoin('class', 'summar-output-key-link');
+          }
         }
       }
 
       return defaultRender(tokens, idx, options, env, self);
     };
+  }
+
+  private resolveOutputKey(href: string): string | null {
+    if (!href) {
+      return null;
+    }
+
+    const trimmed = href.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    if (this.context.outputRecords.has(trimmed)) {
+      return trimmed;
+    }
+
+    return null;
   }
 
   private resolveVaultFilePath(href: string): string | null {
@@ -290,6 +313,25 @@ export class SummarView extends View {
       return;
     }
 
+    const internalAnchor = target.closest('a.summar-output-key-link') as HTMLAnchorElement | null;
+    if (internalAnchor) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const outputKey = internalAnchor.getAttribute('data-summar-output-key');
+      if (!outputKey) {
+        return;
+      }
+
+      if (this.eventHandler && typeof (this.eventHandler as any).handleNewNoteClick === 'function') {
+        Promise.resolve(this.eventHandler.handleNewNoteClick(outputKey)).catch((error) => {
+          SummarDebug.log(1, `Error handling new note click for key ${outputKey}: ${error}`);
+        });
+      }
+
+      return;
+    }
+
     const anchor = target.closest('a.obsidian-note-link') as HTMLAnchorElement | null;
     if (!anchor) {
       return;
@@ -309,8 +351,7 @@ export class SummarView extends View {
       return;
     }
 
-    // this.app.workspace.openLinkText(filePath, '', false);
-    openNote(this.context.plugin, filePath, '')
+    openNote(this.context.plugin, filePath, '');
   };
 
   private async renderView(): Promise<void> {

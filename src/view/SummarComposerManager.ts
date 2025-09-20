@@ -540,8 +540,7 @@ SummarDebug.log(1, `filePath: ${filePath}`);
 
         let outputText = '';
         if (rec?.syncNote) {
-          const encodedPath = encodeURI(rec.noteName as string).replace(/%5B/g, '[').replace(/%5D/g, ']'); // 공백·한글 처리
-          outputText = `from: [[${rec.label}](${encodedPath})]`;
+          outputText = `from: [[${rec.label}](${this.targetKey})]`;
         }
         this.context.plugin.updateOutputText(this.targetKey,
                                             headerLabel,

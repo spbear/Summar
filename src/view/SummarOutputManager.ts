@@ -467,7 +467,7 @@ export class SummarOutputManager implements ISummarOutputManager {
                   const dotIndex = lastSegment.lastIndexOf('.');
                   const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
                   
-                  noteSyncOutput = `from: [[${displayName}](${encodedPath})]`;
+                  noteSyncOutput = `from: [[${displayName}](${key})]`;
                 } else if (convType === 'output' || convType === SummarAIParamType.OUTPUT) {
                   lastAssistantOutput = conv.text || '';
                   // SummarDebug.log(1, `Found matching assistant OUTPUT at index ${i}`);
