@@ -81,19 +81,23 @@ export function createOutputHeaderButtons(key: string, context: ISummarViewConte
   const uploadWikiButton = createIconButton('upload-output-to-wiki-button', 'Upload this result to Confluence', 'file-up');
   uploadWikiButton.disabled = true;
   uploadWikiButton.style.display = 'none';
+  uploadWikiButton.setAttribute('data-responsive-ready', 'false');
 
   const uploadSlackButton = createIconButton('upload-output-to-slack-button', 'Upload this result to Slack', 'hash');
   uploadSlackButton.disabled = true;
   uploadSlackButton.style.display = 'none';
+  uploadSlackButton.setAttribute('data-responsive-ready', 'false');
 
   const newNoteButton = createIconButton('new-note-button', 'Create new note with this result', 'file-output');
   newNoteButton.disabled = true;
   newNoteButton.style.display = 'none';
+  newNoteButton.setAttribute('data-responsive-ready', 'false');
 
   const replyButton = createIconButton('reply-output-button', 'reply', 'message-square-reply');
   replyButton.disabled = true;
   const canShowComposer = context.composerManager?.canShowComposer(200)?.canShow ?? false;
   replyButton.style.display = 'none';
+  replyButton.setAttribute('data-responsive-ready', 'false');
 
   if (!canShowComposer) {
     replyButton.disabled = true;
@@ -105,6 +109,7 @@ export function createOutputHeaderButtons(key: string, context: ISummarViewConte
   const copyButton = createIconButton('copy-output-button', 'Copy this result to clipboard', 'copy');
   copyButton.disabled = true;
   copyButton.style.display = 'none';
+  copyButton.setAttribute('data-responsive-ready', 'false');
 
   const spacer = document.createElement('div');
   spacer.style.flex = '1';
@@ -938,6 +943,23 @@ function setupOutputHeaderResponsiveButtons(outputHeader: HTMLElement, buttons: 
   };
 
   // 버튼 가시성 업데이트 함수
+  const applyVisibility = (button: HTMLElement, hidden: boolean, extraHidden = false) => {
+    button.setAttribute('data-responsive-hidden', hidden ? 'true' : 'false');
+    button.setAttribute('data-responsive-extra-hidden', extraHidden ? 'true' : 'false');
+
+    if (!button.hasAttribute('data-responsive-ready')) {
+      button.setAttribute('data-responsive-ready', 'false');
+    }
+
+    const isReady = button.getAttribute('data-responsive-ready') === 'true';
+    const shouldHide = hidden || extraHidden || !isReady;
+    if (shouldHide) {
+      button.style.display = 'none';
+    } else {
+      button.style.display = 'block';
+    }
+  };
+
   const updateButtonVisibility = (width: number) => {
     let changed = false;
 
@@ -950,39 +972,36 @@ function setupOutputHeaderResponsiveButtons(outputHeader: HTMLElement, buttons: 
 
     if (hiddenButtons.copy !== newCopyHidden) {
       hiddenButtons.copy = newCopyHidden;
-      buttons.copy.style.display = newCopyHidden ? 'none' : 'block';
       changed = true;
     }
+    applyVisibility(buttons.copy, newCopyHidden);
 
     // Reply 버튼은 항상 composer 가용성 체크 (조건 없이 매번 실행)
     const canShowComposer = context.composerManager?.canShowComposer(200)?.canShow ?? false;
-    const shouldShowReply = !newReplyHidden && canShowComposer;
-    const currentReplyDisplay = buttons.reply.style.display;
-    const newReplyDisplay = shouldShowReply ? 'block' : 'none';
-    
-    if (hiddenButtons.reply !== newReplyHidden || currentReplyDisplay !== newReplyDisplay) {
+    const replyExtraHidden = !canShowComposer;
+    if (hiddenButtons.reply !== newReplyHidden) {
       hiddenButtons.reply = newReplyHidden;
-      buttons.reply.style.display = newReplyDisplay;
       changed = true;
     }
+    applyVisibility(buttons.reply, newReplyHidden, replyExtraHidden);
 
     if (hiddenButtons.newNote !== newNewNoteHidden) {
       hiddenButtons.newNote = newNewNoteHidden;
-      buttons.newNote.style.display = newNewNoteHidden ? 'none' : 'block';
       changed = true;
     }
+    applyVisibility(buttons.newNote, newNewNoteHidden);
 
     if (hiddenButtons.uploadSlack !== newUploadSlackHidden) {
       hiddenButtons.uploadSlack = newUploadSlackHidden;
-      buttons.uploadSlack.style.display = newUploadSlackHidden ? 'none' : 'block';
       changed = true;
     }
+    applyVisibility(buttons.uploadSlack, newUploadSlackHidden);
 
     if (hiddenButtons.uploadWiki !== newUploadWikiHidden) {
       hiddenButtons.uploadWiki = newUploadWikiHidden;
-      buttons.uploadWiki.style.display = newUploadWikiHidden ? 'none' : 'block';
       changed = true;
     }
+    applyVisibility(buttons.uploadWiki, newUploadWikiHidden);
 
     // 변경사항이 있으면 이벤트 콜백 호출
     if (changed && context.onOutputHeaderButtonVisibilityChanged) {

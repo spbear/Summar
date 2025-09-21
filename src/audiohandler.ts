@@ -515,9 +515,7 @@ export class AudioHandler extends SummarViewContainer {
 			);
 		}
 
-		const arrayBuffer = await blob.arrayBuffer();
 
-		addFileField("file", fileName, fileType, arrayBuffer);
 		// addField("model", this.plugin.settings.sttModel || "whisper-1");
 		addField("model", this.plugin.settingsv2.recording.sttModel || this.plugin.getDefaultModel("sttModel"));
 
@@ -527,15 +525,32 @@ export class AudioHandler extends SummarViewContainer {
 
 		addField("response_format", this.plugin.settingsv2.recording.sttModel === "whisper-1" ? "verbose_json" : "json");
 
-		if ((this.plugin.settingsv2.recording.sttModel === "gpt-4o-mini-transcribe" || this.plugin.settingsv2.recording.sttModel === "gpt-4o-transcribe")
-			&& this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]) {
-			addField("prompt", this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
-			// this.pushOutputPrompt(this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]);
-			this.sttPrompt = this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel];
+		let init_prompt = ``;
+
+		if (this.plugin.settingsv2.recording.sttModel === "whisper-1") {
+			if (this.plugin.settingsv2.recording.customVocabulary && 
+				this.plugin.settingsv2.recording.customVocabulary.length > 0 ) {
+				init_prompt += `${this.plugin.settingsv2.recording.customVocabulary}`;
+			}
 		} else {
-			// this.pushOutputPrompt('transcribe using whisper-1');
-			this.sttPrompt = 'transcribe using whisper-1';
+			if (this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel]) {
+				init_prompt += this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel];
+			}
+			if (this.plugin.settingsv2.recording.customVocabulary && 
+				this.plugin.settingsv2.recording.customVocabulary.length > 0 ) {
+				init_prompt += `\n\nWhen transcribing, ` + 
+							`make sure to recognize and spell the following terms correctly: ` +
+							`${this.plugin.settingsv2.recording.customVocabulary}`;
+			}
+			this.sttPrompt = this.plugin.settingsv2.recording.sttPrompt[this.plugin.settingsv2.recording.sttModel];
 		}
+		if (init_prompt.length > 0 ) {
+			SummarDebug.log(3, `buildMultipartFormData() - [${init_prompt}]`);
+			addField("prompt", init_prompt);
+		}
+	
+		const arrayBuffer = await blob.arrayBuffer();
+		addFileField("file", fileName, fileType, arrayBuffer);
 
 		bodyParts.push(encoder.encode(`--${boundary}--${CRLF}`));
 
@@ -687,20 +702,30 @@ export class AudioHandler extends SummarViewContainer {
 
 		// this.pushOutputPrompt(systemInstruction);
 		this.sttPrompt = systemInstruction;
+		
+		if (this.plugin.settingsv2.recording.customVocabulary && 
+			this.plugin.settingsv2.recording.customVocabulary.length > 0 ) {
+			systemInstruction += `\nWhen transcribing, ` + 
+								 `make sure to recognize and spell the following terms correctly: ` +
+								 `${this.plugin.settingsv2.recording.customVocabulary}.\n`;
+		}
 
 		try {
 			const bodyContent = JSON.stringify({
-				contents: [{
-					parts: [
-						{ text: systemInstruction },
-						{
-							inlineData: {
-								mimeType: mimeType,
-								data: base64
+				contents: [
+					{
+						role: "user",
+						parts: [
+							{ text: systemInstruction },
+							{
+								inlineData: {
+									mimeType: mimeType,
+									data: base64
+								}
 							}
-						}
-					]
-				}],
+						]
+					}
+				],
 			});
 
 			await summarai.completeWithBody(bodyContent, duration);

@@ -69,6 +69,7 @@ export class PluginSettingsV2 {
   
   recording: {
     autoRecordOnZoomMeeting: boolean;
+    customVocabulary: string;
     selectedDeviceId: { [deviceKey: string]: string };
     recordingDir: string;
     saveTranscriptAndRefineToNewNote: boolean;
@@ -83,6 +84,7 @@ export class PluginSettingsV2 {
     refineSummaryPrompt: string;
   } = {
     autoRecordOnZoomMeeting: false,
+    customVocabulary: "",
     selectedDeviceId: {},
     recordingDir: "",
     saveTranscriptAndRefineToNewNote: true,

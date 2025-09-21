@@ -526,13 +526,29 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
       const originalButton = originalItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
       if (originalButton) {
         button.disabled = originalButton.disabled;
-        button.style.display = originalButton.style.display;
+
+        const responsiveReady = originalButton.getAttribute('data-responsive-ready') ?? 'false';
+        const responsiveHidden = originalButton.getAttribute('data-responsive-hidden') ?? 'false';
+        const responsiveExtraHidden = originalButton.getAttribute('data-responsive-extra-hidden') ?? 'false';
+
+        button.setAttribute('data-responsive-ready', responsiveReady);
+        button.setAttribute('data-responsive-hidden', responsiveHidden);
+        button.setAttribute('data-responsive-extra-hidden', responsiveExtraHidden);
+
+        const shouldHide = responsiveHidden === 'true' || responsiveExtraHidden === 'true' || responsiveReady !== 'true';
+        button.style.display = shouldHide ? 'none' : originalButton.style.display || 'block';
       } else {
         button.disabled = true;
+        button.setAttribute('data-responsive-ready', 'false');
+        button.setAttribute('data-responsive-hidden', 'true');
+        button.setAttribute('data-responsive-extra-hidden', 'false');
         button.style.display = 'none';
       }
     } else {
       button.disabled = true;
+      button.setAttribute('data-responsive-ready', 'false');
+      button.setAttribute('data-responsive-hidden', 'true');
+      button.setAttribute('data-responsive-extra-hidden', 'false');
       button.style.display = 'none';
     }
 
@@ -552,25 +568,32 @@ export class SummarStickyHeaderManager implements ISummarStickyHeaderManager {
     button.setAttribute('data-key', key);
 
     const canShowComposer = this.context.composerManager?.canShowComposer(200)?.canShow ?? false;
-    if (!canShowComposer) {
-      button.style.display = 'none';
-      button.disabled = true;
-    } else {
-      const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
-      if (originalItem) {
-        const originalButton = originalItem.querySelector('button[button-id="reply-output-button"]') as HTMLButtonElement;
-        if (originalButton) {
-          button.disabled = originalButton.disabled;
-          button.style.display = originalButton.style.display;
-        } else {
-          button.disabled = true;
-          button.style.display = 'none';
-        }
+    const originalItem = this.context.outputRecords.get(key)?.itemEl || null;
+    let responsiveHidden = 'true';
+    let responsiveExtraHidden = canShowComposer ? 'false' : 'true';
+    let responsiveReady = 'false';
+
+    if (originalItem) {
+      const originalButton = originalItem.querySelector('button[button-id="reply-output-button"]') as HTMLButtonElement;
+      if (originalButton) {
+        responsiveReady = originalButton.getAttribute('data-responsive-ready') ?? 'false';
+        responsiveHidden = originalButton.getAttribute('data-responsive-hidden') ?? 'false';
+        responsiveExtraHidden = originalButton.getAttribute('data-responsive-extra-hidden') ?? (canShowComposer ? 'false' : 'true');
+
+        button.disabled = originalButton.disabled;
+        button.style.display = originalButton.style.display;
       } else {
         button.disabled = true;
         button.style.display = 'none';
       }
+    } else {
+      button.disabled = !canShowComposer;
+      button.style.display = canShowComposer ? 'none' : 'none';
     }
+
+    button.setAttribute('data-responsive-ready', responsiveReady);
+    button.setAttribute('data-responsive-hidden', responsiveHidden);
+    button.setAttribute('data-responsive-extra-hidden', responsiveExtraHidden);
 
     button.addEventListener('click', (event) => {
       event.stopPropagation();

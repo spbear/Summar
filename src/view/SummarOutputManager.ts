@@ -1154,11 +1154,38 @@ export class SummarOutputManager implements ISummarOutputManager {
     'copy-output-button',
     'reply-output-button'
   ]): void {
+    const outputKey = outputItem.getAttribute('output-key');
+
     buttons.forEach(buttonId => {
       const button = outputItem.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement;
-      if (button) {
-        button.disabled = false;
-        button.style.display = '';
+      if (!button) {
+        return;
+      }
+
+      button.disabled = false;
+      button.setAttribute('data-responsive-ready', 'true');
+
+      const hiddenDueToWidth = button.getAttribute('data-responsive-hidden') === 'true';
+      const hiddenDueToExtra = button.getAttribute('data-responsive-extra-hidden') === 'true';
+
+      if (hiddenDueToWidth || hiddenDueToExtra) {
+        button.style.display = 'none';
+      } else {
+        button.style.display = 'block';
+      }
+
+      if (outputKey) {
+        const stickyHeader = this.context.containerEl.querySelector(`.sticky-header[data-key="${outputKey}"]`);
+        if (stickyHeader) {
+          const stickyButton = stickyHeader.querySelector(`button[button-id="${buttonId}"]`) as HTMLButtonElement | null;
+          if (stickyButton) {
+            stickyButton.disabled = false;
+            stickyButton.setAttribute('data-responsive-ready', button.getAttribute('data-responsive-ready') ?? 'true');
+            stickyButton.setAttribute('data-responsive-hidden', button.getAttribute('data-responsive-hidden') ?? 'false');
+            stickyButton.setAttribute('data-responsive-extra-hidden', button.getAttribute('data-responsive-extra-hidden') ?? 'false');
+            stickyButton.style.display = button.style.display;
+          }
+        }
       }
     });
   }
