@@ -1,7 +1,7 @@
 import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
 import { createOutputHeader, createOutputHeaderButtons, getDefaultLabelIcon, setHeaderHighlight as applyHeaderHighlight, clearHeaderHighlight as resetHeaderHighlight } from "./SummarHeader";
 import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
-import { SummarDebug } from "../globals";
+import { getFileBaseName, SummarDebug } from "../globals";
 import { SummarAIParam, SummarAIParamType } from "../summarai-types";
 
 export class SummarOutputManager implements ISummarOutputManager {
@@ -461,13 +461,13 @@ export class SummarOutputManager implements ISummarOutputManager {
               if (conv.role === 'assistant') {
                 const convType = conv.type;
                 if ((convType === SummarAIParamType.NOTESYNC || convType === 'notesync') && noteName) {
-                  const encodedPath = encodeURI(noteName).replace(/%5B/g, '[').replace(/%5D/g, ']'); // 공백·한글 처리
-                  const segments = noteName.split(/[\\\/]/);
-                  const lastSegment = segments.length > 0 ? segments[segments.length - 1] : noteName;
-                  const dotIndex = lastSegment.lastIndexOf('.');
-                  const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
+                  // const encodedPath = encodeURI(noteName).replace(/%5B/g, '[').replace(/%5D/g, ']'); // 공백·한글 처리
+                  // const segments = noteName.split(/[\\\/]/);
+                  // const lastSegment = segments.length > 0 ? segments[segments.length - 1] : noteName;
+                  // const dotIndex = lastSegment.lastIndexOf('.');
+                  // const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
                   
-                  noteSyncOutput = `from: [[${displayName}](${key})]`;
+                  noteSyncOutput = `context: [[${getFileBaseName(it.noteName)}](${key})]`;
                   const rec = this.context.outputRecords.get(key);
                   if (rec) {
                     rec.syncNote = true;

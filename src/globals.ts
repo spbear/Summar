@@ -249,6 +249,22 @@ export function containsDomain(text: string, domain: string): boolean {
   return domainPattern.test(text);
 }
 
+export function getFileBaseName(filePath: string): string {
+  if (!filePath) {
+    return '';
+  }
+
+  const segments = filePath.split(/[\\\/]/);
+  const rawName = segments.length > 0 ? segments[segments.length - 1] : filePath;
+
+  const dotIndex = rawName.lastIndexOf('.');
+  if (dotIndex > 0) {
+    return rawName.substring(0, dotIndex);
+  }
+
+  return rawName;
+}
+
 export function parseHotkey(hotkeyString: string): Hotkey | undefined{
   if (!hotkeyString || hotkeyString.length===0) return undefined;
   const parts = hotkeyString.split('+').map(part => part.trim().toLowerCase());

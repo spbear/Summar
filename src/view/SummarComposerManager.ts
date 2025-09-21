@@ -1,6 +1,6 @@
 import { setIcon } from "obsidian";
 import { ISummarComposerManager, ISummarViewContext, SummarOutputRecord } from "./SummarViewTypes";
-import { SummarDebug } from "../globals";
+import { getFileBaseName, SummarDebug } from "../globals";
 import { createComposerHeader, ComposerHeaderButtonsSet } from "./SummarHeader";
 import { SummarAI } from "../summarai";
 import { SummarAIParam, SummarAIParamType } from "../summarai-types";
@@ -386,11 +386,7 @@ export class SummarComposerManager implements ISummarComposerManager {
     this.targetKey = null;
     this.clearAllHighlighting();
 
-    const segments = filePath.split(/[\\\/]/);
-    const lastSegment = segments.length > 0 ? segments[segments.length - 1] : filePath;
-    const dotIndex = lastSegment.lastIndexOf('.');
-    const displayName = dotIndex > 0 ? lastSegment.slice(0, dotIndex) : lastSegment;
-    this.setComposerLabel(displayName);
+    this.setComposerLabel(getFileBaseName(filePath));
 
     this.targetKey = this.context.plugin.generateUniqueId();
 
@@ -402,7 +398,7 @@ export class SummarComposerManager implements ISummarComposerManager {
 
         const rec = new SummarOutputRecord(this.targetKey);
         rec.noteName = filePath;
-        rec.label = displayName;
+        rec.label = 'notelink';
         rec.noteName = filePath;
         rec.syncNote = true;
         const notePrompt = "I will provide the full content of a note.\n" + 
@@ -422,12 +418,12 @@ export class SummarComposerManager implements ISummarComposerManager {
         rec.conversations.push(new SummarAIParam('assistant', noteContent, SummarAIParamType.NOTESYNC));
         this.context.outputRecords.set(this.targetKey, rec);
         
-SummarDebug.log(1, `filePath: ${filePath}`);       
+// SummarDebug.log(1, `filePath: ${filePath}`);       
       }
     }
 
     this.showComposerContainer();
-    SummarDebug.log(1, `Composer linked to note: ${displayName} (key: ${this.targetKey})`);
+    // SummarDebug.log(1, `Composer linked to note: ${displayName} (key: ${this.targetKey})`);
   }
 
   showComposerContainer(): void {
@@ -534,11 +530,12 @@ SummarDebug.log(1, `filePath: ${filePath}`);
       let rec = this.context.outputRecords.get(this.targetKey) || null;
       if (!rec || !rec.itemEl) {
         const composerLabel = this.composerHeaderLabel?.textContent || 'compose prompt';
-        const headerLabel = composerLabel === 'compose prompt' ? 'conversation' : composerLabel;
+        let headerLabel = composerLabel === 'compose prompt' ? 'conversation' : composerLabel;
 
         let outputText = '';
         if (rec?.syncNote) {
-          outputText = `from: [[${rec.label}](${this.targetKey})]`;
+          outputText = `context: [[${getFileBaseName(rec.noteName as string)}](${this.targetKey})]`;
+          headerLabel = 'notelink';
         }
         this.context.plugin.updateOutputText(this.targetKey,
                                             headerLabel,
