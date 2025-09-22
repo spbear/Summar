@@ -11,6 +11,37 @@ import {
 import * as os from 'os';
 import { Device } from '@capacitor/device';
 
+export const PDF_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="1.5"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+  <!-- File outline with folded corner -->
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <polyline points="14 2 14 8 20 8"/>
+  
+  <!-- Bottom bar (black by default; themeable via 'color') -->
+  <rect x="1" y="13" width="22" height="10" rx="1.2" fill="var(--text-muted)" stroke="var(--text-muted)"/>
+
+  <!-- 'PDF' letters in var(--background-primary) strokes on the bar -->
+  <!-- P -->
+  <path d="M5.5 16v4" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <path d="M5.5 16h2" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <path d="M7.5 16c1 0 1 2 0 2H5.5" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <!-- D -->
+  <path d="M10.5 16v4" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <path d="M10.5 16h2" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <path d="M12.5 16c1.6 0 1.6 4 0 4H10.5" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <!-- F -->
+  <path d="M16.5 16v4" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <path d="M16.5 16h3" stroke="var(--background-primary)" stroke-width="1.5"/>
+  <path d="M16.5 18h2" stroke="var(--background-primary)" stroke-width="1.5"/>
+</svg>
+`;
+
 import SummarPlugin from "./main";
 import { SummarOutputRecord } from "./view/SummarViewTypes";
 

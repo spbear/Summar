@@ -10,7 +10,7 @@ export class SettingHelperModal extends Modal {
     private slackWorkspaceCheckbox: HTMLInputElement;
     private slackApiCheckbox: HTMLInputElement;
 
-    private customVocabularyCheckbox: HTMLInputElement;
+    private customVocabularyCheckbox?: HTMLInputElement;
 
     private onApply?: () => void;
 
@@ -24,6 +24,9 @@ export class SettingHelperModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
+
+        // reset transient references
+        this.customVocabularyCheckbox = undefined;
 
         // Ensure modal width accommodates description text on a single line
         this.modalEl.style.width = "90vw";
@@ -153,34 +156,38 @@ export class SettingHelperModal extends Modal {
             slackAppNoticeDiv.innerHTML = `Note: Add the Slack app to your target channel first. See help link above.`;
 
 
-            // Custom Vocabulary
-            const customVocabularyDiv = settingsInfo.createEl("div");
-            customVocabularyDiv.style.marginBottom = "8px";
-            customVocabularyDiv.style.display = "flex";
-            customVocabularyDiv.style.alignItems = "flex-start";
-            this.customVocabularyCheckbox = customVocabularyDiv.createEl("input", { type: "checkbox" });
-            this.customVocabularyCheckbox.style.marginRight = "8px";
-            this.customVocabularyCheckbox.checked = true;
-            const customVocabularyLabel = customVocabularyDiv.createEl("label");
-            customVocabularyLabel.style.cursor = "pointer";
-            customVocabularyLabel.style.display = "inline-block";
-            customVocabularyLabel.style.flex = "1";
-            customVocabularyLabel.style.whiteSpace = "normal";
-            customVocabularyLabel.style.wordBreak = "break-word";
-            customVocabularyLabel.innerHTML = `Custom Transcription Vocabulary:<br /><span style="color: var(--text-accent)">${recording.customVocabulary || 'N/A'}</span>`;
-            // 라벨 클릭 시 체크박스 토글
-            customVocabularyLabel.addEventListener("click", () => {
-                this.customVocabularyCheckbox.checked = !this.customVocabularyCheckbox.checked;
-            });
-            
-            // customVocabulary PAT 링크 (customVocabulary 아래에 추가)
-            const customVocabularyDesc = settingsInfo.createEl("div");
-            customVocabularyDesc.style.marginBottom = "8px";
-            customVocabularyDesc.style.marginLeft = "23px"; // 체크박스 너비(14px) + 마진(8px) = 22px로 정렬
-            customVocabularyDesc.style.fontSize = "0.9em"; // 0.85em에서 0.9em으로 증가
-            customVocabularyDesc.style.color = "var(--text-muted)";
-            customVocabularyDesc.innerHTML = `Comma-separated word list to ensure clear recognition and accurate spelling while transcribing.`;
-            
+            if (recording?.customVocabulary && recording.customVocabulary.length > 0 ) {
+                // Custom Vocabulary
+                const customVocabularyDiv = settingsInfo.createEl("div");
+                customVocabularyDiv.style.marginBottom = "8px";
+                customVocabularyDiv.style.display = "flex";
+                customVocabularyDiv.style.alignItems = "flex-start";
+                this.customVocabularyCheckbox = customVocabularyDiv.createEl("input", { type: "checkbox" });
+                this.customVocabularyCheckbox.style.marginRight = "8px";
+                this.customVocabularyCheckbox.checked = true;
+                const customVocabularyLabel = customVocabularyDiv.createEl("label");
+                customVocabularyLabel.style.cursor = "pointer";
+                customVocabularyLabel.style.display = "inline-block";
+                customVocabularyLabel.style.flex = "1";
+                customVocabularyLabel.style.whiteSpace = "normal";
+                customVocabularyLabel.style.wordBreak = "break-word";
+                customVocabularyLabel.innerHTML = `Custom Transcription Vocabulary:<br /><span style="color: var(--text-accent)">${recording.customVocabulary || 'N/A'}</span>`;
+                // 라벨 클릭 시 체크박스 토글
+                customVocabularyLabel.addEventListener("click", () => {
+                    if (this.customVocabularyCheckbox) {
+                        this.customVocabularyCheckbox.checked = !this.customVocabularyCheckbox.checked;
+                    }
+                });
+                
+                // customVocabulary PAT 링크 (customVocabulary 아래에 추가)
+                const customVocabularyDesc = settingsInfo.createEl("div");
+                customVocabularyDesc.style.marginBottom = "8px";
+                customVocabularyDesc.style.marginLeft = "23px"; // 체크박스 너비(14px) + 마진(8px) = 22px로 정렬
+                customVocabularyDesc.style.fontSize = "0.9em"; // 0.85em에서 0.9em으로 증가
+                customVocabularyDesc.style.color = "var(--text-muted)";
+                customVocabularyDesc.innerHTML = `Comma-separated word list to ensure clear recognition and accurate spelling while transcribing.`;
+            } else {
+            }
         }
 
         // 버튼 영역
@@ -245,7 +252,7 @@ export class SettingHelperModal extends Modal {
                 this.plugin.settingsv2.common.slackApiDomain = common.slackApiDomain;
                 appliedCount++;
             }
-            if (this.customVocabularyCheckbox?.checked && recording.customVocabulary) {
+            if (recording?.customVocabulary && this.customVocabularyCheckbox?.checked) {
                 this.plugin.settingsv2.recording.customVocabulary = recording.customVocabulary;
                 appliedCount++;
             }

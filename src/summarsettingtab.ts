@@ -1,6 +1,6 @@
-import { PluginSettingTab, Setting, Platform, ButtonComponent, Modal, App } from "obsidian";
+import { PluginSettingTab, Setting, Platform, ButtonComponent, Modal, App, addIcon, getIcon } from "obsidian";
 
-import { SummarDebug, SummarRequestUrl, SummarRequestUrlWithTimeout, getDeviceId, sanitizeLabel, SummarTooltip, extractDomain } from "./globals";
+import { SummarDebug, SummarRequestUrl, SummarRequestUrlWithTimeout, getDeviceId, sanitizeLabel, SummarTooltip, extractDomain, PDF_SVG } from "./globals";
 import { PluginUpdater } from "./pluginupdater";
 import SummarPlugin from "./main";
 import { ConfluenceAPI } from "./confluenceapi";
@@ -130,10 +130,14 @@ export class SummarSettingsTab extends PluginSettingTab {
     });
 
     const tabContents = containerEl.createDiv({ cls: 'settings-tab-contents' });
+    if (!getIcon('pdf-file-0')) {
+      addIcon('pdf-file-0', PDF_SVG);
+    }
+
     const tabs = [
       { name: 'Common', icon: 'settings', id: 'common-tab', tooltip: 'Common Settings' },
       { name: 'Webpage', icon: 'globe', id: 'webpage-tab', tooltip: 'Webpage Summary' },
-      { name: 'PDF', icon: 'file-text', id: 'pdf-tab', tooltip: 'PDF Summary' },
+      { name: 'PDF', icon: 'pdf-file-0', id: 'pdf-tab', tooltip: 'PDF Summary' },
       { name: 'Recording', icon: 'voicemail', id: 'recording-tab', tooltip: 'Transcription Summary' },
       { name: 'Schedule', icon: 'calendar-check', id: 'schedule-tab', tooltip: 'Auto recording' },
       { name: 'Custom command', icon: 'wand-sparkles', id: 'custom-tab', tooltip: 'Custom Commands' },
