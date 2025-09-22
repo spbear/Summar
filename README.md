@@ -66,11 +66,11 @@ For detailed usage instructions, feature explanations, and tips on how to effect
 ### 📖 **[User Manual](docs/user-manual.md)** - Complete guide covering all features, settings, and integrations
 
 The user manual includes:
-- Step-by-step configuration guides for all settings tabs
-- Complete feature explanations for SummarView interface
-- Command palette and context menu integrations
-- Keyboard shortcuts and tips for optimal usage
-- Platform-specific features and limitations
+- Step-by-step configuration for API keys, Slack Canvas/Message modes, custom vocabulary, and conversation retention
+- Detailed walkthroughs of the SummarView chat interface, sticky headers, and responsive action buttons
+- Conversation storage, reload, and note-sync workflows using the conversations directory
+- Command palette, reply composer, and file explorer integrations for audio, PDF, and web flows
+- Platform-specific tips, troubleshooting guides, and productivity shortcuts across desktop environments
 
 ---
 
@@ -155,3 +155,21 @@ Complete reference for Summar's configuration files and data structures:
 - **2025-08-14**: Enhanced Slack integration with empty token support, markdown formatting improvements, and enterprise domain configuration
 - **2025-08-14**: Improved UI/UX with visual separators, simplified domain inputs, and dynamic button state management
 - **2025-08-16**: Added comprehensive Slack Canvas API integration with dual-mode support (Canvas/Message) and advanced markdown processing 
+- **2025-08-17**: Enabled Slack API settings on macOS desktop and refreshed plugin manifest metadata
+- **2025-08-21**: Added audio recording cleanup routines with automated post-update handling
+- **2025-08-24**: Introduced in-view chat interface with responsive result toggles and button visibility controls
+- **2025-08-27**: Rebuilt SummarView architecture with dedicated managers, throttled sticky headers, and improved event lifecycle management
+- **2025-08-29**: Upgraded IndexedDB schema and chat logging for richer conversation history retention
+- **2025-09-03**: Delivered a standardized chat workflow with revamped headers, sticky menu interactions, and refined input handling
+- **2025-09-06**: Added reply actions, highlight management, and IME-aware prompt submission across composer and headers
+- **2025-09-07**: Migrated conversation storage to a dedicated directory and accepted structured message payloads for AI requests
+- **2025-09-08**: Implemented finalization flags and refactored output/conversation management for consistent state updates
+- **2025-09-10**: Polished markdown output with improved code block rendering and note naming consistency
+- **2025-09-11**: Expanded conversation APIs with incremental updates, temporary result handling, and unified folding logic
+- **2025-09-12**: Added conversation model controls in settings and refined model selection UX across composer components
+- **2025-09-13**: Revamped output header responsiveness, menu icons, and event flow for SummarView interfaces
+- **2025-09-15**: Introduced configurable conversation cleanup retention and asynchronous output clearing
+- **2025-09-16**: Replaced OutputHeaderComposer with SummarHeader and preserved original filenames during output import/export
+- **2025-09-20**: Enhanced note synchronization with contextual note opening, content retrieval, and key resolution improvements
+- **2025-09-21**: Added custom vocabulary pipeline with shared base-name handling for transcription outputs
+- **2025-09-22**: Exposed custom vocabulary settings in the UI for more accurate speech-to-text results

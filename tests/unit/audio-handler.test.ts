@@ -1,5 +1,48 @@
 import { jest } from '@jest/globals';
+import { TextDecoder, TextEncoder } from 'util';
+import { AudioHandler } from '../../src/audiohandler';
 import { mockApp, mockPlugin } from '../setup';
+
+class TestBlob {
+  private parts: BlobPart[];
+  type: string;
+
+  constructor(parts: BlobPart[], options?: { type?: string }) {
+    this.parts = parts;
+    this.type = options?.type ?? '';
+  }
+
+  async text(): Promise<string> {
+    const decoder = new TextDecoder();
+    return this.parts.map((part) => {
+      if (typeof part === 'string') {
+        return part;
+      }
+      if (part instanceof ArrayBuffer) {
+        return decoder.decode(part);
+      }
+      if (ArrayBuffer.isView(part)) {
+        return decoder.decode(part as Uint8Array);
+      }
+      return String(part);
+    }).join('');
+  }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    const text = await this.text();
+    return new TextEncoder().encode(text).buffer;
+  }
+}
+
+if (!(global as any).TextEncoder) {
+  (global as any).TextEncoder = TextEncoder;
+}
+
+if (!(global as any).TextDecoder) {
+  (global as any).TextDecoder = TextDecoder;
+}
+
+(global as any).Blob = TestBlob as unknown as typeof Blob;
 
 describe('AudioHandler', () => {
   let audioHandler: any;
@@ -201,5 +244,117 @@ describe('AudioHandler', () => {
       expect(generateTranscriptionFileName('my recording.wav')).toBe('my recording-transcription.md');
       expect(generateTranscriptionFileName('file<>name.m4a')).toBe('file--name-transcription.md');
     });
+  });
+});
+
+describe('AudioHandler custom vocabulary integration', () => {
+  const createPluginStub = (recordingOverrides: Partial<{
+    sttModel: string;
+    customVocabulary: string;
+    sttPrompt: Record<string, string>;
+    recordingLanguage?: string;
+  }> = {}) => {
+    const recordingDefaults = {
+      sttModel: 'whisper-1',
+      customVocabulary: '',
+      sttPrompt: {} as Record<string, string>,
+      recordingLanguage: 'en',
+    };
+
+    return {
+      app: {
+        vault: {
+          adapter: {
+            readBinary: jest.fn(async () => new ArrayBuffer(0)),
+          },
+        },
+      },
+      manifest: { version: '1.0.0' },
+      settingsv2: {
+        common: {
+          openaiApiKey: 'sk-test',
+          googleApiKey: 'gk-test',
+        },
+        recording: { ...recordingDefaults, ...recordingOverrides },
+        system: { debugLevel: 0 },
+      },
+      generateUniqueId: jest.fn().mockReturnValue('output-key'),
+      clearAllOutputItems: jest.fn(async () => undefined),
+      pushOutputPrompt: jest.fn(),
+      updateOutputText: jest.fn(),
+      appendOutputText: jest.fn(),
+      getOutputText: jest.fn(),
+      setNewNoteName: jest.fn(),
+      foldOutput: jest.fn(),
+      getDefaultModel: jest.fn().mockReturnValue('whisper-1'),
+    } as any;
+  };
+
+  const createHandler = (overrides?: Partial<{
+    sttModel: string;
+    customVocabulary: string;
+    sttPrompt: Record<string, string>;
+    recordingLanguage?: string;
+  }>) => {
+    const plugin = createPluginStub(overrides);
+    const handler = new AudioHandler(plugin);
+    return { handler, plugin };
+  };
+
+  const createAudioBlob = () => ({
+    arrayBuffer: async () => new TextEncoder().encode('audio data').buffer,
+  }) as unknown as Blob;
+
+  test('includes custom vocabulary as prompt for whisper-1 model', async () => {
+    const customVocabulary = 'Alpha, Beta, Gamma';
+    const { handler } = createHandler({
+      sttModel: 'whisper-1',
+      customVocabulary,
+    });
+
+    const blob = createAudioBlob();
+    const { body } = await handler.buildMultipartFormData(blob, 'sample.wav', 'audio/wav');
+    const multipartBuffer = await (body as any).arrayBuffer();
+    const multipart = new TextDecoder().decode(multipartBuffer);
+
+    expect(multipart).toContain('name="prompt"');
+    expect(multipart).toContain(customVocabulary);
+    expect(multipart).not.toContain('When transcribing, make sure to recognize');
+  });
+
+  test('appends guidance with custom vocabulary for non-whisper models', async () => {
+    const customVocabulary = 'API Gateway, Lambda, DynamoDB';
+    const model = 'gemini-1.5-flash';
+    const basePrompt = 'Base transcription instructions';
+    const { handler } = createHandler({
+      sttModel: model,
+      customVocabulary,
+      sttPrompt: { [model]: basePrompt },
+    });
+
+    const blob = createAudioBlob();
+    const { body } = await handler.buildMultipartFormData(blob, 'meeting.webm', 'audio/webm');
+    const multipartBuffer = await (body as any).arrayBuffer();
+    const multipart = new TextDecoder().decode(multipartBuffer);
+
+    expect(multipart).toContain(`name="model"\r\n\r\n${model}`);
+    expect(multipart).toContain(basePrompt);
+    expect(multipart).toContain('When transcribing, make sure to recognize and spell the following terms correctly:');
+    expect(multipart).toContain(customVocabulary);
+  });
+
+  test('omits prompt field when no custom vocabulary or prompt is provided', async () => {
+    const { handler } = createHandler({
+      sttModel: 'whisper-1',
+      customVocabulary: '',
+      sttPrompt: {},
+    });
+
+    const blob = createAudioBlob();
+    const { body } = await handler.buildMultipartFormData(blob, 'clip.ogg', 'audio/ogg');
+    const multipartBuffer = await (body as any).arrayBuffer();
+    const multipart = new TextDecoder().decode(multipartBuffer);
+
+    expect(multipart).not.toContain('name="prompt"');
   });
 });

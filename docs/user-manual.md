@@ -58,6 +58,10 @@ The Summar plugin settings are organized into multiple tabs, each offering speci
   - STT (Speech-to-Text) model selection
   - Transcript summary model selection
   - Custom prompts for STT and summarization with set default/revert functionality
+- **Custom Vocabulary Management**:
+  - Enable the "Custom Vocabulary" option to provide comma-separated domain terms
+  - Shared with live transcription prompts and file-based STT requests
+  - Ensures consistent spelling in transcripts across Whisper, Gemini, and Google models
 - **Recording Settings**:
   - Recording unit (1-20 seconds)
   - Toggle for saving transcripts to new notes
@@ -97,6 +101,9 @@ The Summar plugin settings are organized into multiple tabs, each offering speci
   - Success rates and average latency
   - Feature-wise breakdown with interactive charts
   - Model usage statistics with cost tracking
+- **Conversation Retention**:
+  - Configure automatic cleanup window (in minutes) for stored conversations
+  - Controls how long conversation history and intermediate drafts remain available for reloading
 
 ## 2. SummarView Features
 
@@ -139,6 +146,13 @@ The SummarView provides a dedicated interface for interacting with Summar featur
   - Summarization progress and status
   - Final results and error messages
   - Real-time updates during processing
+- **Chat Interface**:
+  - Inline composer embeds allow follow-up prompts via the **Reply** button
+  - Recent assistant/author messages appear as collapsible conversation items beneath each result
+  - Supports IME-aware input handling for precise Enter/Shift+Enter behavior
+- **Sticky Output Headers**:
+  - SummarHeader keeps key actions (Copy, Reply, New Note, Upload buttons) responsive as you scroll
+  - Buttons automatically collapse/expand based on viewport width and configured integrations
 
 ### Status Integration
 - **Dynamic Button States**: Buttons enable/disable based on:
@@ -154,8 +168,22 @@ The SummarView provides a dedicated interface for interacting with Summar featur
   - Context-sensitive help and status information
   - Dynamic content based on current configuration
   - Interactive channel/service information display
+- **Conversation Management**:
+  - Load recent conversations from the `conversations/` directory via the header menu
+  - Original import filenames are preserved to make reloading historical sessions effortless
+  - Fold/unfold actions keep transcript, conversation, and note-sync items synchronized
 
-## 3. Command Palette Integrations
+## 3. Conversation Workflows
+
+Summar now treats every transcript or summarization run as part of a persistent conversation.
+
+- **Automatic Saving**: Chats and summaries persist to the `conversations/` folder with timestamped filenames.
+- **Manual Reload**: Use the header menu → **Load conversations** to restore prior sessions, including note context and assistant outputs.
+- **Cleanup Policy**: The retention slider in settings purges aged conversations while keeping recent history accessible.
+- **Note Synchronization**: When a conversation writes back to a note, the header highlights the linked note and surfaces `context: [[Note Title]]` chips for quick navigation.
+- **Reply Workflow**: Hitting **Reply** re-opens the composer with the recent context and adheres to the active conversation model selection.
+
+## 4. Command Palette Integrations
 
 Access Summar features through Obsidian's Command Palette (Ctrl/Cmd+P):
 
@@ -178,7 +206,7 @@ Access Summar features through Obsidian's Command Palette (Ctrl/Cmd+P):
 - **Result Handling**: Based on command configuration (append to note/copy to clipboard)
 - **Error Handling**: Commands show appropriate error messages for missing API keys or configuration
 
-## 4. File Explorer Integrations
+## 5. File Explorer Integrations
 
 Right-click context menus in Obsidian's file explorer provide direct access to Summar features:
 
@@ -204,7 +232,7 @@ For folders containing audio or webm files:
 - Automatically filters and processes relevant audio files
 - Combines multiple files for comprehensive meeting transcription
 
-## 5. Text Selection Context Menu
+## 6. Text Selection Context Menu
 
 Right-click on selected text in notes to access custom commands:
 
@@ -223,7 +251,7 @@ Right-click on selected text in notes to access custom commands:
 - **Model Availability**: Validates selected AI model availability
 - **Graceful Failure**: Shows descriptive error messages for common issues
 
-## 6. Link Context Menu Integration
+## 7. Link Context Menu Integration
 
 Right-click on links in notes to access web page summarization:
 
@@ -237,7 +265,7 @@ Right-click on links in notes to access web page summarization:
 - **Result Display**: Shows summarization progress and results in SummarView
 - **Error Handling**: Graceful handling of invalid URLs or network issues
 
-## 7. Testing & Development
+## 8. Testing & Development
 
 ### Automated Testing Setup
 

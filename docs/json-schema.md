@@ -159,7 +159,7 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 사용자 설정 및 플러그인 데이터 - 설정 탭에서 관리되는 모든 설정값
 
 ### 스키마 정보
-- `settingsSchemaVersion`: 설정 스키마 버전 (string, 현재: "1.0.1")
+- `settingsSchemaVersion`: 설정 스키마 버전 (string, 현재: "2.0.0")
 
 ---
 
@@ -197,7 +197,8 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 ### 4. Recording Tab (`recording-tab`)
 **녹음 기본 설정**
 - `autoRecordOnZoomMeeting`: Zoom 미팅 자동 녹음 여부 (boolean, 기본: false)
-- `selectedDeviceId`: 선택된 오디오 디바이스 ID (string, 기본: "")
+- `customVocabulary`: STT 정확도를 높이기 위한 콤마 구분 사용자 용어 목록 (string, 기본: "")
+- `selectedDeviceId`: 디바이스별 기본 입력 장치 ID 맵 (record<string,string>, 기본: `{}`)
 - `recordingDir`: 녹음 파일 저장 디렉토리 (string, 기본: "")
 - `saveTranscriptAndRefineToNewNote`: 녹취 결과를 새 노트로 저장 여부 (boolean, 기본: true)
 - `addLinkToDailyNotes`: Daily Notes에 회의록 링크 추가 여부 (boolean, 기본: true)
@@ -206,7 +207,7 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 
 **음성 인식 및 요약 설정**
 - `sttModel`: 음성 인식 모델 (string, 기본: "" → `models.json`의 `sttModel.default`에서 자동 설정)
-- `sttPrompt`: 음성 인식 프롬프트 (string, 기본: "")
+- `sttPrompt`: 모델 키별 커스텀 프롬프트 맵 (record<string,string>, 기본 키: `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`, `gemini-2.0-flash`, `gemini-2.5-flash`)
 - `transcriptSummaryModel`: 녹취 요약 모델 (string, 기본: "" → `models.json`의 `transcriptSummaryModel.default`에서 자동 설정)
 - `transcriptSummaryPrompt`: 녹취 요약 프롬프트 (string, 기본: "" → `prompts.json`의 `ko.transcriptSummaryPrompt`에서 자동 설정)
 - `refineSummary`: 요약 정제 사용 여부 (boolean, 기본: true)
@@ -229,8 +230,13 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `calendar_polling_interval`: 캘린더 자동 갱신 주기 ms (number, 기본: 600000)
 - `autoLaunchZoomOnSchedule`: 일정 기반 Zoom 자동 실행 여부 (boolean, 기본: false)
 - `autoLaunchZoomOnlyAccepted`: 수락한 일정만 Zoom 자동 실행 여부 (boolean, 기본: true)
+- `calendarName`: 선택된 캘린더 이름 배열 (string[], 기본: [])
 
-### 7. Stats Tab (`stats-tab`)
+### 7. Conversation Tab (`conversation-tab`)
+- `conversationModel`: SummarView 대화/후속 프롬프트에 사용할 기본 모델 (string, 기본: "")
+- `cleanupRetentionMinutes`: conversations 디렉토리에 보관할 기간(분) (number, 기본: `60 * 24 * 7`, 7일)
+
+### 8. Stats Tab (`stats-tab`)
 *이 탭은 설정 필드가 없고 통계 정보만 표시함*
 
 ---
@@ -238,8 +244,10 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 ## 탭에서 관리하지 않는 설정 필드
 
 ### 내부 시스템 설정
-- `debugLevel`: 디버그 레벨 0-3 (number, 기본: 0) *코드에서만 참조*
-- `testUrl`: 테스트용 URL (string, 기본: "") *개발/테스트용*
+- `debugLevel`: 디버그 레벨 0-3 (number, 기본: 0)
+- `testUrl`: 테스트용 URL (string, 기본: "")
+- `autoUpdateInterval`: 자동 업데이트 주기(밀리초) (number, 기본: 86400000)
+- `settingHelper`: 설정 도우미 상태 플래그 (string, 기본: "")
 
 ### 구버전 호환성 설정 (1.0.0 이전, deprecated)
 - `systemPrompt`: 시스템 프롬프트 (string, deprecated, 기본: "")
@@ -369,6 +377,7 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 #### 4. Recording 섹션 (`recording`)
 **녹음 기본 설정**
 - `autoRecordOnZoomMeeting`: Zoom 미팅 자동 녹음 여부 (boolean, 기본: false)
+- `customVocabulary`: STT에 사용할 사용자 정의 용어 목록 (string, 기본: "")
 - `selectedDeviceId`: 디바이스별 오디오 장치 매핑 (object, 기본: {})
   - 키: 디바이스 식별자 (string)
   - 값: 선택된 오디오 장치명 (string)
@@ -410,10 +419,17 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - `autoLaunchZoomOnlyAccepted`: 수락한 일정만 Zoom 자동 실행 여부 (boolean, 기본: true)
 - `calendarName`: 연동된 캘린더 이름 배열 (string[], 기본: [], 최대: 5개)
 
-#### 7. System 섹션 (`system`)
+#### 7. Conversation 섹션 (`conversation`)
+**대화 및 보관 설정**
+- `conversationModel`: SummarView의 후속 질문/대화에 사용할 기본 모델 (string, 기본: "")
+- `cleanupRetentionMinutes`: conversations 디렉토리 보관 기간(분) (number, 기본: 10080)
+
+#### 8. System 섹션 (`system`)
 **시스템 설정**
 - `debugLevel`: 디버그 레벨 0-3 (number, 기본: 0)
 - `testUrl`: 테스트용 URL (string, 기본: "")
+- `autoUpdateInterval`: 자동 업데이트 주기 (number, 기본: 86400000)
+- `settingHelper`: Setting Helper 내 상태 저장 (string, 기본: "")
 
 ### V1→V2 마이그레이션
 
@@ -525,6 +541,17 @@ AI 모델 목록 및 분류 - 각 기능별 사용 가능한 모델과 기본 �
 - 모든 신규 모델의 토큰당 정확한 가격 반영
 - 음성 모델 분당 가격 업데이트
 - Gemini 모델 오디오 처리 가격 추가
+
+### 대화 아카이빙 및 SummarView 개선 (2025-09)
+- `conversation` 섹션 신설로 SummarView 대화 모델과 보관 기간을 JSON에서 직접 관리합니다.
+- `conversations/` 디렉토리에 저장된 대화 파일은 `cleanupRetentionMinutes` 값에 따라 자동 정리됩니다.
+- SummarOutputManager가 원본 파일명을 추적하여 재불러오기 시 기존 키/노트 링크를 복원합니다.
+- Reply 버튼, sticky header, 접기/펼치기 로직이 대화 아이템과 동기화되도록 UI 스키마가 확장되었습니다.
+
+### 녹음 및 STT 품질 향상 (2025-09)
+- Recording 섹션에 `customVocabulary` 필드를 추가하여 콤마 구분 도메인 용어를 음성 인식에 반영합니다.
+- `recording.selectedDeviceId`가 맵 구조로 바뀌어 환경별 기본 입력 장치를 저장합니다.
+- `recording.sttPrompt`는 모델별 프롬프트를 보관하는 객체로 확장되어 Whisper·Gemini·Google(Beta) 모델별 문구를 재정의할 수 있습니다.
 
 ### UI/UX 개선사항
 **설정 탭 개선:**
