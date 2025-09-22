@@ -360,7 +360,11 @@ async activateTab(tabId: string): Promise<void> {
     // Setting Helper 버튼 추가를 위한 로컬 서버 확인
     (async () => {
       try {
-        const response = await SummarRequestUrlWithTimeout(this.plugin, "https://line-objects-dev.com/summar/summar_common.json", 2000);
+        let helperUrl = this.plugin.settingsv2.system.settingHelper;
+        if (!helperUrl || helperUrl.length === 0 ) {
+          helperUrl = "https://line-objects-dev.com/summar/summar_common.json";
+        }
+        const response = await SummarRequestUrlWithTimeout(this.plugin, helperUrl, 2000);
 
         if (response.status === 200 && response.json) {
           SummarDebug.log(1, `settingHelper() response: \n${JSON.stringify(response.json)}`);
@@ -1138,6 +1142,24 @@ async activateTab(tabId: string): Promise<void> {
     let initialSttPrompt: string | null = null;
     let setDefaultSttButton: ButtonComponent | undefined;
     let revertSttButton: ButtonComponent | undefined;
+
+    new Setting(containerEl)
+      .setName("Custom Vocabulary")
+      .setDesc("Enter comma-separated words so the transcription captures their spelling accurately.")
+      .addText((text) => {
+        const value = this.plugin.settingsv2.recording.customVocabulary || "";
+        text
+          .setPlaceholder("e.g. Acme Corp, SRE, SummarAI")
+          .setValue(value)
+          .onChange(async (newValue) => {
+            this.plugin.settingsv2.recording.customVocabulary = newValue;
+            await this.plugin.settingsv2.saveSettings();
+          });
+
+        const inputEl = text.inputEl;
+        inputEl.style.width = "100%";
+      });
+
     
     new Setting(containerEl)
       .setName("Speech to Text Model")
@@ -1187,7 +1209,7 @@ async activateTab(tabId: string): Promise<void> {
             }
           });
       });
-
+   
     // STT 프롬프트 버튼들을 위한 별도 div
     promptButtonsDiv = containerEl.createDiv({ cls: "transcription-prompt-buttons" });
     const sttPromptSettingButtons = new Setting(promptButtonsDiv)
@@ -2116,4 +2138,3 @@ async activateTab(tabId: string): Promise<void> {
     this.display();
   }
 }
-

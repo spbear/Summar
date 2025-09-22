@@ -138,10 +138,12 @@ export class PluginSettingsV2 {
     debugLevel: number;
     testUrl: string;
     autoUpdateInterval: number;
+    settingHelper: string;
   } = {
     debugLevel: 0,
     testUrl: "",
-    autoUpdateInterval: 1000 * 60 * 60 * 24 // 24시간 (밀리초)
+    autoUpdateInterval: 1000 * 60 * 60 * 24, // 24시간 (밀리초)
+    settingHelper: ""
   };
 
   constructor(app: App, pluginId: string) {

@@ -9,6 +9,9 @@ export class SettingHelperModal extends Modal {
     private confluenceCheckbox: HTMLInputElement;
     private slackWorkspaceCheckbox: HTMLInputElement;
     private slackApiCheckbox: HTMLInputElement;
+
+    private customVocabularyCheckbox: HTMLInputElement;
+
     private onApply?: () => void;
 
     constructor(plugin: SummarPlugin, helperConfig: SettingHelperConfig, onApply?: () => void) {
@@ -21,6 +24,10 @@ export class SettingHelperModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
+
+        // Ensure modal width accommodates description text on a single line
+        this.modalEl.style.width = "90vw";
+        this.modalEl.style.maxWidth = "780px";
 
         // 모달 제목 설정
         contentEl.createEl("h2", { text: "Setting Helper" });
@@ -39,7 +46,7 @@ export class SettingHelperModal extends Modal {
             settingsInfo.style.marginLeft = "20px";
             settingsInfo.style.fontSize = "1.0em"; // 0.9em에서 1.0em으로 증가
             
-            const { common } = this.helperConfig;
+            const { common, recording } = this.helperConfig;
             
             // OpenAI API Endpoint URL
             const openaiDiv = settingsInfo.createEl("div");
@@ -144,6 +151,36 @@ export class SettingHelperModal extends Modal {
             slackAppNoticeDiv.style.fontSize = "0.85em";
             slackAppNoticeDiv.style.color = "var(--text-muted)";
             slackAppNoticeDiv.innerHTML = `Note: Add the Slack app to your target channel first. See help link above.`;
+
+
+            // Custom Vocabulary
+            const customVocabularyDiv = settingsInfo.createEl("div");
+            customVocabularyDiv.style.marginBottom = "8px";
+            customVocabularyDiv.style.display = "flex";
+            customVocabularyDiv.style.alignItems = "flex-start";
+            this.customVocabularyCheckbox = customVocabularyDiv.createEl("input", { type: "checkbox" });
+            this.customVocabularyCheckbox.style.marginRight = "8px";
+            this.customVocabularyCheckbox.checked = true;
+            const customVocabularyLabel = customVocabularyDiv.createEl("label");
+            customVocabularyLabel.style.cursor = "pointer";
+            customVocabularyLabel.style.display = "inline-block";
+            customVocabularyLabel.style.flex = "1";
+            customVocabularyLabel.style.whiteSpace = "normal";
+            customVocabularyLabel.style.wordBreak = "break-word";
+            customVocabularyLabel.innerHTML = `Custom Transcription Vocabulary:<br /><span style="color: var(--text-accent)">${recording.customVocabulary || 'N/A'}</span>`;
+            // 라벨 클릭 시 체크박스 토글
+            customVocabularyLabel.addEventListener("click", () => {
+                this.customVocabularyCheckbox.checked = !this.customVocabularyCheckbox.checked;
+            });
+            
+            // customVocabulary PAT 링크 (customVocabulary 아래에 추가)
+            const customVocabularyDesc = settingsInfo.createEl("div");
+            customVocabularyDesc.style.marginBottom = "8px";
+            customVocabularyDesc.style.marginLeft = "23px"; // 체크박스 너비(14px) + 마진(8px) = 22px로 정렬
+            customVocabularyDesc.style.fontSize = "0.9em"; // 0.85em에서 0.9em으로 증가
+            customVocabularyDesc.style.color = "var(--text-muted)";
+            customVocabularyDesc.innerHTML = `Comma-separated word list to ensure clear recognition and accurate spelling while transcribing.`;
+            
         }
 
         // 버튼 영역
@@ -188,7 +225,7 @@ export class SettingHelperModal extends Modal {
         try {
             if (!this.helperConfig.common) return;
 
-            const { common } = this.helperConfig;
+            const { common, recording } = this.helperConfig;
             let appliedCount = 0;
             
             // 선택된 설정값들만 플러그인 설정에 적용
@@ -206,6 +243,10 @@ export class SettingHelperModal extends Modal {
             }
             if (this.slackApiCheckbox?.checked && common.slackApiDomain) {
                 this.plugin.settingsv2.common.slackApiDomain = common.slackApiDomain;
+                appliedCount++;
+            }
+            if (this.customVocabularyCheckbox?.checked && recording.customVocabulary) {
+                this.plugin.settingsv2.recording.customVocabulary = recording.customVocabulary;
                 appliedCount++;
             }
 

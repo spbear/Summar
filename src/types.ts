@@ -125,6 +125,9 @@ export interface SettingHelperConfig {
         slackApiDomain: string;
         slackApiProxyDoc: string;
     };
+    recording: {
+        customVocabulary: string;
+    }
 }
 
 // export type PromptCategory = 'webPrompt' | 'pdfPrompt' | 'sttPrompt' | 'transcriptSummaryPrompt' | 'refineSummaryPrompt';
