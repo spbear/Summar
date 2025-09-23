@@ -1,4 +1,4 @@
-import { Platform, setIcon, normalizePath, MarkdownView } from "obsidian";
+import { Platform, setIcon, normalizePath, MarkdownView, Menu } from "obsidian";
 import { createOutputHeader, createOutputHeaderButtons, getDefaultLabelIcon, setHeaderHighlight as applyHeaderHighlight, clearHeaderHighlight as resetHeaderHighlight } from "./SummarHeader";
 import { ISummarOutputManager, ISummarViewContext, SummarOutputRecord, SummarViewEvents } from "./SummarViewTypes";
 import { getFileBaseName, SummarDebug } from "../globals";
@@ -242,6 +242,7 @@ export class SummarOutputManager implements ISummarOutputManager {
             const cleaned = this.cleanupMarkdownOutput(rendered);
             const enhanced = this.enhanceCodeBlocks(cleaned);
             targetItem.innerHTML = enhanced;
+            targetItem.dataset.rawText = newText;
             
             SummarDebug.log(1, `Conversation updated for key: ${key}, globalIndex: ${targetIndex}, role: ${targetRole}, domIndex: ${conversationTypeCount}`);
             return true;
@@ -271,6 +272,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     conversationDiv.className = 'conversation-item';
     conversationDiv.setAttribute('data-role', role);
     conversationDiv.setAttribute('data-key', key);
+    conversationDiv.dataset.rawText = text;
     
     // createOutputText() 참고한 스타일 설정
     conversationDiv.style.width = '100%';
@@ -304,6 +306,8 @@ export class SummarOutputManager implements ISummarOutputManager {
     const cleaned = this.cleanupMarkdownOutput(rendered);
     const enhanced = this.enhanceCodeBlocks(cleaned);
     conversationDiv.innerHTML = enhanced;
+
+    this.attachCopyContextMenu(conversationDiv, () => conversationDiv.dataset.rawText || '');
 
     // itemEl에 appendChild
     rec.itemEl.appendChild(conversationDiv);
@@ -1055,6 +1059,7 @@ export class SummarOutputManager implements ISummarOutputManager {
     
     // 텍스트 선택 이벤트 설정
     this.setupTextSelectionEvents(outputText);
+    this.attachCopyContextMenu(outputText, () => this.getOutput(key));
     
     return outputText;
   }
@@ -1144,6 +1149,51 @@ export class SummarOutputManager implements ISummarOutputManager {
         
         this.context.timeoutRefs.add(timeoutId);
       }
+    }, { signal });
+  }
+
+  private attachCopyContextMenu(element: HTMLElement, getFallbackText: () => string): void {
+    const signal = this.context.abortController.signal;
+
+    element.addEventListener('contextmenu', (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const menu = new Menu();
+      menu.addItem((item) => {
+        item.setTitle('Copy');
+
+        item.onClick(async () => {
+          let textToCopy = '';
+
+          try {
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed) {
+              const anchorNode = selection.anchorNode;
+              const focusNode = selection.focusNode;
+              if (anchorNode && focusNode && element.contains(anchorNode) && element.contains(focusNode)) {
+                textToCopy = selection.toString();
+              }
+            }
+          } catch (_error) {
+            // Selection inspection can fail on some platforms; fall back to element text
+          }
+
+          if (!textToCopy) {
+            textToCopy = getFallbackText() || '';
+          }
+
+          try {
+            await navigator.clipboard.writeText(textToCopy);
+            SummarDebug.Notice(1, 'Content copied to clipboard');
+          } catch (error) {
+            SummarDebug.error(1, 'Error copying to clipboard:', error);
+            SummarDebug.Notice(0, 'Failed to copy content to clipboard');
+          }
+        });
+      });
+
+      menu.showAtMouseEvent(event);
     }, { signal });
   }
 
