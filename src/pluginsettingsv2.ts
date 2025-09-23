@@ -168,7 +168,12 @@ export class PluginSettingsV2 {
       confluenceDomain: "",
       confluenceParentPageUrl: "",
       confluenceParentPageSpaceKey: "",
-      confluenceParentPageId: ""
+      confluenceParentPageId: "",
+      useSlackAPI: false,
+      slackBotToken: "",
+      slackChannelId: "",
+      slackWorkspaceDomain: "",
+      slackApiDomain: ""
     });
 
     // Web 섹션 초기화
@@ -186,6 +191,7 @@ export class PluginSettingsV2 {
     // Recording 섹션 초기화
     Object.assign(this.recording, {
       autoRecordOnZoomMeeting: false,
+      customVocabulary: "",
       selectedDeviceId: {},
       recordingDir: "",
       saveTranscriptAndRefineToNewNote: true,
@@ -193,7 +199,12 @@ export class PluginSettingsV2 {
       recordingUnit: 15,
       recordingLanguage: "ko-KR",
       sttModel: "",
-      sttPrompt: {},
+      sttPrompt: {
+        "gpt-4o-transcribe": "",
+        "gpt-4o-mini-transcribe": "",
+        "gemini-2.0-flash": "",
+        "gemini-2.5-flash": ""
+      },
       transcriptSummaryModel: "",
       transcriptSummaryPrompt: "",
       refineSummary: true,
@@ -215,10 +226,18 @@ export class PluginSettingsV2 {
       calendarName: []
     });
 
+    // Conversation 섹션 초기화
+    Object.assign(this.conversation, {
+      conversationModel: "",
+      cleanupRetentionMinutes: 60 * 24 * 7
+    });
+
     // System 섹션 초기화
     Object.assign(this.system, {
       debugLevel: 0,
-      testUrl: ""
+      testUrl: "",
+      autoUpdateInterval: 1000 * 60 * 60 * 24,
+      settingHelper: ""
     });
   }
 
