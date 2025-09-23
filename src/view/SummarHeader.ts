@@ -141,7 +141,7 @@ export function getDefaultLabelIcon(label: string): string {
   if (/(note|memo)/.test(l)) return 'file';
   if (/(wiki|confluence)/.test(l)) return 'book';
   if (/(slack)/.test(l)) return 'hash';
-  if (/(chat|composer|compose prompt)/.test(l)) return 'message-square-more';
+  if (/(chat|composer|compose prompt|conversation)/.test(l)) return 'message-square';
   if (/(summary)/.test(l)) return 'clipboard-list';
   if (/(refinement)/.test(l)) return 'clipboard-check';
   if (/(custom)/.test(l)) return 'pocket-knife';
