@@ -3,6 +3,13 @@ import { TextDecoder, TextEncoder } from 'util';
 import { AudioHandler } from '../../src/audiohandler';
 import { mockApp, mockPlugin } from '../setup';
 
+function toArrayBuffer(text: string): ArrayBuffer {
+  const encoded = new TextEncoder().encode(text);
+  const buffer = new ArrayBuffer(encoded.length);
+  new Uint8Array(buffer).set(encoded);
+  return buffer;
+}
+
 class TestBlob {
   private parts: BlobPart[];
   type: string;
@@ -30,7 +37,7 @@ class TestBlob {
 
   async arrayBuffer(): Promise<ArrayBuffer> {
     const text = await this.text();
-    return new TextEncoder().encode(text).buffer;
+    return toArrayBuffer(text);
   }
 }
 
@@ -290,7 +297,7 @@ describe('AudioHandler custom vocabulary integration', () => {
     } as any;
   };
 
-  const createHandler = (overrides?: Partial<{
+const createHandler = (overrides?: Partial<{
     sttModel: string;
     customVocabulary: string;
     sttPrompt: Record<string, string>;
@@ -302,7 +309,7 @@ describe('AudioHandler custom vocabulary integration', () => {
   };
 
   const createAudioBlob = () => ({
-    arrayBuffer: async () => new TextEncoder().encode('audio data').buffer,
+    arrayBuffer: async () => toArrayBuffer('audio data'),
   }) as unknown as Blob;
 
   test('includes custom vocabulary as prompt for whisper-1 model', async () => {
