@@ -148,9 +148,6 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
       const buttonId = button.getAttribute('button-id');
       
       switch (buttonId) {
-        case 'fetch-button':
-          await this.handleFetchClick();
-          break;
         case 'pdf-button':
           await this.handlePdfClick();
           break;
@@ -162,22 +159,6 @@ export class SummarContainerEventHandler implements ISummarEventHandler {
           break;
       }
     }, { signal: this.context.abortController.signal });
-  }
-
-  private async handleFetchClick(): Promise<void> {
-    const urlInputField = this.context.plugin.urlInputField;
-    if (!urlInputField) {
-      SummarDebug.Notice(0, "Input field not found.");
-      return;
-    }
-    
-    const url = urlInputField.value.trim();
-    if (!url) {
-      SummarDebug.Notice(0, "Please enter a valid URL.");
-      return;
-    }
-    
-    this.context.plugin.confluenceHandler.fetchAndSummarize(url);
   }
 
   private async handlePdfClick(): Promise<void> {
