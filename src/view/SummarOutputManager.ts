@@ -1152,6 +1152,108 @@ export class SummarOutputManager implements ISummarOutputManager {
     }, { signal });
   }
 
+  private deleteConversation(element: HTMLElement): void {
+    const outputKey = element.getAttribute('data-key');
+    const role = element.getAttribute('data-role');
+
+    if (!outputKey || !role) {
+      SummarDebug.error(1, 'Missing data-key or data-role attribute');
+      return;
+    }
+
+    const rec = this.context.outputRecords.get(outputKey);
+    if (!rec || !rec.itemEl) {
+      SummarDebug.error(1, 'Output record not found');
+      return;
+    }
+
+    // Find all conversation-item elements in DOM
+    const conversationItems = rec.itemEl.querySelectorAll('.conversation-item');
+    const domIndex = Array.from(conversationItems).indexOf(element as Element);
+
+    if (domIndex === -1) {
+      SummarDebug.error(1, 'Conversation item not found in DOM');
+      return;
+    }
+
+    // Map DOM index to conversations array index (only CONVERSATION type)
+    let conversationTypeCount = 0;
+    let targetGlobalIndex = -1;
+
+    for (let i = 0; i < rec.conversations.length; i++) {
+      if (rec.conversations[i].type === SummarAIParamType.CONVERSATION) {
+        if (conversationTypeCount === domIndex) {
+          targetGlobalIndex = i;
+          break;
+        }
+        conversationTypeCount++;
+      }
+    }
+
+    if (targetGlobalIndex === -1) {
+      SummarDebug.error(1, 'Conversation not found in array');
+      return;
+    }
+
+    // Determine indices to delete
+    let startIndex: number;
+    let deleteCount: number;
+    let domStartIndex: number;
+    let domDeleteCount: number;
+
+    if (role === 'user') {
+      // Delete current (user) + next (assistant if exists)
+      startIndex = targetGlobalIndex;
+      domStartIndex = domIndex;
+
+      // Check if next item exists and is assistant
+      const hasNextAssistant =
+        targetGlobalIndex + 1 < rec.conversations.length &&
+        rec.conversations[targetGlobalIndex + 1].type === SummarAIParamType.CONVERSATION &&
+        rec.conversations[targetGlobalIndex + 1].role === 'assistant';
+
+      deleteCount = hasNextAssistant ? 2 : 1;
+      domDeleteCount = hasNextAssistant ? 2 : 1;
+
+    } else if (role === 'assistant') {
+      // Delete previous (user) + current (assistant)
+      if (targetGlobalIndex === 0) {
+        SummarDebug.error(1, 'Cannot delete assistant without preceding user');
+        return;
+      }
+
+      // Check if previous item is user
+      const hasPrevUser =
+        rec.conversations[targetGlobalIndex - 1].type === SummarAIParamType.CONVERSATION &&
+        rec.conversations[targetGlobalIndex - 1].role === 'user';
+
+      if (!hasPrevUser) {
+        SummarDebug.error(1, 'Previous item is not a user message');
+        return;
+      }
+
+      startIndex = targetGlobalIndex - 1;
+      deleteCount = 2;
+      domStartIndex = domIndex - 1;
+      domDeleteCount = 2;
+
+    } else {
+      SummarDebug.error(1, 'Invalid role: ' + role);
+      return;
+    }
+
+    // Delete from conversations array
+    rec.conversations.splice(startIndex, deleteCount);
+
+    // Delete from DOM
+    for (let i = 0; i < domDeleteCount; i++) {
+      const itemToRemove = conversationItems[domStartIndex + i];
+      itemToRemove?.remove();
+    }
+
+    SummarDebug.Notice(1, 'Conversation deleted');
+  }
+
   private attachCopyContextMenu(element: HTMLElement, getFallbackText: () => string): void {
     const signal = this.context.abortController.signal;
 
@@ -1230,10 +1332,10 @@ ${formattedHtml}
 
       if (element.classList.contains('conversation-item')) {
         menu.addItem((item) => {
-          item.setTitle('Delete content');
+          item.setTitle('Delete conversation');
 
           item.onClick(() => {
-            SummarDebug.Notice(1, 'Delete content');
+            this.deleteConversation(element);
           });
         });
       }
