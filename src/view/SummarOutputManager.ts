@@ -1161,7 +1161,7 @@ export class SummarOutputManager implements ISummarOutputManager {
 
       const menu = new Menu();
       menu.addItem((item) => {
-        item.setTitle('Copy');
+        item.setTitle('Copy markdown');
 
         item.onClick(async () => {
           let textToCopy = '';
@@ -1185,13 +1185,58 @@ export class SummarOutputManager implements ISummarOutputManager {
 
           try {
             await navigator.clipboard.writeText(textToCopy);
-            SummarDebug.Notice(1, 'Content copied to clipboard');
+            SummarDebug.Notice(1, 'Markdown copied to clipboard');
           } catch (error) {
-            SummarDebug.error(1, 'Error copying to clipboard:', error);
-            SummarDebug.Notice(0, 'Failed to copy content to clipboard');
+            SummarDebug.error(1, 'Error copying markdown to clipboard:', error);
+            SummarDebug.Notice(0, 'Failed to copy markdown to clipboard');
           }
         });
       });
+
+      menu.addItem((item) => {
+        item.setTitle('Copy formatted contents');
+
+        item.onClick(async () => {
+          try {
+            const formattedHtml = element.innerHTML;
+            const plainText = element.innerText || element.textContent || '';
+
+            // Slack과 다른 앱들이 인식할 수 있도록 완전한 HTML 문서 구조 제공
+            const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+</head>
+<body>
+${formattedHtml}
+</body>
+</html>`;
+
+            const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
+            const textBlob = new Blob([plainText], { type: 'text/plain' });
+
+            const clipboardItem = new ClipboardItem({
+              'text/html': htmlBlob,
+              'text/plain': textBlob
+            });
+            await navigator.clipboard.write([clipboardItem]);
+            SummarDebug.Notice(1, 'Formatted content copied to clipboard');
+          } catch (error) {
+            SummarDebug.error(1, 'Error copying formatted content to clipboard:', error);
+            SummarDebug.Notice(0, 'Failed to copy formatted content to clipboard');
+          }
+        });
+      });
+
+      if (element.classList.contains('conversation-item')) {
+        menu.addItem((item) => {
+          item.setTitle('Delete content');
+
+          item.onClick(() => {
+            SummarDebug.Notice(1, 'Delete content');
+          });
+        });
+      }
 
       menu.showAtMouseEvent(event);
     }, { signal });
