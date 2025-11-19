@@ -10,9 +10,6 @@
         "gpt-5-mini": "gpt-5-mini",
         "gpt-5-nano": "gpt-5-nano",
         "gpt-5.1": "gpt-5.1",
-        "gpt-5.1-chat-latest": "gpt-5.1-chat-latest",
-        "gpt-5.1-codex": "gpt-5.1-codex",
-        "gpt-5.1-codex-mini": "gpt-5.1-codex-mini",
         "o1-mini": "o1-mini",
         "o3-mini": "o3-mini",
         "gemini-2.0-flash": "gemini-2.0-flash",
@@ -28,10 +25,7 @@
         "gpt-5": "gpt-5",
         "gpt-5-mini": "gpt-5-mini",
         "gpt-5-nano": "gpt-5-nano",
-        "gpt-5.1": "gpt-5.1",
-        "gpt-5.1-chat-latest": "gpt-5.1-chat-latest",
-        "gpt-5.1-codex": "gpt-5.1-codex",
-        "gpt-5.1-codex-mini": "gpt-5.1-codex-mini"
+        "gpt-5.1": "gpt-5.1"
       }
     },
     "sttModel": {
@@ -54,9 +48,6 @@
         "gpt-5-mini": "gpt-5-mini",
         "gpt-5-nano": "gpt-5-nano",
         "gpt-5.1": "gpt-5.1",
-        "gpt-5.1-chat-latest": "gpt-5.1-chat-latest",
-        "gpt-5.1-codex": "gpt-5.1-codex",
-        "gpt-5.1-codex-mini": "gpt-5.1-codex-mini",
         "o1-mini": "o1-mini",
         "o3-mini": "o3-mini",
         "gemini-2.0-flash": "gemini-2.0-flash",
@@ -73,9 +64,6 @@
         "gpt-5-mini": "gpt-5-mini",
         "gpt-5-nano": "gpt-5-nano",
         "gpt-5.1": "gpt-5.1",
-        "gpt-5.1-chat-latest": "gpt-5.1-chat-latest",
-        "gpt-5.1-codex": "gpt-5.1-codex",
-        "gpt-5.1-codex-mini": "gpt-5.1-codex-mini",
         "o1-mini": "o1-mini",
         "o3-mini": "o3-mini",
         "gemini-2.0-flash": "gemini-2.0-flash",
