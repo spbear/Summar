@@ -258,25 +258,45 @@ export class SummarAI extends SummarViewContainer {
             body: bodyContent,
             throw: false
           });
-          SummarDebug.log(1, `SummarAI.audioTranscription() response: \n${JSON.stringify(response.json)}`);
-          // SummarDebug.log(1, `OpenAI model: ${this.aiModel}, feature: ${this.feature}, duration: ${duration}`);
+          // JSON 파싱 시도
+          let jsonData;
+          try {
+            jsonData = response.json;
+            SummarDebug.log(1, `SummarAI.audioTranscription() response: \n${JSON.stringify(jsonData)}`);
+          } catch (error) {
+            // JSON 파싱 실패 시 원본 텍스트로 에러 생성
+            const errMsg = response.text || 'Empty response';
+            const err: any = new Error(`[HTTP ${response.status}] Failed to parse JSON response: ${errMsg.substring(0, 200)}`);
+            err.status = response.status;
+            err.statusCode = response.status;
+            throw err;
+          }
 
-          if (response && response.json) {
+          if (response && jsonData) {
             this.response.status = response.status;
-            this.response.json = response.json;
-            if (response.json.text) {
-              this.response.text = response.json.text.trim();
-              if (response.json.duration) {
-                duration = response.json.duration;
+            this.response.json = jsonData;
+
+            // HTTP 에러 상태 코드 체크
+            if (response.status >= 400) {
+              const errorMsg = jsonData.error?.message || jsonData.message || 'Unknown error';
+              const error: any = new Error(`[HTTP ${response.status}] ${errorMsg}`);
+              error.status = response.status;
+              error.statusCode = response.status;
+              error.response = jsonData;
+              throw error;
+            }
+            if (jsonData.text) {
+              this.response.text = jsonData.text.trim();
+              if (jsonData.duration) {
+                duration = jsonData.duration;
               }
-              // trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true, "", duration);
               const statsid: string = (await trackapi.logAPICall({
                 provider: 'openai',
                 model: this.aiModel,
                 endpoint: 'audio/transcription',
                 feature: this.feature,
                 requestData: bodyContent,
-                responseData: response.json,
+                responseData: jsonData,
                 duration: duration,
               })) || '';
               this.response.statsId = statsid;
@@ -286,15 +306,14 @@ export class SummarAI extends SummarViewContainer {
               }
             }
             else {
-              this.response.text = response.json.error ? response.json.error.message : 'No content available';
-              // trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, false, this.response.text, duration);
+              this.response.text = jsonData.error ? jsonData.error.message : 'No content available';
               const statsid: string = (await trackapi.logAPICall({
                 provider: 'openai',
                 model: this.aiModel,
                 endpoint: 'audio/transcription',
                 feature: this.feature,
                 requestData: bodyContent,
-                responseData: response.json,
+                responseData: jsonData,
                 success: false,
                 errorMessage: this.response.text,
                 duration: duration,
@@ -306,9 +325,8 @@ export class SummarAI extends SummarViewContainer {
               }
             }
           }
-//          trackapi.logAPICall('openai', this.aiModel, 'audio/transcription', this.feature, bodyContent, response.json, true);
 
-          return response.json;
+          return jsonData;
 
         }
       }
