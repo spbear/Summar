@@ -8,6 +8,7 @@ import { SlackAPI } from "./slackapi";
 import { SummarStatsModal } from "./summarstatsmodal";
 import { SettingHelperConfig } from "./types";
 import { SettingHelperModal } from "./settinghelper";
+import { FolderSuggest } from "./foldersuggest";
 
 export class SummarSettingsTab extends PluginSettingTab {
   plugin: SummarPlugin;
@@ -1056,16 +1057,18 @@ async activateTab(tabId: string): Promise<void> {
       });
 
     new Setting(containerEl)
-      .setName("Temporary folder")
+      .setName("Audio recording & Transcription folder")
       .setDesc("Specify the path in the vault where to save the audio files and the transcription files")
       .addText((text) => {
         text
-          .setPlaceholder("Specify temporary folder")
+          .setPlaceholder("Browse folders or type path")
           .setValue(this.plugin.settingsv2.recording.recordingDir || "")
           .onChange(async (value) => {
             this.plugin.settingsv2.recording.recordingDir = value;
             await this.plugin.settingsv2.saveSettings();
           });
+
+        new FolderSuggest(this.app, text.inputEl);
 
         const textAreaEl = text.inputEl;
         textAreaEl.style.width = "100%";
