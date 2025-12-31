@@ -252,7 +252,23 @@ export class AudioRecordingManager extends SummarViewContainer {
 		}
 
 		SummarDebug.log(1, `recordingDir: ${this.plugin.settingsv2.recording.recordingDir}`);
-		this.recordingPath = normalizePath(this.plugin.settingsv2.recording.recordingDir + "/" + this.timeStamp + folderSuffix);
+
+		// 날짜별 폴더 구조 생성 옵션이 활성화된 경우
+		let basePath = this.plugin.settingsv2.recording.recordingDir;
+		if (this.plugin.settingsv2.recording.organizeByDate) {
+			const now = new Date();
+			const year = now.getFullYear();
+			const month = String(now.getMonth() + 1).padStart(2, '0');
+			const day = String(now.getDate()).padStart(2, '0');
+			const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+			const dayName = dayNames[now.getDay()];
+
+			// YYYY/YYYY-MM/YYYY-MM-DD (Day) 형식으로 폴더 구조 생성
+			const datePath = `${year}/${year}-${month}/${year}-${month}-${day} (${dayName})`;
+			basePath = normalizePath(basePath + "/" + datePath);
+		}
+
+		this.recordingPath = normalizePath(basePath + "/" + this.timeStamp + folderSuffix);
 		await this.plugin.app.vault.adapter.mkdir(this.recordingPath);
 		SummarDebug.log(1,`recordingPath: ${this.recordingPath}`);
 

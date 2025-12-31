@@ -1074,6 +1074,15 @@ async activateTab(tabId: string): Promise<void> {
         textAreaEl.style.width = "100%";
       });
 
+    new Setting(containerEl)
+      .setName("Organize recordings by date")
+      .setDesc("Automatically organize recordings into year/month/day subfolders")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settingsv2.recording.organizeByDate).onChange(async (value) => {
+          this.plugin.settingsv2.recording.organizeByDate = value;
+          await this.plugin.settingsv2.saveSettings();
+        }));
+
       new Setting(containerEl)
       .setName("Save to a New Note")
       .setDesc("Enable this toggle button to save the summary results to a new note.")

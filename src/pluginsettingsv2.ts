@@ -72,6 +72,7 @@ export class PluginSettingsV2 {
     customVocabulary: string;
     selectedDeviceId: { [deviceKey: string]: string };
     recordingDir: string;
+    organizeByDate: boolean;
     saveTranscriptAndRefineToNewNote: boolean;
     addLinkToDailyNotes: boolean;
     recordingUnit: number;
@@ -87,6 +88,7 @@ export class PluginSettingsV2 {
     customVocabulary: "",
     selectedDeviceId: {},
     recordingDir: "",
+    organizeByDate: false,
     saveTranscriptAndRefineToNewNote: true,
     addLinkToDailyNotes: true,
     recordingUnit: 15,
