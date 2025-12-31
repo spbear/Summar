@@ -395,15 +395,15 @@ export class AudioRecordingManager extends SummarViewContainer {
 
 	private async saveFile(blob: Blob, fileName: string): Promise<void> {
 		// webm 파일이면 duration 메타데이터를 삽입
-		if ((Platform.isMacOS && Platform.isDesktopApp) &&
-			fileName.toLowerCase().endsWith('.webm')) {
+		if (fileName.toLowerCase().endsWith('.webm')) {
 			try {
-				const fixWebmDuration = (await import("webm-duration-fix/lib/index.js")).default;
-				const fixedBlob = await fixWebmDuration(blob);
+				const ysFixWebmDuration = (await import("fix-webm-duration")).default;
+				// duration을 밀리초 단위로 전달
+				const fixedBlob = await ysFixWebmDuration(blob, this.elapsedTime, { logger: false });
 				blob = fixedBlob;
-				SummarDebug.log(1, `webm-duration-fix applied to: ${fileName}`);
+				SummarDebug.log(1, `fix-webm-duration applied to: ${fileName} (duration: ${this.elapsedTime}ms)`);
 			} catch (e) {
-				SummarDebug.error(1, `webm-duration-fix failed for: ${fileName}`, e);
+				SummarDebug.error(1, `fix-webm-duration failed for: ${fileName}`, e);
 			}
 		}
 
